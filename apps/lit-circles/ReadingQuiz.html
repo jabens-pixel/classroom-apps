@@ -1,0 +1,296 @@
+<!-- ======================================================================
+     Literature Circles — Reading Quiz, student side (release 2026-10-18b)
+     Rides along with BackendClient (LC_INCLUDE_WITH in Code.gs), so Index.html didn't change.
+     - Week hub: a "Reading Quiz" card between Step 2 and Step 3 when the group has a quiz.
+     - The quiz page (state.view = 'week_quiz'): one question at a time from the server. The
+       answer key never comes to this page; it is checked on the server.
+     - While a question is on screen: copying, selecting and right-click are off, and leaving the
+       quiz (switching tab, clicking out of the window for more than a moment, leaving the page
+       inside the app, or reloading) locks that question and is logged for the teacher.
+     The teacher's tile, results and quiz builder live in BackendClient.html; the server in Quiz.js.
+     ====================================================================== -->
+<style id="lcQuizStyles">
+.journey-step-grid.has-quiz{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.journey-step.lc-quiz-step{grid-column:1 / -1;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px 22px}
+.journey-step.lc-quiz-step .step-no{grid-row:1 / span 2}
+.journey-step.lc-quiz-step h3{margin:0!important}
+.journey-step.lc-quiz-step p{margin:0!important;grid-column:2}
+.journey-step.lc-quiz-step .step-status{position:static!important;grid-column:3;grid-row:1;justify-self:end}
+.journey-step.lc-quiz-step .step-action{grid-column:3;grid-row:2;justify-self:end;white-space:nowrap}
+.lc-quiz-step .step-no.lc-q{font-size:20px!important}
+.lc-quiz-live{display:inline-block;padding:4px 10px;background:var(--rr-lime,#E9FE5F);color:var(--rr-ink,#111);font:800 12px var(--rr-body,Roboto,Arial,sans-serif);text-transform:uppercase;letter-spacing:.06em}
+@media(max-width:640px){.journey-step-grid.has-quiz{grid-template-columns:1fr!important}}
+@media(max-width:820px){.journey-step.lc-quiz-step{grid-template-columns:auto 1fr}.journey-step.lc-quiz-step .step-status,.journey-step.lc-quiz-step .step-action{grid-column:1 / -1;grid-row:auto;justify-self:start}.journey-step.lc-quiz-step p{grid-column:1 / -1}}
+.lc-quiz{max-width:860px;margin:0 auto}
+.lc-quiz .card{padding:30px 34px!important}
+.lc-quiz-lock,.lc-quiz-lock *{-webkit-user-select:none!important;user-select:none!important;-webkit-touch-callout:none!important}
+.lc-quiz-top{display:flex;justify-content:space-between;align-items:baseline;gap:12px;flex-wrap:wrap}
+.lc-quiz h2{margin:4px 0 6px}
+.lc-quiz .lc-quiz-sub{margin:0 0 18px;color:var(--rr-muted,#454545);font-size:15px}
+.lc-quiz-rules{margin:14px 0 22px;padding:0;list-style:none;display:grid;gap:10px}
+.lc-quiz-rules li{position:relative;padding:12px 14px 12px 44px;background:var(--rr-chip,#EEEEEA);font-size:15px;line-height:1.5;color:var(--rr-ink,#111)}
+.lc-quiz-rules li:before{content:attr(data-n);position:absolute;left:12px;top:11px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;background:var(--rr-ink,#111);color:#fff;font:800 12px var(--rr-body,Roboto,Arial,sans-serif)}
+.lc-quiz-progress{display:flex;gap:5px;margin:4px 0 18px}
+.lc-quiz-progress span{flex:1;height:6px;background:var(--rr-rule,#E3E3DF)}
+.lc-quiz-progress span.is-done{background:var(--rr-ink,#111)}
+.lc-quiz-progress span.is-now{background:var(--rr-lime,#E9FE5F);box-shadow:inset 0 0 0 1px var(--rr-ink,#111)}
+.lc-quiz-count{font:800 13px var(--rr-body,Roboto,Arial,sans-serif);text-transform:uppercase;letter-spacing:.08em;color:var(--rr-muted,#454545)}
+.lc-quiz-q{margin:0 0 18px;font:700 24px/1.3 var(--rr-display,'Roboto Condensed',Arial,sans-serif);color:var(--rr-ink,#111)}
+.lc-quiz-choices{display:grid;gap:10px;margin:0 0 20px}
+.lc-quiz button.lc-quiz-choice{clip-path:none!important;display:flex;align-items:flex-start;gap:14px;width:100%;margin:0;padding:14px 16px;text-align:left;background:#fff!important;color:var(--rr-ink,#111)!important;border:2px solid var(--rr-rule,#E3E3DF)!important;border-radius:0;font:500 17px/1.4 var(--rr-body,Roboto,Arial,sans-serif)!important;text-transform:none!important;letter-spacing:0!important;box-shadow:none!important;cursor:pointer}
+.lc-quiz button.lc-quiz-choice:hover{border-color:var(--rr-ink,#111)!important}
+.lc-quiz button.lc-quiz-choice[aria-checked=true]{border-color:var(--rr-ink,#111)!important;background:var(--rr-lime,#E9FE5F)!important}
+.lc-quiz-letter{flex:0 0 28px;height:28px;display:flex;align-items:center;justify-content:center;background:var(--rr-ink,#111);color:#fff;font:800 14px var(--rr-body,Roboto,Arial,sans-serif)}
+.lc-quiz-actions{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.lc-quiz-note{margin:14px 0 0;padding:10px 12px;font-size:14px;line-height:1.5;background:var(--rr-warn-bg,#FFF1D6);color:var(--rr-warn,#8A5200)}
+.lc-quiz-note.is-bad{background:var(--rr-bad-bg,#FBEAE8);color:var(--rr-bad,#B0281F)}
+.lc-quiz-note.is-ok{background:var(--rr-ok-bg,#E6F2EA);color:var(--rr-ok,#1D6B47)}
+.lc-quiz-leave{margin-top:26px;padding-top:14px;border-top:1px solid var(--rr-rule,#E3E3DF);font-size:13.5px;color:var(--rr-muted,#454545)}
+.lc-quiz-leave button{margin-left:8px}
+.lc-quiz-score{display:flex;align-items:baseline;gap:10px;margin:6px 0 18px}
+.lc-quiz-score b{font:800 54px/1 var(--rr-display,'Roboto Condensed',Arial,sans-serif)}
+.lc-quiz-score span{font-size:18px;color:var(--rr-muted,#454545)}
+.lc-quiz-review{list-style:none;margin:0;padding:0;display:grid;gap:12px}
+.lc-quiz-review li{padding:14px 16px;border:2px solid var(--rr-rule,#E3E3DF)}
+.lc-quiz-review li.is-right{border-color:#9fd1b3}
+.lc-quiz-review li.is-wrong{border-color:#efc7c1}
+.lc-quiz-review .q{margin:0 0 8px;font-weight:700;font-size:16px}
+.lc-quiz-review .a{margin:0;font-size:15px;line-height:1.5}
+.lc-quiz-review .why{margin:6px 0 0;font-size:14px;color:var(--rr-muted,#454545)}
+.lc-quiz-wait{display:flex;align-items:center;gap:10px;color:var(--rr-muted,#454545)}
+</style>
+<script>
+window.__MB = window.__MB || {};
+window.__MB.ReadingQuiz = 'loading';
+(function () {
+  'use strict';
+  var W = window;
+  if (typeof W.render !== 'function' || typeof W.viewWeek !== 'function') { W.__MB.ReadingQuiz = 'error: Index.html did not load first'; return; }
+  function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function $(id) { return document.getElementById(id); }
+  var SESSION = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); // this page, this load
+  var Q = W.LC_QUIZ = { view: null, busy: false, pick: -1, away: null, brief: [], statusAt: {}, statusBusy: {}, wk: 0, err: '' };
+
+  function rpc(name, arg) {
+    return new Promise(function (resolve, reject) {
+      try { W.google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[name](arg); } catch (e) { reject(e); }
+    });
+  }
+  function errMsg(e) { return e && e.message ? e.message : String(e || 'Something went wrong.'); }
+  function isStudentPage() { return W.platform && W.platform.mode === 'student' && W.state && W.state.group; }
+  function me() { return String((W.state && W.state.email) || '').toLowerCase(); }
+
+  // ---------- the quiz summary from getState (which weeks have a quiz)
+  var _apply = W.applyLoadedStudentState;
+  if (typeof _apply === 'function') {
+    W.applyLoadedStudentState = function (s, opts) {
+      try { if (s && typeof s === 'object') W.state.quizzes = s.quizzes || {}; } catch (e) {}
+      var out = _apply.apply(this, arguments);
+      try { if (s && typeof s === 'object') W.state.quizzes = s.quizzes || {}; } catch (e) {}
+      return out;
+    };
+  }
+  function classOpen(wk) {
+    try { var c = W.platformClassById ? W.platformClassById(W.platform.activeClassId) : null; return !!(c && c.settings && c.settings.quizOpen && c.settings.quizOpen[String(wk)]); } catch (e) { return false; }
+  }
+  function summary(wk) { return ((W.state && W.state.quizzes) || {})[wk] || null; }
+
+  // ---------- week hub: the Reading Quiz card between Step 2 and Step 3
+  function cardHtml(wk) {
+    var s = summary(wk), live = classOpen(wk);
+    var status, desc;
+    if (s && s.state === 'finished') { status = '<span class="badge done">Done</span>'; desc = live ? 'Your answers are in. You’ll see your score when your teacher closes the quiz.' : 'See your score and the answers.'; }
+    else if (s && s.state === 'inProgress') { status = live ? '<span class="lc-quiz-live">Open now</span>' : '<span class="badge pending">Started</span>'; desc = live ? 'You started this quiz. Go back in and finish it.' : 'Your teacher closed the quiz. See how you did.'; }
+    else { status = live ? '<span class="lc-quiz-live">Open now</span>' : '<span class="badge pending">Opens in class</span>'; desc = live ? 'Your teacher has opened it. Take it now, before your group discusses — ten questions on this week’s reading.' : 'Ten questions on this week’s reading, taken in class right before your discussion. Your teacher opens it.'; }
+    return '<div class="journey-step lc-quiz-step" id="lcQuizCard" onclick="lcOpenQuiz()"><div class="step-status">' + status + '</div><div class="step-no lc-q">Q</div><h3>Reading Quiz' + (s && s.section ? ' · ' + esc(s.section) : '') + '</h3><p>' + desc + '</p><div class="step-action">' + (live && !(s && s.state === 'finished') ? 'Take the quiz →' : 'Open →') + '</div></div>';
+  }
+  var _viewWeek = W.viewWeek;
+  W.viewWeek = function () {
+    var html = _viewWeek.apply(this, arguments);
+    try {
+      var wk = Number(W.state.week);
+      if (summary(wk) || classOpen(wk)) {
+        var at = html.indexOf('<div class="journey-step" onclick="openWeekSection(\'peer\')"');
+        if (at > 0) html = html.slice(0, at) + cardHtml(wk) + html.slice(at);
+        else html = html.replace('<div class="journey-step-grid">', '<div class="journey-step-grid">' + cardHtml(wk));
+        html = html.replace('<div class="journey-step-grid">', '<div class="journey-step-grid has-quiz">');
+      }
+      setTimeout(function () { refreshStatus(wk); }, 0);
+    } catch (e) {}
+    return html;
+  };
+  /** Ask the server about this week's quiz (at most every 20 s), and add/refresh the card in place. */
+  function refreshStatus(wk, force) {
+    if (!isStudentPage() || Q.statusBusy[wk]) return;
+    if (!force && Q.statusAt[wk] && Date.now() - Q.statusAt[wk] < 20000) return;
+    Q.statusBusy[wk] = true;
+    rpc('getLiteratureQuizStatus', { email: me(), week: wk }).then(function (v) {
+      Q.statusBusy[wk] = false; Q.statusAt[wk] = Date.now();
+      if (!v) return;
+      W.state.quizzes = W.state.quizzes || {};
+      if (v.state === 'notReady') { delete W.state.quizzes[wk]; }
+      else W.state.quizzes[wk] = { approved: true, section: v.section || '', state: v.state === 'finished' || v.state === 'results' && !v.unanswered ? 'finished' : (v.state === 'inProgress' || v.state === 'results') ? 'inProgress' : 'notStarted' };
+      try { var c = W.platformClassById ? W.platformClassById(W.platform.activeClassId) : null; if (c && c.settings) { c.settings.quizOpen = c.settings.quizOpen || {}; if (v.open) c.settings.quizOpen[String(wk)] = true; else delete c.settings.quizOpen[String(wk)]; } } catch (e) {}
+      if (W.state.view !== 'week' || Number(W.state.week) !== wk) return;
+      var old = $('lcQuizCard'), grid = document.querySelector('.journey-step-grid');
+      if (v.state === 'notReady') { if (old) { old.remove(); if (grid) grid.classList.remove('has-quiz'); } return; }
+      var tmp = document.createElement('div'); tmp.innerHTML = cardHtml(wk); var fresh = tmp.firstChild;
+      if (old) old.replaceWith(fresh);
+      else if (grid) { var peer = grid.querySelector('.journey-step[onclick*="\'peer\'"]'); grid.insertBefore(fresh, peer || null); grid.classList.add('has-quiz'); }
+    }, function () { Q.statusBusy[wk] = false; });
+  }
+
+  // ---------- the quiz page
+  W.lcOpenQuiz = function () { Q.view = null; Q.err = ''; Q.pick = -1; W.state.view = 'week_quiz'; try { W.saveStudentResumeClient(); } catch (e) {} W.render(); load('status'); };
+  function load(kind) {
+    var wk = Number(W.state.week); Q.wk = wk; Q.busy = true; paint();
+    var fn = kind === 'start' ? 'startLiteratureQuiz' : 'getLiteratureQuizStatus';
+    return rpc(fn, { email: me(), week: wk, session: SESSION }).then(function (v) { Q.busy = false; take(v); }, function (e) { Q.busy = false; Q.err = errMsg(e); paint(); });
+  }
+  function take(v) {
+    if (!v) return;
+    if (v.state === 'inProgress') v.state = 'ready'; // status only: Start continues it
+    if (v.state !== 'paused' && v.state !== 'question') Q.lockedNote = '';
+    Q.view = v; Q.err = '';
+    if (!v.current || !Q.shownId || v.current.id !== Q.shownId) Q.pick = -1;
+    Q.shownId = v.current ? v.current.id : '';
+    if (v.current) Q.shownAt = Date.now();
+    paint();
+  }
+  function onQuestion() { return W.state && W.state.view === 'week_quiz' && Q.view && Q.view.state === 'question' && Q.view.current && !Q.leaving; }
+
+  var _render = W.render;
+  W.render = function () {
+    var wasQuiz = Q.onPage, nowQuiz = W.platform && W.platform.mode === 'student' && W.state && W.state.view === 'week_quiz';
+    // Leaving the quiz page inside the app (Back, Home, Feedback…) while a question is on screen locks it.
+    if (wasQuiz && !nowQuiz && Q.view && Q.view.state === 'question' && Q.view.current) leave('page', 0, true);
+    Q.onPage = nowQuiz;
+    if (!nowQuiz) { document.body.classList.remove('lc-quiz-page'); return _render.apply(this, arguments); }
+    try { if (typeof W.lcHistorySyncBeforeRender === 'function') W.lcHistorySyncBeforeRender(); } catch (e) {}
+    try { if (typeof W.renderHeader === 'function') W.renderHeader(); } catch (e) {}
+    document.body.classList.add('lc-quiz-page');
+    var app = $('app'); if (app) app.innerHTML = '<div class="lc-quiz" id="lcQuiz"></div>';
+    paint(); window.scrollTo(0, 0);
+  };
+  function paint() {
+    var box = $('lcQuiz'); if (!box) return;
+    var v = Q.view, wk = Number(W.state.week), g = W.state.group || {};
+    var back = '<a class="backlink" onclick="backToWeekHub()">← Back to Week ' + wk + '</a>';
+    var head = '<div class="lc-quiz-top"><div class="week-kicker">Reading Quiz · Week ' + wk + '</div></div><h2>' + esc(v && v.bookTitle || g.bookTitle || 'Your book') + '</h2><p class="lc-quiz-sub">' + (v && v.section ? 'Covers ' + esc(v.section) + ' — this week’s reading only.' : 'This week’s reading only.') + '</p>';
+    var err = Q.err ? '<div class="lc-quiz-note is-bad">' + esc(Q.err) + '</div>' : '';
+    box.classList.toggle('lc-quiz-lock', !!(v && v.state === 'question'));
+    if (!v) { box.innerHTML = back + '<div class="card">' + head + (Q.busy ? '<p class="lc-quiz-wait"><span class="spinner"></span> Checking the quiz…</p>' : '') + err + (Q.err ? '<button onclick="lcQuizRetry()">Try again</button>' : '') + '</div>'; return; }
+    var s = v.state, html;
+    if (s === 'notReady') html = '<p>Your teacher hasn’t set up a quiz for this week yet.</p>';
+    else if (s === 'closed') html = '<p>Your teacher opens the quiz in class, right before your group’s discussion. When they say it’s open, press <b>Check again</b>.</p><div class="lc-quiz-actions"><button onclick="lcQuizRetry()"' + (Q.busy ? ' disabled' : '') + '>Check again</button></div>';
+    else if (s === 'ready') html = rulesHtml(v) + '<div class="lc-quiz-actions"><button id="lcQuizStart" onclick="lcQuizStart()"' + (Q.busy ? ' disabled' : '') + '>' + (v.answered ? 'Continue the quiz' : 'Start the quiz') + '</button>' + (Q.busy ? '<span class="lc-quiz-wait"><span class="spinner"></span></span>' : '') + '</div>';
+    else if (s === 'question') html = questionHtml(v);
+    else if (s === 'paused') html = (Q.lockedNote ? '<div class="lc-quiz-note is-bad">' + esc(Q.lockedNote) + '</div>' : '<div class="lc-quiz-note">Your last question was locked because you left the quiz.</div>') + '<p style="margin-top:14px">' + (v.answered || 0) + ' of ' + (v.count || 10) + ' done. Stay on this page from here on.</p><div class="lc-quiz-actions"><button id="lcQuizStart" onclick="lcQuizStart()"' + (Q.busy ? ' disabled' : '') + '>Continue to the next question</button></div>';
+    else if (s === 'finished') html = '<div class="lc-quiz-note is-ok"><b>All done — your answers are in.</b> You’ll see your score and the right answers after your teacher closes the quiz.</div><p style="margin-top:14px">Now head into your discussion.</p>';
+    else if (s === 'results') html = resultsHtml(v);
+    else html = '';
+    var notice = v.notice ? '<div class="lc-quiz-note">' + esc(v.notice) + '</div>' : '';
+    box.innerHTML = (s === 'question' || s === 'paused' ? '' : back) + '<div class="card">' + head + notice + err + html + '</div>';
+    if (s === 'question') { var first = box.querySelector('.lc-quiz-choice'); if (first && !box.contains(document.activeElement)) { try { first.focus({ preventScroll: true }); } catch (e) {} } }
+  }
+  function rulesHtml(v) {
+    return '<ul class="lc-quiz-rules">' +
+      '<li data-n="1">' + (v.count || 10) + ' multiple-choice questions, one at a time. Once you answer a question you can’t go back to it.</li>' +
+      '<li data-n="2"><b>Stay on this page until you finish.</b> If you switch tabs, click out of this window, leave this page or reload it, the question on your screen locks and counts as wrong — and your teacher sees when it happened.</li>' +
+      '<li data-n="3">Answer from your own reading. Your score and the right answers appear after your teacher closes the quiz.</li></ul>' +
+      (v.answered ? '<div class="lc-quiz-note">You already answered ' + v.answered + ' of ' + v.count + '. You’ll pick up where you left off.</div><br>' : '');
+  }
+  function questionHtml(v) {
+    var c = v.current, n = v.count || 10, done = v.answered || 0, bars = '';
+    for (var i = 1; i <= n; i++) bars += '<span class="' + (i <= done ? 'is-done' : i === done + 1 ? 'is-now' : '') + '"></span>';
+    var choices = c.choices.map(function (t, k) { return '<button type="button" class="lc-quiz-choice" role="radio" aria-checked="' + (Q.pick === k) + '" onclick="lcQuizPick(' + k + ')"><span class="lc-quiz-letter">' + 'ABCD'.charAt(k) + '</span><span>' + esc(t) + '</span></button>'; }).join('');
+    var lockNote = Q.lockedNote ? '<div class="lc-quiz-note is-bad">' + esc(Q.lockedNote) + '</div>' : '';
+    return lockNote + '<div class="lc-quiz-count">Question ' + (done + 1) + ' of ' + n + '</div><div class="lc-quiz-progress" aria-hidden="true">' + bars + '</div>' +
+      '<p class="lc-quiz-q" id="lcQuizQ">' + esc(c.q) + '</p><div class="lc-quiz-choices" role="radiogroup" aria-labelledby="lcQuizQ">' + choices + '</div>' +
+      '<div class="lc-quiz-actions"><button id="lcQuizSubmit" onclick="lcQuizAnswer()"' + (Q.pick < 0 || Q.busy ? ' disabled' : '') + '>' + (Q.busy ? 'Saving…' : done + 1 === n ? 'Submit last answer' : 'Submit answer') + '</button><span class="muted">You can’t change it after this.</span></div>' +
+      '<div class="lc-quiz-leave">Need to stop? <button type="button" class="secondary" onclick="lcQuizAskLeave()">Leave the quiz</button><span id="lcQuizLeaveAsk"></span></div>';
+  }
+  function resultsHtml(v) {
+    var items = (v.items || []).map(function (it) {
+      if (it.missing) return '';
+      var cls = it.right ? 'is-right' : 'is-wrong';
+      if (!it.choices) return '<li class="is-wrong"><p class="q">' + it.n + '. ' + esc(it.q) + '</p><p class="a">✗ ' + (it.locked ? '🔒 Locked — you left the quiz on this question.' : 'Not answered.') + ' <span class="why">(The answer stays hidden.)</span></p></li>';
+      return '<li class="' + cls + '"><p class="q">' + it.n + '. ' + esc(it.q) + '</p><p class="a">' + (it.right ? '✓ ' : '✗ ') + 'Your answer: ' + esc(it.choices[it.pick]) + '</p>' + (it.right ? '' : '<p class="a">Right answer: <b>' + esc(it.choices[it.answer]) + '</b></p>') + (it.why ? '<p class="why">' + esc(it.why) + '</p>' : '') + '</li>';
+    }).join('');
+    return '<div class="lc-quiz-score"><b>' + v.score + ' / ' + v.max + '</b><span>right</span></div>' + (v.unanswered ? '<div class="lc-quiz-note">The quiz closed before you answered ' + v.unanswered + ' question' + (v.unanswered === 1 ? '' : 's') + '.</div><br>' : '') + '<ol class="lc-quiz-review">' + items + '</ol>';
+  }
+  W.lcQuizRetry = function () { Q.err = ''; load('status'); };
+  W.lcQuizStart = function () { if (Q.busy) return; Q.lockedNote = ''; load('start'); };
+  W.lcQuizPick = function (k) { if (Q.busy || !onQuestion()) return; Q.pick = k; document.querySelectorAll('.lc-quiz-choice').forEach(function (b, i) { b.setAttribute('aria-checked', i === k ? 'true' : 'false'); }); var sb = $('lcQuizSubmit'); if (sb) sb.disabled = false; };
+  W.lcQuizAnswer = function () {
+    if (Q.busy || !onQuestion() || Q.pick < 0) return;
+    if (Q.pendingLeave && retryPendingLeave()) return; // a leave that couldn't be sent goes first
+    var v = Q.view, brief = Q.brief.splice(0, Q.brief.length);
+    Q.busy = true; var sb = $('lcQuizSubmit'); if (sb) { sb.disabled = true; sb.textContent = 'Saving…'; }
+    Q.lockedNote = '';
+    rpc('answerLiteratureQuiz', { email: me(), week: Q.wk, qid: v.current.id, pick: Q.pick, session: SESSION, brief: brief }).then(function (nv) { Q.busy = false; take(nv); }, function (e) {
+      Q.busy = false; Q.brief = brief.concat(Q.brief);
+      Q.err = errMsg(e) + ' Your answer may not have saved — press Submit again.'; paint();
+    });
+  };
+  W.lcQuizAskLeave = function () {
+    var el = $('lcQuizLeaveAsk'); if (!el) return;
+    el.innerHTML = ' <b>Leaving locks this question (it counts as wrong).</b> <button type="button" onclick="lcQuizLeaveNow()">Leave anyway</button> <button type="button" class="secondary" onclick="this.parentNode.innerHTML=\'\'">Stay</button>';
+  };
+  W.lcQuizLeaveNow = function () { W.backToWeekHub(); };
+
+  // ---------- leaving the quiz: tab hidden, window blur (past a short grace), page left, reload
+  function leave(kind, awayMs, fromRender) {
+    if (!Q.view || !Q.view.current || Q.leaving) return;
+    var qid = Q.view.current.id, wk = Q.wk, brief = Q.brief.splice(0, Q.brief.length), before = Number(Q.view.locked || 0); Q.leaving = true;
+    var p = rpc('leaveLiteratureQuiz', { email: me(), week: wk, qid: qid, awayMs: awayMs || 0, kind: kind, session: SESSION, brief: brief });
+    p.then(function (nv) {
+      Q.leaving = false; Q.pendingLeave = null;
+      if (fromRender) { if (nv) { Q.view = nv; } return; }
+      if (nv && Number(nv.locked || 0) > before) Q.lockedNote = 'The last question was locked because you left the quiz (' + (kind === 'hidden' ? 'switched tabs' : 'clicked out of this window') + '). It counts as wrong, and your teacher can see it happened.';
+      take(nv);
+    }, function () {
+      // No connection: remember it. The question stays locked-to-be — it is sent before any answer.
+      Q.leaving = false; Q.brief = brief.concat(Q.brief);
+      Q.pendingLeave = { kind: kind, ms: awayMs || 0, qid: qid };
+    });
+  }
+  function retryPendingLeave() {
+    var pl = Q.pendingLeave; if (!pl || !Q.view || !Q.view.current || Q.view.current.id !== pl.qid) { Q.pendingLeave = null; return false; }
+    Q.pendingLeave = null; leave(pl.kind, pl.ms); return true;
+  }
+  W.addEventListener('online', function () { if (onQuestion()) retryPendingLeave(); });
+  function awayStart(kind) {
+    if (!onQuestion() || Q.away) return;
+    Q.away = { kind: kind, at: Date.now(), qid: Q.view.current.id, timer: null };
+    var grace = Number(Q.view.graceMs) || 1500;
+    Q.away.timer = setTimeout(function () { if (Q.away && !Q.away.sent) { Q.away.sent = true; leave(Q.away.kind, Date.now() - Q.away.at); } }, grace);
+  }
+  function awayEnd() {
+    if (!Q.away) return;
+    var a = Q.away, ms = Date.now() - a.at; Q.away = null; clearTimeout(a.timer);
+    if (a.sent) return;
+    // Phones and tablets pause timers in the background: if the student was away past the grace time,
+    // the question on screen is locked now that they are back.
+    if (ms >= ((Q.view && Number(Q.view.graceMs)) || 1500) && onQuestion() && Q.view.current.id === a.qid) { leave(a.kind, ms); return; }
+    Q.brief.push({ kind: a.kind, ms: ms, qid: a.qid, at: new Date().toISOString() });
+  }
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { if (Q.away) Q.away.kind = 'hidden'; else awayStart('hidden'); } else awayEnd(); });
+  W.addEventListener('blur', function () { awayStart('blur'); });
+  W.addEventListener('focus', function () { awayEnd(); });
+  // Closing or reloading the page isn't sent from here: the server sees the quiz reopened from a new
+  // page and locks the question that was on screen then (so it is never counted twice).
+  // no copying, selecting or right-click while a question is on screen
+  ['copy', 'cut', 'contextmenu', 'selectstart', 'dragstart'].forEach(function (t) {
+    document.addEventListener(t, function (e) { if (onQuestion() && e.target && e.target.closest && e.target.closest('#lcQuiz')) e.preventDefault(); }, true);
+  });
+  document.addEventListener('keydown', function (e) {
+    if (!onQuestion()) return;
+    var k = String(e.key || '').toLowerCase();
+    if ((e.ctrlKey || e.metaKey) && 'acpsux'.indexOf(k) >= 0 && k) { e.preventDefault(); return; }
+    if (/^[1-4a-d]$/.test(k) && !(e.target && /input|textarea/i.test(e.target.tagName))) { var idx = /\d/.test(k) ? Number(k) - 1 : 'abcd'.indexOf(k); W.lcQuizPick(idx); }
+  }, true);
+
+  W.__MB.ReadingQuiz = 'ok';
+})();
+</script>

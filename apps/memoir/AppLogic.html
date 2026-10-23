@@ -1,0 +1,1353 @@
+<script>
+window.__MB = window.__MB || {}; __MB.AppLogic = 'started';
+// ===========================================================================
+// MEMOIR — the student app (and the teacher's preview of it)
+//
+// One `state` object, one render(), one bind() that re-attaches every handler
+// after each render. state is kept in localStorage and, once BackendClient has
+// connected a class, autosaved whole to the WORK sheet -- anything added to
+// state.memoir travels with no server change at all.
+//
+// Styling belongs to the PAGE, never to the viewer: a teacher opening a stage
+// sees exactly what a student sees.
+// ===========================================================================
+const APP_KEY = "memoirState";
+const PASTE_MIN_CHARS = 8;           // a pasted word or a fixed typo is not worth flagging
+const WRITING_IDLE_MS = 2 * 60 * 1000;
+
+function safeLocalGet_(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+function safeLocalSet_(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+
+function blankMemoir_() {
+  const m = { texts: {}, cadence: {}, checks: {}, meta: {}, submissions: {}, selfEval: {}, selfComments: {}, coach: {}, poster: { title: "", author: "", hint: "" }, reviewMode: "edit" };
+  STAGES.forEach((s) => {
+    m.texts[s.key] = "";
+    m.cadence[s.key] = [];
+    m.checks[s.key] = s.checklist.map(() => false);
+  });
+  return m;
+}
+// Anything can come back from storage or the server: an older build's shape,
+// a Sheets-mangled value, nothing at all. Normalise at the door so nothing
+// downstream has to ask.
+function normalizeMemoir_(raw) {
+  const b = blankMemoir_();
+  const r = raw && typeof raw === "object" ? raw : {};
+  const m = Object.assign(b, r);
+  ["texts", "cadence", "checks", "meta", "submissions", "selfEval", "selfComments", "coach"].forEach((f) => {
+    if (!m[f] || typeof m[f] !== "object" || Array.isArray(m[f])) m[f] = {};
+  });
+  STAGES.forEach((s) => {
+    m.texts[s.key] = typeof m.texts[s.key] === "string" ? m.texts[s.key] : String(m.texts[s.key] || "");
+    m.cadence[s.key] = migrateCadenceLog_(m.cadence[s.key]);
+    let ch = Array.isArray(m.checks[s.key]) ? m.checks[s.key] : [];
+    m.checks[s.key] = s.checklist.map((_, i) => ch[i] === true);
+    if (!Array.isArray(m.coach[s.key])) m.coach[s.key] = [];
+  });
+  m.poster = Object.assign({ title: "", author: "", hint: "" }, r.poster && typeof r.poster === "object" ? r.poster : {});
+  m.reviewMode = m.reviewMode === "read" ? "read" : "edit";
+  return m;
+}
+function normalizeAppState_(s) {
+  s = s && typeof s === "object" ? s : {};
+  s.role = s.role || "student";
+  s.view = s.view || "home";
+  s.scaffold = s.scaffold === "less" ? "less" : "more";
+  s.releasedSteps = s.releasedSteps && typeof s.releasedSteps === "object" ? s.releasedSteps : {};
+  s.aiCoach = s.aiCoach !== false;
+  s.aiPoster = s.aiPoster !== false;
+  s.leadPaste = s.leadPaste !== false;
+  s.highlighting = s.highlighting === true;
+  s.focus = s.focus === true;
+  s.className = s.className || "Memoir";
+  s.memoir = normalizeMemoir_(s.memoir);
+  return s;
+}
+let state = normalizeAppState_(JSON.parse(safeLocalGet_(APP_KEY) || "null"));
+
+function save() { safeLocalSet_(APP_KEY, JSON.stringify(state)); }
+
+// Anything can arrive here -- Sheets turns a period typed as "2" into a number.
+function esc(s) {
+  return (s === null || s === undefined || s === false ? "" : String(s)).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m]);
+}
+function backend_() { return typeof window !== "undefined" ? window.MEMOIR_BACKEND || null : null; }
+function connected_() { const b = backend_(); return !!(b && b.enabled && b.ready && b.user); }
+function isStudent_() { return state.role === "student"; }
+// AI controls appear only when the deployed app has them switched on (Code.gs
+// AI_FEATURES_ON) -- never in an offline preview.
+function aiOn_() { const b = backend_(); return !!(b && b.enabled && b.ready && b.aiFeatures === true); }
+
+/* ---- The browser Back button -----------------------------------------------
+   The app never changes page, so every move goes through render(), which pushes
+   one history entry per new place. Back pops it and puts the app back. The URL
+   is left alone (the Apps Script iframe refuses rewrites); if history is
+   unavailable the app simply behaves as it did without it. Back from the first
+   screen is allowed to leave the app. */
+let __navKeyNow = null, __navRestoring = false, __navOk = true;
+function navKey_() { return String(state.view || "home"); }
+function navSync_() {
+  if (!__navOk || __navRestoring) return;
+  let key = navKey_();
+  if (key === __navKeyNow) return;
+  try {
+    if (__navKeyNow === null) history.replaceState({ mmNav: key }, "");
+    else history.pushState({ mmNav: key }, "");
+    __navKeyNow = key;
+  } catch (e) { __navOk = false; }
+}
+window.addEventListener("popstate", (e) => {
+  if (!__navOk) return;
+  let key = e.state && e.state.mmNav;
+  if (!key) return;
+  __navRestoring = true;
+  __navKeyNow = key;
+  try { state.view = key; saveNav_(); render(); window.scrollTo(0, 0); } finally { __navRestoring = false; }
+});
+// Moving between pages is remembered in this browser only; it never sends the
+// whole memoir to the server just because a different page is open.
+function saveNav_() {
+  const b = backend_();
+  if (b && b.saveLocal) b.saveLocal(); else save();
+}
+function go_(view) {
+  state.view = view;
+  document.body.classList.remove("nav-open");
+  saveNav_();
+  render();
+  window.scrollTo(0, 0);
+}
+function renderKeepScroll_() {
+  let sx = window.scrollX || 0, sy = window.scrollY || 0;
+  render();
+  requestAnimationFrame(() => window.scrollTo(sx, sy));
+}
+
+function showToast(msg, kind) {
+  let t = document.getElementById("toast");
+  if (!t) { t = document.createElement("div"); t.id = "toast"; t.setAttribute("role", "status"); document.body.appendChild(t); }
+  t.className = "toast show " + (kind || "");
+  t.textContent = msg;
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.classList.remove("show"), 3200);
+}
+
+// ---- Line icons (one stroke family, drawn here, no emoji) -------------------
+const ICON_PATHS = {
+  left: "M10 3 5 8l5 5",
+  right: "M6 3l5 5-5 5",
+  check: "M3.5 8.5l3 3 6-7",
+  lock: "M4.5 7V5.5a3.5 3.5 0 0 1 7 0V7M3.5 7h9v6.5h-9z",
+  refresh: "M13.5 8a5.5 5.5 0 1 1-1.6-3.9M13.5 2.5v3h-3",
+  download: "M8 2.5v8M4.5 7 8 10.5 11.5 7M3 13.5h10",
+  chat: "M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z",
+  pen: "M10.5 2.5l3 3-7.5 7.5H3v-3z",
+  eye: "M1.5 8s2.5-4.5 6.5-4.5S14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8zM8 6a2 2 0 1 0 0 4 2 2 0 0 0 0-4z",
+  image: "M2.5 3.5h11v9h-11zM2.5 10.5l3-3 3 3 2-2 3 3M10.5 6.2a.8.8 0 1 0 0 .1",
+  push: "M5 11 11 5M6 5h5v5",
+  dots: "M3 8h.01M8 8h.01M13 8h.01",
+  users: "M5.5 7a2.2 2.2 0 1 0 0-4.4 2.2 2.2 0 0 0 0 4.4zM1.5 13c0-2.2 1.8-4 4-4s4 1.8 4 4M10.5 3a2.2 2.2 0 0 1 0 4.2M11.5 9.2c1.8.4 3 1.9 3 3.8",
+  x: "M4 4l8 8M12 4l-8 8",
+  menu: "M2.5 4h11M2.5 8h11M2.5 12h11",
+  star: "M8 2.5l1.7 3.6 3.8.4-2.9 2.6.8 3.8L8 11l-3.4 1.9.8-3.8-2.9-2.6 3.8-.4z",
+  expand: "M2.5 6V2.5H6M13.5 6V2.5H10M2.5 10v3.5H6M13.5 10v3.5H10",
+  shrink: "M6 2.5V6H2.5M10 2.5V6h3.5M6 13.5V10H2.5M10 13.5V10h3.5"
+};
+function icon(name, cls) {
+  let d = ICON_PATHS[name] || "";
+  let dotStyle = name === "dots" ? ' stroke-width="2.6"' : "";
+  return `<svg class="ic ${cls || ""}" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"${dotStyle}><path d="${d}"/></svg>`;
+}
+
+// ---- The memoir's text ---------------------------------------------------------
+function wordCount(text) {
+  let t = String(text || "").trim();
+  return t ? t.split(/\s+/).length : 0;
+}
+function stageText_(key) { return String((state.memoir.texts || {})[key] || ""); }
+function assembledText_() { return STAGE_KEYS.map((k) => stageText_(k).trim()).filter(Boolean).join("\n\n"); }
+// The same FNV hash as Code.gs submissionSig_, so a turn-in recorded here is
+// recognised by the server's gradebook.
+function submissionSig_(text) {
+  let t = String(text || ""), h = 2166136261;
+  for (let i = 0; i < t.length; i++) {
+    h ^= t.charCodeAt(i);
+    h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0;
+  }
+  return t.length + ":" + h.toString(16);
+}
+function submissionTextFor_(key) { return key === MEMOIR_FINAL_KEY ? assembledText_() : stageText_(key).trim(); }
+function submissionOf_(key) {
+  let text = submissionTextFor_(key);
+  let rec = (state.memoir.submissions || {})[key] || null;
+  let submitted = !!(rec && rec.sig && text && rec.sig === submissionSig_(text));
+  return { text, rec, submitted, changed: !!(rec && rec.sig && text && !submitted), at: rec && rec.submittedAt ? rec.submittedAt : "" };
+}
+function markSubmitted_(key) {
+  state.memoir.submissions = state.memoir.submissions || {};
+  state.memoir.submissions[key] = { sig: submissionSig_(submissionTextFor_(key)), submittedAt: new Date().toISOString() };
+}
+// The student's grade record for a piece, when a class is connected.
+function gradeRec_(key) {
+  let b = backend_();
+  let gs = b && b.gradeSummary && b.gradeSummary.memoir;
+  if (!gs) return null;
+  return key === MEMOIR_FINAL_KEY ? gs.finalTotal || null : (gs.steps || {})[key] || null;
+}
+function hasNum_(v) { return v !== null && v !== undefined && v !== "" && !Number.isNaN(Number(v)); }
+function released_(key) { return !isStudent_() || (state.releasedSteps || {})[key] !== false; }
+
+// One status for every graded piece, used by the sidebar, the page header and
+// the grade cards so they can never disagree.
+//   kind: none | draft | turned | changed | graded | excluded | locked
+function pieceStatus_(key) {
+  if (!released_(key)) return { kind: "locked", label: "Opens when your teacher releases it" };
+  let g = gradeRec_(key);
+  if (key === "share") {
+    let posted = shareOwnPost_();
+    if (g && g.excluded) return { kind: "excluded", label: "Not graded" };
+    if (g && hasNum_(g.teacherScore) && !g.editedAfterGrading) return { kind: "graded", label: "Graded · " + g.teacherScore + " / " + g.possible };
+    return posted ? { kind: "turned", label: "Posted" } : { kind: "none", label: "Not posted yet" };
+  }
+  if (key === MEMOIR_POSTER_KEY) {
+    let b = backend_();
+    let saved = (b && b.poster && b.poster.savedAt) || state.memoir.poster.savedAt;
+    if (g && g.excluded) return { kind: "excluded", label: "Not graded" };
+    if (g && hasNum_(g.teacherScore)) return { kind: "graded", label: Number(g.teacherScore) > 0 ? "Complete" : "Not complete" };
+    return saved ? { kind: "turned", label: "Turned in" } : { kind: "none", label: "Not started yet" };
+  }
+  let sub = submissionOf_(key);
+  if (!sub.text) return { kind: "none", label: "Not started yet" };
+  if (key === MEMOIR_FINAL_KEY) {
+    if (g && g.hasAnyResult && !g.editedAfterGrading && g.complete) return { kind: "graded", label: "Graded · " + g.earned + " / " + g.possible };
+  } else if (g) {
+    if (g.excluded) return { kind: "excluded", label: sub.submitted ? "Turned in · not graded" : "In progress · not graded" };
+    if (hasNum_(g.teacherScore) && !g.editedAfterGrading)
+      return { kind: "graded", label: MEMOIR_PASS_FAIL[key] ? (Number(g.teacherScore) > 0 ? "Complete" : "Not complete") : "Graded · " + g.teacherScore + " / " + g.possible };
+  }
+  if (sub.submitted) return { kind: "turned", label: MEMOIR_PASS_FAIL[key] ? "Turned in · complete" : "Turned in" };
+  if (sub.changed) return { kind: "changed", label: "Changed — turn in again" };
+  return { kind: "draft", label: "In progress" };
+}
+function statusChip_(st) {
+  return `<span class="status-chip st-${st.kind}">${st.kind === "locked" ? icon("lock") : st.kind === "graded" || st.kind === "turned" ? icon("check") : ""}${esc(st.label)}</span>`;
+}
+function worthLabel_(key) {
+  if (key === MEMOIR_FINAL_KEY) return MEMOIR_CRITERIA.length * CRITERION_MAX + " pts";
+  return MEMOIR_PASS_FAIL[key] ? "Complete / incomplete" : MEMOIR_STEP_POINTS[key] + " pts";
+}
+// Where a student should pick up: the first stage that is open and not turned in.
+function nextStageKey_() {
+  let k = STAGE_KEYS.find((key) => released_(key) && !submissionOf_(key).submitted);
+  return k || null;
+}
+
+// ---- Highlights: internal vs external ------------------------------------------
+// Each highlight is an explicit {type, start, end} range over the stage's text,
+// like a highlighter stroke. Ranges shift and trim as the student edits, so
+// they keep marking the same words.
+function migrateCadenceLog_(log) {
+  if (!Array.isArray(log)) return [];
+  let cursor = 0;
+  return log.map((entry) => {
+    if (entry && typeof entry.start === "number" && typeof entry.end === "number") {
+      cursor = Math.max(cursor, entry.end);
+      return { type: entry.type, start: entry.start, end: entry.end };
+    }
+    let start = cursor, end = entry && typeof entry.end === "number" ? entry.end : start;
+    cursor = Math.max(cursor, end);
+    return { type: entry && entry.type, start, end };
+  }).filter((r) => r.end > r.start && (r.type === "internal" || r.type === "external"));
+}
+function diffEdit_(oldStr, newStr) {
+  let start = 0, maxStart = Math.min(oldStr.length, newStr.length);
+  while (start < maxStart && oldStr[start] === newStr[start]) start++;
+  let oldEnd = oldStr.length, newEnd = newStr.length;
+  while (oldEnd > start && newEnd > start && oldStr[oldEnd - 1] === newStr[newEnd - 1]) { oldEnd--; newEnd--; }
+  return { start, oldEnd, newEnd };
+}
+function adjustRange_(range, diff) {
+  let delta = diff.newEnd - diff.oldEnd;
+  let s = range.start, e = range.end;
+  if (e <= diff.start) return { type: range.type, start: s, end: e };
+  if (s >= diff.oldEnd) return { type: range.type, start: s + delta, end: e + delta };
+  if (s <= diff.start && e >= diff.oldEnd) return { type: range.type, start: s, end: e + delta };
+  if (s >= diff.start && e <= diff.oldEnd) return null;
+  if (s < diff.start && e < diff.oldEnd) return diff.start > s ? { type: range.type, start: s, end: diff.start } : null;
+  let ns = diff.newEnd, ne = e + delta;
+  return ne > ns ? { type: range.type, start: ns, end: ne } : null;
+}
+function shiftLog_(log, oldValue, newValue) {
+  if (oldValue === newValue) return log;
+  let d = diffEdit_(oldValue, newValue);
+  return log.map((r) => adjustRange_(r, d)).filter(Boolean);
+}
+function cutOverlap_(log, cand) {
+  let out = [];
+  log.forEach((r) => {
+    if (!(r.start < cand.end && cand.start < r.end)) { out.push(r); return; }
+    if (r.start < cand.start) out.push({ type: r.type, start: r.start, end: cand.start });
+    if (r.end > cand.end) out.push({ type: r.type, start: cand.end, end: r.end });
+  });
+  return out;
+}
+function segments_(text, log) {
+  let sorted = (log || []).slice().sort((a, b) => a.start - b.start);
+  let segs = [], cursor = 0;
+  sorted.forEach((en) => {
+    let s = Math.max(cursor, Math.min(en.start, text.length));
+    let e = Math.max(s, Math.min(en.end, text.length));
+    if (s > cursor) segs.push({ type: "plain", text: text.slice(cursor, s) });
+    if (e > s) segs.push({ type: en.type, text: text.slice(s, e) });
+    cursor = Math.max(cursor, e);
+  });
+  if (cursor < text.length) segs.push({ type: "plain", text: text.slice(cursor) });
+  return segs;
+}
+function highlightedHtml_(text, log) {
+  if (!String(text || "")) return "";
+  return segments_(String(text), log).map((sg) =>
+    sg.type === "internal" ? `<mark class="hl-internal">${esc(sg.text)}</mark>` :
+    sg.type === "external" ? `<mark class="hl-external">${esc(sg.text)}</mark>` : esc(sg.text)).join("") + "\n";
+}
+function cadenceCounts_(log) {
+  let l = Array.isArray(log) ? log : [];
+  return { internal: l.filter((t) => t.type === "internal").length, external: l.filter((t) => t.type === "external").length };
+}
+function cadenceTip_(log) {
+  if (!Array.isArray(log) || log.length < 3) return "";
+  // Read the beats in the order they appear in the writing, not the order tagged.
+  let lastThree = log.slice().sort((a, b) => a.start - b.start).slice(-3).map((t) => t.type);
+  if (lastThree.every((t) => t === "internal")) return "Your last three highlighted beats are all internal — try grounding the reader in an action, a line of dialogue, or a sound.";
+  if (lastThree.every((t) => t === "external")) return "Your last three highlighted beats are all external — try slipping in what you were thinking or feeling.";
+  return "";
+}
+
+// ---------------------------------------------------------------------------
+// Writing-process record
+//
+// For every writing box the app records, per character, how the text arrived:
+//   t  typed here                     (not stored -- anything unmarked)
+//   p  pasted from outside the app    (flagged to the teacher)
+//   q  moved in from the student's own writing in this app (not flagged)
+//   u  already in the box before tracking began (origin unknown, never
+//      reported as typed)
+// run-length encoded as spans, plus paste counts, blocked outside-paste
+// attempts, and writing time. No clipboard contents and no keystroke history.
+//
+// Paste rules: The Lead accepts a paste (students often wrote it as a
+// discussion post first). Every other box blocks outside paste -- the drafting
+// is meant to happen in the student's own words -- but always lets a student
+// move their OWN sentences between stages, which revising needs.
+//
+// Writing time: each edit adds the gap since the previous edit in that box; a
+// gap over two minutes starts a new sitting and adds nothing. lastInputAt is
+// saved, so a reload mid-sentence keeps counting. Text already present when
+// timing began makes the total a lower bound.
+// ---------------------------------------------------------------------------
+function writingClockFrom_(meta) {
+  let m = meta || {};
+  if (typeof m.activeMs !== "number") return null;
+  return { activeMs: Number(m.activeMs) || 0, sessions: Number(m.sessions) || 0, lastInputAt: Number(m.lastInputAt) || 0,
+           timeStartedAt: String(m.timeStartedAt || ""), untimedChars: Number(m.untimedChars) || 0 };
+}
+function writingClockTick_(clock, lengthBefore, now) {
+  now = now || Date.now();
+  let c = clock || { activeMs: 0, sessions: 0, lastInputAt: 0, timeStartedAt: new Date(now).toISOString(), untimedChars: Number(lengthBefore) || 0 };
+  let gap = c.lastInputAt ? now - c.lastInputAt : Infinity;
+  if (!(gap <= WRITING_IDLE_MS)) c.sessions += 1;
+  else if (gap > 0) c.activeMs += gap;
+  c.lastInputAt = now;
+  return c;
+}
+function originArray_(meta, len) {
+  let fill = meta && meta.trackingStartedAt ? "t" : (len ? "u" : "t");
+  let a = new Array(len).fill(fill);
+  (meta && Array.isArray(meta.spans) ? meta.spans : []).forEach((sp) => {
+    let from = Math.max(0, sp[0] | 0), to = Math.min(len, sp[1] | 0);
+    let kind = sp[2] === "q" ? "q" : sp[2] === "p" ? "p" : sp[2] === "u" ? "u" : "t";
+    for (let i = from; i < to; i++) a[i] = kind;
+  });
+  return a;
+}
+function metaFromOrigin_(a, counters, startedAt) {
+  let spans = [], i = 0;
+  while (i < a.length) {
+    if (a[i] === "t") { i++; continue; }
+    let j = i;
+    while (j < a.length && a[j] === a[i]) j++;
+    spans.push([i, j, a[i]]);
+    i = j;
+  }
+  let out = { spans, total: a.length, events: counters.events || 0, outsideEvents: counters.outsideEvents || 0,
+              ownEvents: counters.ownEvents || 0, blocked: counters.blocked || 0, trackingStartedAt: startedAt };
+  if (counters.clock) Object.assign(out, { activeMs: counters.clock.activeMs, sessions: counters.clock.sessions, lastInputAt: counters.clock.lastInputAt,
+                                          timeStartedAt: counters.clock.timeStartedAt, untimedChars: counters.clock.untimedChars });
+  return out;
+}
+function editDiff_(oldText, newText) {
+  let max = Math.min(oldText.length, newText.length), p = 0;
+  while (p < max && oldText[p] === newText[p]) p++;
+  let s = 0;
+  while (s < max - p && oldText[oldText.length - 1 - s] === newText[newText.length - 1 - s]) s++;
+  return { p, s, insertedLen: newText.length - s - p };
+}
+function normalizeForMatch_(t) {
+  return String(t || "").replace(/[‘’‛]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, "-").replace(/\s+/g, " ").trim().toLowerCase();
+}
+// Text copied or cut out of any writing box in this app. Checked alongside the
+// memoir itself, because text that was CUT is no longer anywhere in it.
+let __memoirClip = "", __memoirClipKinds = null;
+document.addEventListener("copy", rememberOwnClip_, true);
+document.addEventListener("cut", rememberOwnClip_, true);
+function rememberOwnClip_(e) {
+  let el = e.target;
+  if (!el || !el.classList || !el.classList.contains("writer-input")) return;
+  try {
+    __memoirClip = String(el.value || "").slice(el.selectionStart, el.selectionEnd);
+    // Remember where each copied character came from, so text first pasted in
+    // from outside keeps that label when it is moved to another stage.
+    let key = el.dataset.stage;
+    __memoirClipKinds = key ? originArray_((state.memoir.meta || {})[key], el.value.length).slice(el.selectionStart, el.selectionEnd) : null;
+  } catch (err) { __memoirClipKinds = null; }
+}
+function isOwnText_(text) {
+  let needle = normalizeForMatch_(text);
+  if (!needle) return false;
+  if (__memoirClip && normalizeForMatch_(__memoirClip).indexOf(needle) !== -1) return true;
+  let hay = normalizeForMatch_(STAGE_KEYS.map(stageText_).join("\n"));
+  return hay.indexOf(needle) !== -1;
+}
+function pasteAllowedIn_(key) {
+  if (!isStudent_()) return true;
+  return key === "lead" && state.leadPaste !== false;
+}
+
+// Attach tracking to one writing box. opts.onEdit(prev, next) runs BEFORE the
+// state is updated, so the highlighter can shift its ranges against the old text.
+function attachWritingBox_(el, key, opts) {
+  if (!el) return;
+  opts = opts || {};
+  state.memoir.meta = state.memoir.meta || {};
+  let prev = el.value;
+  let meta = state.memoir.meta[key] || null;
+  let origin = originArray_(meta, prev.length);
+  let counters = {
+    events: meta ? Number(meta.events || 0) : 0, outsideEvents: meta ? Number(meta.outsideEvents || 0) : 0,
+    ownEvents: meta ? Number(meta.ownEvents || 0) : 0, blocked: meta ? Number(meta.blocked || 0) : 0,
+    clock: writingClockFrom_(meta)
+  };
+  let startedAt = (meta && meta.trackingStartedAt) || new Date().toISOString();
+  // Persist the baseline at once: text already here becomes "unknown", so the
+  // teacher never sees a false claim that older work was typed in the app.
+  if (!meta) { state.memoir.meta[key] = metaFromOrigin_(origin, counters, startedAt); save(); }
+  let pendingKind = null, pendingKinds = null, clipboardRead = false;
+
+  function incoming(e, text) {
+    let t = String(text || "");
+    clipboardRead = t.length > 0;
+    pendingKinds = null;
+    let own = t.length > 0 && isOwnText_(t);
+    if (!own && !pasteAllowedIn_(key)) {
+      e.preventDefault();
+      counters.blocked++;
+      state.memoir.meta[key] = metaFromOrigin_(origin, counters, startedAt);
+      save();
+      showToast("Pasting from outside the app is turned off in this box — it's for drafting in your own words. You can still move your own sentences between stages.", "warn");
+      pendingKind = null;
+      return;
+    }
+    pendingKind = own ? "q" : (t.length >= PASTE_MIN_CHARS ? "p" : null);
+    pendingKinds = own && __memoirClipKinds && t === __memoirClip && __memoirClipKinds.some((k) => k === "p" || k === "u")
+      ? __memoirClipKinds.map((k) => (k === "p" || k === "u" ? k : "q")) : null;
+  }
+  el.addEventListener("paste", (e) => {
+    let t = "";
+    try { t = (e.clipboardData || window.clipboardData).getData("text") || ""; } catch (err) { t = ""; }
+    incoming(e, t);
+  });
+  el.addEventListener("drop", (e) => {
+    let t = "";
+    try { t = (e.dataTransfer && e.dataTransfer.getData("text")) || ""; } catch (err) { t = ""; }
+    incoming(e, t);
+  });
+  el.addEventListener("input", (e) => {
+    let next = el.value;
+    let it = e && e.inputType;
+    let pasteish = it === "insertFromPaste" || it === "insertFromDrop" || it === "insertFromPasteAsQuotation";
+    let d = editDiff_(prev, next);
+    let kind = "t";
+    if (pendingKind) kind = pendingKind;
+    else if (pasteish && !clipboardRead && d.insertedLen >= PASTE_MIN_CHARS) kind = pasteAllowedIn_(key) ? "p" : "q";
+    if (kind === "p") { counters.events++; counters.outsideEvents++; }
+    else if (kind === "q") { counters.events++; counters.ownEvents++; }
+    pendingKind = null;
+    clipboardRead = false;
+    counters.clock = writingClockTick_(counters.clock, prev.length);
+    let mid = pendingKinds && pendingKinds.length === d.insertedLen ? pendingKinds.slice() : new Array(d.insertedLen > 0 ? d.insertedLen : 0).fill(kind);
+    pendingKinds = null;
+    origin = origin.slice(0, d.p).concat(mid, origin.slice(prev.length - d.s));
+    if (origin.length !== next.length) origin = new Array(next.length).fill("u");   // safety net: origin unknown, never claimed as typed
+    if (opts.onEdit) opts.onEdit(prev, next);
+    prev = next;
+    state.memoir.texts[key] = next;
+    state.memoir.meta[key] = metaFromOrigin_(origin, counters, startedAt);
+    save();
+    if (opts.afterEdit) opts.afterEdit(next);
+  });
+}
+function writingTimeText_(ms) {
+  ms = Math.max(0, Number(ms) || 0);
+  let min = Math.round(ms / 60000);
+  if (ms > 0 && min < 1) return "<1 min";
+  if (min < 60) return min + " min";
+  let h = Math.floor(min / 60), rest = min % 60;
+  return h + " h" + (rest ? " " + rest + " min" : "");
+}
+// The student's own one-line record under their writing box.
+function studentProcessLine_(key) {
+  let text = stageText_(key);
+  let m = (state.memoir.meta || {})[key] || {};
+  let words = wordCount(text);
+  let time = typeof m.activeMs === "number" ? (Number(m.untimedChars || 0) > 0 ? "≥ " : "") + writingTimeText_(m.activeMs) + " writing" : (text.trim() ? "Not timed yet" : "");
+  return `<div class="proc-line" id="procLine-${key}"><span class="pill">${words} word${words === 1 ? "" : "s"}</span>${time ? `<span class="pill">${esc(time)}</span>` : ""}<span class="proc-note">Your teacher can see word count, writing time and anything pasted.</span></div>`;
+}
+function refreshProcessLine_(key) {
+  let el = document.getElementById("procLine-" + key);
+  if (el) el.outerHTML = studentProcessLine_(key);
+}
+
+// ===========================================================================
+// Views
+// ===========================================================================
+// The order a student moves through the unit. Next / Back follow this.
+const FLOW = ["stage:lead", "share", "stage:beginning", "stage:rising", "stage:callback", "stage:climax", "stage:sowhat", "review", "poster"];
+function flowLabel_(view) {
+  if (view.indexOf("stage:") === 0) return STAGE_BY_KEY[view.slice(6)].label;
+  return { share: "Lead Share", review: "Review & Turn In", poster: "Memoir Poster", grades: "Your Grades", home: "Start" }[view] || view;
+}
+function flowNeighbours_(view) {
+  let i = FLOW.indexOf(view);
+  return { prev: i > 0 ? FLOW[i - 1] : "home", next: i >= 0 && i < FLOW.length - 1 ? FLOW[i + 1] : null };
+}
+function viewReleased_(view) {
+  if (view.indexOf("stage:") === 0) return released_(view.slice(6));
+  if (view === "share") return released_("share");
+  if (view === "review") return released_("final");
+  if (view === "poster") return released_("poster");
+  return true;
+}
+
+// ---- The story arc ---------------------------------------------------------------
+// x is story time, y is tension. The Lead sits at the Callback's height, joined
+// by a dashed line: it opens on that moment, then the story rewinds.
+const ARC_LABELS = {
+  lead: [52, 28, "start"], beginning: [106, 134, "start"], rising: [372, 120, "middle"],
+  callback: [600, 66, "middle"], climax: [742, 22, "start"], sowhat: [856, 130, "middle"]
+};
+function arcSvg_(currentKey, opts) {
+  opts = opts || {};
+  let nodes = STAGES.map((s, i) => {
+    let [x, y] = ARC_POINTS[s.key];
+    let st = pieceStatus_(s.key);
+    let done = st.kind === "turned" || st.kind === "graded";
+    let here = s.key === currentKey;
+    let locked = st.kind === "locked";
+    let [lx, ly, anchor] = ARC_LABELS[s.key];
+    let label = `${i + 1} ${s.short}${here ? " · you are here" : ""}`;
+    let dot = here
+      ? `<circle cx="${x}" cy="${y}" r="14" class="arc-ring" style="stroke:${s.color}"/><circle cx="${x}" cy="${y}" r="7.5" style="fill:${s.color}"/>`
+      : done
+        ? `<circle cx="${x}" cy="${y}" r="9" style="fill:${s.color}"/>`
+        : `<circle cx="${x}" cy="${y}" r="8.5" class="arc-open ${locked ? "is-locked" : ""}" style="stroke:${locked ? "var(--line-2)" : s.color}"/>`;
+    return `<g class="arc-node ${here ? "is-here" : ""}" data-view="stage:${s.key}" tabindex="0" role="link" aria-label="Stage ${i + 1}, ${esc(s.label)}: ${esc(st.label)}">
+      <circle cx="${x}" cy="${y}" r="22" class="arc-hit"/>${dot}
+      <text x="${lx}" y="${ly}" text-anchor="${anchor}" class="arc-label ${here ? "is-here" : ""}" ${here ? `style="fill:${s.color}"` : ""}>${esc(label)}</text></g>`;
+  }).join("");
+  let cur = currentKey ? ARC_POINTS[currentKey] : null;
+  return `<svg class="arc-svg ${opts.large ? "is-large" : ""}" viewBox="0 0 952 142" role="group" aria-label="The shape of your memoir: tension rises from the Beginning to the Climax and falls into So What. The Lead sits at the Callback's height.">
+    <path d="${ARC_PATH}" class="arc-track"/>
+    ${cur && currentKey !== "lead" ? `<path d="${ARC_PATH}" class="arc-progress" pathLength="100" style="stroke-dasharray:${arcProgressPct_(currentKey)} 100"/>` : ""}
+    <line x1="46" y1="36" x2="590" y2="36" class="arc-flash"/>
+    ${nodes}
+  </svg>`;
+}
+function arcProgressPct_(key) {
+  return { beginning: 1, rising: 37, callback: 68, climax: 82, sowhat: 100 }[key] || 0;
+}
+
+// ---- Sidebar ------------------------------------------------------------------------
+function navItem_(view, name, note, color, extra) {
+  let active = String(state.view || "") === view;
+  return `<button type="button" class="nav-item ${active ? "active" : ""} ${extra || ""}" data-view="${view}" style="--acc:${color}" ${active ? 'aria-current="page"' : ""}>
+    <span class="nav-bar" aria-hidden="true"></span><span class="nav-text"><span class="nav-name">${name}</span>${note ? `<span class="nav-note">${esc(note)}</span>` : ""}</span></button>`;
+}
+function sidebar() {
+  // Teachers see their own tools first; the student pages follow as a preview,
+  // labelled with what each page is rather than a status that only means
+  // something to a student.
+  let teacher = !isStudent_();
+  let h = "";
+  if (teacher) {
+    h += `<div class="nav-group"><div class="nav-title">Teacher</div>`;
+    h += navItem_("manage", "Dashboard", "Grading, gradebook, release", "var(--amber)");
+    h += navItem_("grade", "Grade the Memoir", "One piece at a time", "var(--amber)");
+    if (state.role === "admin") h += navItem_("admin", "Admin", "Teacher access", "var(--muted)");
+    h += `</div>`;
+  }
+  let note = (st, plain) => (teacher ? plain : st.label);
+  let cls = (st) => (teacher ? "" : "st-" + st.kind);
+  h += `<div class="nav-group"><div class="nav-title">${teacher ? "Student pages" : "Your memoir"}</div>`;
+  h += navItem_("home", "Start here", "How a memoir is built", "var(--muted)", "nav-home");
+  STAGES.forEach((s, i) => {
+    let st = pieceStatus_(s.key);
+    h += navItem_("stage:" + s.key, `${i + 1} · ${esc(s.label)}`, note(st, s.note), s.color, cls(st));
+    if (s.key === "lead") {
+      let sh = pieceStatus_("share");
+      h += navItem_("share", "Lead Share board", note(sh, "Post the Lead, reply to two"), pieceColor("share"), "nav-sub " + cls(sh));
+    }
+  });
+  h += `</div><div class="nav-group"><div class="nav-title">Finish</div>`;
+  let fin = pieceStatus_(MEMOIR_FINAL_KEY);
+  h += navItem_("review", "Review &amp; Turn In", note(fin, "All six stages, self-rating"), pieceColor("final"), cls(fin));
+  let po = pieceStatus_(MEMOIR_POSTER_KEY);
+  h += navItem_("poster", "Memoir Poster", note(po, "Title, byline, the whole memoir"), pieceColor("poster"), cls(po));
+  h += navItem_("grades", "Your Grades", teacher ? "What students see" : "Scores and what's waiting", "var(--peri)");
+  h += `</div>`;
+  let el = document.getElementById("sidebar");
+  el.innerHTML = h;
+  el.querySelectorAll(".nav-item").forEach((b) => (b.onclick = () => openView_(b.dataset.view)));
+}
+function openView_(view) {
+  if (!viewReleased_(view) && isStudent_()) {
+    go_(view);   // the page itself explains it is not open yet
+    return;
+  }
+  go_(view);
+}
+
+// ---- Start page -------------------------------------------------------------------------
+function home() {
+  let next = nextStageKey_();
+  let started = STAGE_KEYS.some((k) => stageText_(k).trim());
+  let cta = next
+    ? `<button type="button" class="btn btn-primary btn-lg" data-view="stage:${next}">${started ? "Pick up where you left off: " + esc(STAGE_BY_KEY[next].label) : "Begin with The Lead"} ${icon("right")}</button>`
+    : `<button type="button" class="btn btn-primary btn-lg" data-view="review">Review &amp; turn in your memoir ${icon("right")}</button>`;
+  let road = STAGES.map((s, i) => {
+    let st = pieceStatus_(s.key);
+    return `<button type="button" class="road-step st-${st.kind}" data-view="stage:${s.key}" style="--acc:${s.color}">
+      <span class="road-num">${i + 1}</span><span class="road-text"><strong>${esc(s.label)}</strong><span>${esc(s.note)}</span></span>${statusChip_(st)}</button>`;
+  }).join("");
+  return `<section class="hero">
+      <div class="eyebrow">Personal narrative</div>
+      <h1 class="hero-title">Memoir <em>Lead to Climax</em></h1>
+      <p class="hero-lede">Great memoirs often don't start at the true beginning. They open with a flash of the most intense moment, rewind to tell the story in order, circle back to that same moment for a slow-motion climax, and finally step back to reflect on why it mattered.</p>
+      <div class="arc-card is-hero">${arcSvg_(null, { large: true })}</div>
+      <div class="hero-actions">${cta}</div>
+    </section>
+    <section class="card">
+      <div class="card-head"><h2 class="card-title">Six stages</h2><span class="muted-note">Move between them freely — click any stage to jump there.</span></div>
+      <div class="roadmap">${road}</div>
+    </section>
+    <section class="card notes-card">
+      <h2 class="card-title">How this works</h2>
+      <ul class="plain-list">
+        <li><strong>Your draft saves automatically</strong> to your school account as you type — nothing to download or upload.</li>
+        <li><strong>Turn in each stage</strong> when it's ready. You can keep revising afterwards; if you change it, turn it in again.</li>
+        <li><strong>Pasting from outside the app is turned off</strong> in every writing box${state.leadPaste !== false ? " except The Lead — if you already wrote your lead as a discussion post, paste it in there" : ""}. You can always move your own sentences between stages.</li>
+        <li><strong>Your teacher can see</strong> each box's word count, writing time, and anything pasted in. It's there to help a conversation about your writing, never to decide anything on its own.</li>
+        <li>Turn <strong>More support</strong> (why the move works, sentence starters, an example, a checklist) on or off whenever you like.</li>
+      </ul>
+    </section>`;
+}
+
+// ---- One stage ------------------------------------------------------------------------------
+// The writing box is the page. The task, the reference passage and the
+// checklist sit in the column on the right; More support adds the why, the
+// starters and an example there too. Focus hides the app's own navigation and
+// the story arc so only the writing and its instructions remain -- with one
+// obvious way back out.
+function focusBtnHtml_() {
+  return state.focus
+    ? `<button type="button" class="btn btn-sm focus-toggle is-on" id="focusToggle" aria-pressed="true" title="Show the menu and story arc again (Esc)">${icon("shrink")} Exit focus</button>`
+    : `<button type="button" class="btn btn-sm focus-toggle" id="focusToggle" aria-pressed="false" title="Hide the menu and story arc while you write">${icon("expand")} Focus</button>`;
+}
+function highlightOn_() { return state.highlighting === true; }
+function stagePage(key) {
+  let s = STAGE_BY_KEY[key];
+  if (!s) return home();
+  let st = pieceStatus_(key);
+  let nb = flowNeighbours_("stage:" + key);
+  if (!released_(key)) {
+    return `<div class="stage-page" style="--acc:${s.color}"><section class="arc-card">${arcSvg_(key)}</section>
+      <section class="card locked-card">${icon("lock", "ic-lg")}<h1 class="page-title">${esc(s.label)} isn't open yet</h1>
+      <p>Your teacher opens each stage as the class reaches it. Anything you've already written here is saved and will be waiting for you.</p>
+      <div class="nav-row"><button type="button" class="btn" data-view="${nb.prev}">${icon("left")} ${esc(flowLabel_(nb.prev))}</button></div></section></div>`;
+  }
+  let more = state.scaffold !== "less";
+  let hl = highlightOn_();
+  let text = stageText_(key);
+  let log = state.memoir.cadence[key] || [];
+  let counts = cadenceCounts_(log);
+  let ref = s.refKey ? stageText_(s.refKey).trim() : "";
+  let refLabel = s.refKey ? STAGE_BY_KEY[s.refKey].label : "";
+  let paste = pasteAllowedIn_(key);
+  let placeholder = key === "lead" && paste ? "Type your Lead here, or paste it in from your discussion post…" : "Start writing here…";
+  let passFail = !!MEMOIR_PASS_FAIL[key];
+  let refHtml = s.refKey
+    ? `<details class="rail-card ref-panel" open><summary class="rail-title">Your ${esc(refLabel)}, for reference</summary>${ref ? `<p class="ref-text">${esc(ref)}</p>` : `<p class="ref-empty">You haven't written ${esc(refLabel)} yet.</p>`}</details>`
+    : "";
+  let checklist = `<div class="rail-card"><div class="rail-title">Craft checklist</div>${s.checklist.map((item, i) => `<label class="check-item ${state.memoir.checks[key][i] ? "is-checked" : ""}"><input type="checkbox" class="checkBox" data-stage="${key}" data-idx="${i}" ${state.memoir.checks[key][i] ? "checked" : ""}><span>${esc(item)}</span></label>`).join("")}</div>`;
+  let support = more
+    ? `<div class="rail-card"><div class="rail-title">Why this move</div><p>${s.why}</p></div>
+       <div class="rail-card"><div class="rail-title">Sentence starters</div><ul class="starter-list">${s.starters.map((x) => `<li>${esc(x)}</li>`).join("")}</ul></div>
+       <div class="rail-card"><div class="rail-title">Example</div><p class="example-text">${esc(s.example)}</p></div>`
+    : `<p class="rail-less">Less support is on: the explanation, sentence starters and example are hidden. Your task and checklist stay.</p>`;
+  let hlCard = hl ? `<section class="hl-card">
+          <div class="hl-bar">
+            <span class="hl-label">Highlight a selection</span>
+            <button type="button" class="hl-btn hl-btn-internal" id="tagInternal"><span class="sw" aria-hidden="true"></span>Internal</button>
+            <button type="button" class="hl-btn hl-btn-external" id="tagExternal"><span class="sw" aria-hidden="true"></span>External</button>
+            <button type="button" class="hl-undo" id="tagUndo" ${log.length ? "" : "disabled"}>Undo</button>
+            <div class="hl-balance" id="hlBalance">${hlBalanceHtml_(counts)}</div>
+          </div>
+          <p class="hl-help">Now that your draft is written, look at how it moves between inside and outside. Select words, then mark them <strong>Internal</strong> (thoughts, feelings, questions) or <strong>External</strong> (actions, sounds, dialogue, what you see). Aim for a mix.</p>
+          <p class="hl-tip ${cadenceTip_(log) ? "show" : ""}" id="hlTip">${esc(cadenceTip_(log))}</p>
+        </section>` : "";
+  return `<div class="stage-page stage-writing" style="--acc:${s.color}">
+    <section class="arc-card stage-arc">${arcSvg_(key)}</section>
+    <div class="stage-grid">
+      <div class="stage-main">
+        <div class="stage-head">
+          <div class="stage-head-text">
+            <div class="eyebrow-row"><span class="eyebrow" style="color:${s.color}">Stage ${s.index + 1} of 6</span><span class="graded-badge">${passFail ? "Graded · complete / incomplete" : "Graded assignment · " + MEMOIR_STEP_POINTS[key] + " pts"}</span><span id="stageStatus">${statusChip_(st)}</span></div>
+            <h1 class="page-title">${esc(s.title)}</h1>
+          </div>
+          ${focusBtnHtml_()}
+        </div>
+        <p class="task-inline"><strong>Your task.</strong> ${s.task}</p>
+        <div class="writer">
+          <div class="writer-backdrop" aria-hidden="true"><div class="writer-backdrop-inner" id="writerBackdrop">${highlightedHtml_(text, hl ? log : [])}</div></div>
+          <textarea class="writer-input has-backdrop" id="writerBox" data-stage="${key}" spellcheck="true" placeholder="${esc(placeholder)}" aria-label="${esc(s.label)} — your writing">${esc(text)}</textarea>
+        </div>
+        <div class="writer-foot">${studentProcessLine_(key)}<p class="paste-rule">${paste ? (isStudent_() ? "Pasting is allowed in this box." : "Teacher preview: pasting is allowed everywhere.") : "Pasting from outside the app is off in this box. Moving your own sentences between stages still works."}</p></div>
+        ${hlCard}
+        ${coachCardHtml_(key)}
+        <div class="nav-row">
+          <button type="button" class="btn" data-view="${nb.prev}">${icon("left")} ${esc(flowLabel_(nb.prev))}</button>
+          <span class="nav-row-right" id="turnInArea">${turnInAreaHtml_(key, nb.next)}</span>
+        </div>
+      </div>
+      <aside class="stage-rail ${more ? "" : "is-less"}" aria-label="Instructions for ${esc(s.label)}">
+        <div class="rail-card rail-task"><div class="rail-title">Your task</div><p>${s.task}</p></div>
+        ${refHtml}
+        ${checklist}
+        <div class="seg" role="group" aria-label="Support level"><button type="button" class="seg-btn ${more ? "active" : ""}" id="supportMore" aria-pressed="${more}">More support</button><button type="button" class="seg-btn ${more ? "" : "active"}" id="supportLess" aria-pressed="${!more}">Less support</button></div>
+        ${support}
+      </aside>
+    </div>
+  </div>`;
+}
+function hlBalanceHtml_(c) {
+  let total = c.internal + c.external;
+  let pi = total ? Math.round((c.internal / total) * 100) : 0;
+  return `<div class="hl-meter" role="img" aria-label="${c.internal} internal and ${c.external} external highlights">${total ? `<span class="m-in" style="width:${pi}%"></span><span class="m-ex" style="width:${100 - pi}%"></span>` : ""}</div><span class="hl-counts"><strong>${c.internal}</strong> internal · <strong>${c.external}</strong> external</span>`;
+}
+function turnInAreaHtml_(key, nextView) {
+  let sub = submissionOf_(key);
+  let nextBtn = nextView ? `<button type="button" class="btn ${sub.submitted ? "btn-primary" : ""}" data-view="${nextView}">${esc(flowLabel_(nextView))} ${icon("right")}</button>` : "";
+  let label = !sub.text ? "Turn in" : sub.submitted ? "Turned in" : sub.changed ? "Turn in again" : "Turn in " + STAGE_BY_KEY[key].label;
+  let turn = `<button type="button" class="btn ${sub.submitted ? "btn-done" : "btn-primary"}" id="turnInBtn" data-stage="${key}" ${!sub.text || sub.submitted ? "disabled" : ""}>${sub.submitted ? icon("check") + " " : ""}${esc(label)}</button>`;
+  let note = sub.submitted && sub.at ? `<span class="turnin-note">Turned in ${esc(new Date(sub.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</span>`
+    : sub.changed ? `<span class="turnin-note warn">You changed this after turning it in.</span>` : "";
+  return `${note}${turn}${nextBtn}`;
+}
+function coachCardHtml_(key) {
+  if (!aiOn_() || state.aiCoach === false) return "";
+  let b = backend_();
+  let configured = !(b && b.enabled && b.ready) || b.aiConfigured !== false;
+  if (!configured && isStudent_()) return "";
+  let entries = (state.memoir.coach || {})[key] || [];
+  let latest = entries[entries.length - 1];
+  let older = entries.slice(0, -1).reverse();
+  let body = latest
+    ? `<div class="coach-reply"><div class="coach-when">${esc(new Date(latest.at).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</div><p>${esc(latest.text)}</p></div>${older.length ? `<details class="coach-older"><summary>Earlier feedback (${older.length})</summary>${older.map((e) => `<div class="coach-reply is-old"><div class="coach-when">${esc(new Date(e.at).toLocaleString())}</div><p>${esc(e.text)}</p></div>`).join("")}</details>` : ""}`
+    : `<p class="coach-empty">When you have a draft, the coach will name one move that's working and ask a question or two to help you revise. It never rewrites your words.</p>`;
+  return `<section class="coach-card" id="coachCard">
+    <div class="coach-head"><div><span class="coach-title">${icon("chat")} Writing coach</span><span class="ai-tag" title="Feedback is generated by AI. Treat it as ideas to consider, not as a grade.">AI</span></div>
+    <button type="button" class="btn btn-ghost" id="coachBtn" data-stage="${key}" ${configured ? "" : "disabled"}>Ask about this draft</button></div>
+    ${configured ? "" : `<p class="coach-empty">Add a GEMINI_API_KEY in Script Properties to turn the coach on. Students don't see this card until then.</p>`}
+    <div id="coachBody">${body}</div>
+  </section>`;
+}
+
+// ---- Lead Share board -----------------------------------------------------------------------
+function sharePosts_() {
+  let b = backend_();
+  if (connected_()) return b.discussion || [];
+  return Array.isArray(state.localShare) ? state.localShare : [];
+}
+function myEmail_() { let b = backend_(); return String((b && b.user && b.user.email) || "you@local").toLowerCase(); }
+function isMine_(x) { return x && typeof x.mine === "boolean" ? x.mine : String((x && x.email) || "").toLowerCase() === myEmail_(); }
+function shareOwnPost_() {
+  let me = myEmail_();
+  return sharePosts_().find((p) => isMine_(p)) || null;
+}
+function sharePostHtml_(p) {
+  let me = myEmail_();
+  let mine = isMine_(p);
+  let teacher = !isStudent_();
+  let replies = (p.replies || []).map((r) => `<div class="reply"><div class="reply-head"><strong>${esc(r.name || "Classmate")}</strong>${isMine_(r) ? '<span class="you-tag">You</span>' : ""}<small>${esc(new Date(r.date).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</small>${teacher && connected_() ? `<button type="button" class="link-btn removeShareItem" data-kind="reply" data-id="${esc(r.id)}">Remove</button>` : ""}</div><p>${esc(r.text)}</p></div>`).join("");
+  let stamp = p.updatedAt && String(p.updatedAt) !== String(p.date) ? "Updated " + new Date(p.updatedAt).toLocaleString([], { month: "short", day: "numeric" }) : "Posted " + new Date(p.date).toLocaleString([], { month: "short", day: "numeric" });
+  let replyControl = mine || teacher ? "" : `<button type="button" class="btn btn-ghost btn-sm replyToggle">${icon("chat")} Reply</button>
+    <div class="reply-compose hide"><label class="sr-only" for="reply-${esc(p.id)}">Reply to ${esc(p.name)}</label><textarea id="reply-${esc(p.id)}" class="replyText" maxlength="3000" placeholder="What works in ${esc(p.name || "their")} lead? Then ask one question or make one suggestion."></textarea>
+    <div class="reply-actions"><button type="button" class="btn btn-sm replyCancel">Cancel</button><button type="button" class="btn btn-primary btn-sm replySubmit" data-postid="${esc(p.id)}">Post reply</button></div></div>`;
+  return `<article class="share-post ${mine ? "is-mine" : ""}">
+    <div class="share-head"><strong>${esc(p.name || "Student")}</strong>${mine ? '<span class="you-tag">You</span>' : ""}<small>${esc(stamp)}</small>${teacher && connected_() ? `<button type="button" class="link-btn removeShareItem" data-kind="post" data-id="${esc(p.id)}">Remove post</button>` : ""}</div>
+    <p class="share-text">${esc(p.text)}</p>
+    ${replies ? `<div class="replies">${replies}</div>` : ""}
+    <div class="share-actions">${replyControl}</div></article>`;
+}
+function sharePage() {
+  let color = pieceColor("share");
+  if (!released_("share")) return lockedPage_("The Lead Share board", color, "stage:lead");
+  let posts = sharePosts_();
+  let own = shareOwnPost_();
+  let lead = stageText_("lead").trim();
+  let current = !!own && String(own.text || "").trim() === lead;
+  let btnLabel = own ? (current ? "Your post is up to date" : "Update my post") : "Post my Lead to the board";
+  let myReplies = posts.reduce((n, p) => n + (p.replies || []).filter((r) => isMine_(r)).length, 0);
+  let st = pieceStatus_("share");
+  let studentPart = isStudent_()
+    ? `<section class="card share-me">
+        <div class="card-head"><h2 class="card-title">Your Lead</h2>${statusChip_(st)}</div>
+        ${lead ? `<p class="share-preview">${esc(lead)}</p>` : `<p class="ref-empty">Write your Lead first — then post it here.</p>`}
+        <div class="share-me-actions"><button type="button" class="btn btn-primary" id="postLeadBtn" ${!lead || current ? "disabled" : ""}>${current ? icon("check") + " " : ""}${esc(btnLabel)}</button>
+        <span class="pill">${myReplies} repl${myReplies === 1 ? "y" : "ies"} written</span><span class="muted-note">${own ? "Revised your Lead? Update the same post — replies stay attached." : "Posts and replies are shared with your class."}</span></div>
+      </section>`
+    : `<section class="card"><p class="muted-note">${connected_() ? "The board for the class selected on your dashboard. You can remove any post or reply." : "Preview of the board students see."}</p></section>`;
+  let others = posts.filter((p) => !isMine_(p));
+  let mine = posts.filter((p) => isMine_(p));
+  let list = mine.concat(others);
+  return `<div class="stage-page" style="--acc:${color}">
+    <div class="page-head"><div class="eyebrow" style="color:${color}">After Stage 1</div><h1 class="page-title">Lead Share</h1>
+    <p class="page-sub">Post your Lead for classmates to read, then reply to <strong>at least two</strong> classmates: name one thing that works, and ask one question or make one suggestion. <span class="graded-badge">Graded assignment · 7 pts</span></p></div>
+    ${studentPart}
+    <div class="share-board" id="shareBoard">${list.length ? list.map(sharePostHtml_).join("") : `<p class="empty-note">No one has posted yet.</p>`}</div>
+    <div class="nav-row"><button type="button" class="btn" data-view="stage:lead">${icon("left")} The Lead</button><span class="nav-row-right"><button type="button" class="btn" id="refreshShareBtn">${icon("refresh")} Refresh</button><button type="button" class="btn btn-primary" data-view="stage:beginning">The Beginning ${icon("right")}</button></span></div>
+  </div>`;
+}
+function lockedPage_(name, color, backView) {
+  return `<div class="stage-page" style="--acc:${color}"><section class="card locked-card">${icon("lock", "ic-lg")}<h1 class="page-title">${esc(name)} isn't open yet</h1>
+    <p>Your teacher opens this when the class reaches it. Your writing is saved.</p>
+    <div class="nav-row"><button type="button" class="btn" data-view="${backView}">${icon("left")} ${esc(flowLabel_(backView))}</button></div></section></div>`;
+}
+
+// ---- Review & Turn In ----------------------------------------------------------------------
+function reviewPage() {
+  let color = pieceColor("final");
+  if (!released_("final")) return lockedPage_("Review & Turn In", color, "stage:sowhat");
+  let hl = highlightOn_();
+  let mode = hl && state.memoir.reviewMode === "read" ? "read" : "edit";
+  let totalWords = 0, ci = 0, ce = 0, turned = 0;
+  STAGE_KEYS.forEach((k) => {
+    totalWords += wordCount(stageText_(k));
+    let c = cadenceCounts_(state.memoir.cadence[k]);
+    ci += c.internal; ce += c.external;
+    if (submissionOf_(k).submitted) turned++;
+  });
+  let sections = STAGES.map((s, i) => {
+    let text = stageText_(s.key);
+    let st = pieceStatus_(s.key);
+    let open = released_(s.key);
+    let body = mode === "read"
+      ? (text.trim() ? `<div class="review-read">${highlightedHtml_(text, state.memoir.cadence[s.key])}</div>` : `<p class="ref-empty">Not written yet.</p>`)
+      : open
+        ? `<textarea class="writer-input review-input" data-stage="${s.key}" spellcheck="true" aria-label="${esc(s.label)}" placeholder="${s.key === "lead" && pasteAllowedIn_("lead") ? "Type or paste your Lead…" : "Start writing here…"}">${esc(text)}</textarea>${studentProcessLine_(s.key)}`
+        : `<div class="review-read">${esc(text) || "<em>Not written yet.</em>"}</div><p class="muted-note">Your teacher hasn't opened this stage yet, so it can't be edited here.</p>`;
+    return `<section class="review-section" style="--acc:${s.color}"><div class="review-head"><span class="review-num" style="background:${s.color}">${i + 1}</span><h3>${esc(s.label)}</h3>${statusChip_(st)}<button type="button" class="link-btn" data-view="stage:${s.key}">Open stage</button></div>${body}</section>`;
+  }).join("");
+  let selfRows = MEMOIR_CRITERIA.map((c) => {
+    let cur = state.memoir.selfEval[c];
+    let btns = BAND_LABELS.map((b, i) => `<button type="button" class="band-btn ${String(cur) === String(i) ? "selected" : ""}" data-crit="${esc(c)}" data-band="${i}" title="${esc(MEMOIR_RUBRIC[c][i])}"><span class="band-name">${esc(b)}</span><span class="band-pts">${CRITERION_POINTS[i]}</span></button>`).join("");
+    let desc = cur !== undefined && cur !== "" ? MEMOIR_RUBRIC[c][Number(cur)] : "Choose the band that best describes your memoir right now. Hover a band to read it.";
+    return `<div class="self-row"><div class="self-head"><strong>${esc(c)}</strong></div><div class="band-row">${btns}</div><p class="band-desc" id="bandDesc-${esc(c).replace(/[^A-Za-z]/g, "")}">${esc(desc)}</p>
+      <label class="sr-only" for="selfc-${esc(c).replace(/[^A-Za-z]/g, "")}">Why? (${esc(c)})</label><textarea class="self-comment" id="selfc-${esc(c).replace(/[^A-Za-z]/g, "")}" data-crit="${esc(c)}" placeholder="Why? Point to a moment in your memoir.">${esc(state.memoir.selfComments[c] || "")}</textarea></div>`;
+  }).join("");
+  let fin = submissionOf_(MEMOIR_FINAL_KEY);
+  let fst = pieceStatus_(MEMOIR_FINAL_KEY);
+  let rated = MEMOIR_CRITERIA.filter((c) => state.memoir.selfEval[c] !== undefined && state.memoir.selfEval[c] !== "").length;
+  return `<div class="stage-page" style="--acc:${color}">
+    <div class="page-head"><div class="eyebrow">Finish</div><h1 class="page-title">Review &amp; Turn In</h1>
+      <p class="page-sub">All six stages together, in order. Revise anything here — it's the same writing as each stage page — then rate yourself and turn in your Final Memoir. <span class="graded-badge">Graded assignment · ${MEMOIR_CRITERIA.length * CRITERION_MAX} pts</span></p></div>
+    <div class="stat-row"><span class="pill"><strong>${totalWords}</strong> words</span><span class="pill"><strong>${turned}</strong> of 6 stages turned in</span>${hl ? `<span class="pill pill-in"><strong>${ci}</strong> internal</span><span class="pill pill-ex"><strong>${ce}</strong> external</span>` : ""}</div>
+    ${hl ? `<div class="seg seg-inline" role="group" aria-label="Review mode"><button type="button" class="seg-btn ${mode === "edit" ? "active" : ""}" id="reviewEdit">${icon("pen")} Edit all sections</button><button type="button" class="seg-btn ${mode === "read" ? "active" : ""}" id="reviewRead">${icon("eye")} Highlighted view</button></div>` : ""}
+    ${mode === "read" ? `<p class="legend"><span><span class="sw sw-in"></span>Internal</span><span><span class="sw sw-ex"></span>External</span><span>Unmarked text isn't highlighted yet.</span></p>` : ""}
+    <div class="review-list">${sections}</div>
+    <section class="card self-card"><div class="card-head"><h2 class="card-title">Rate yourself</h2><span class="muted-note">${rated} of 4 rated · your teacher sees this beside their own scoring</span></div>${selfRows}</section>
+    <section class="card final-card"><div class="card-head"><h2 class="card-title">Turn in your Final Memoir</h2>${statusChip_(fst)}</div>
+      <p class="muted-note">Turning it in sends the whole memoir, exactly as it reads above, to your teacher. You can keep revising — if you change it, turn it in again.</p>
+      <div class="nav-row"><button type="button" class="btn" id="downloadDraftBtn">${icon("download")} Download as text</button>
+      <span class="nav-row-right"><button type="button" class="btn ${fin.submitted ? "btn-done" : "btn-primary"}" id="turnInFinalBtn" ${!fin.text || fin.submitted ? "disabled" : ""}>${fin.submitted ? icon("check") + " Final Memoir turned in" : fin.changed ? "Turn in again" : "Turn in Final Memoir"}</button><button type="button" class="btn" data-view="poster">Make your poster ${icon("right")}</button></span></div>
+    </section>
+  </div>`;
+}
+
+// ---- Poster -----------------------------------------------------------------------------------
+// An optional AI-painted background (told to contain no letters) with the
+// student's exact memoir drawn on top in the browser. The words never pass
+// through any text-generating step, so every one of them is guaranteed to be
+// exactly what the student wrote.
+let posterBg_ = null;          // the background image in use, if any
+let posterDrawn_ = false;
+function posterPage() {
+  let color = pieceColor("poster");
+  if (!released_("poster")) return lockedPage_("The Memoir Poster", color, "review");
+  let p = state.memoir.poster || {};
+  let b = backend_();
+  let saved = b && b.poster && b.poster.savedAt ? b.poster : null;
+  let ai = aiOn_() && state.aiPoster !== false;
+  let aiReady = !(b && b.enabled && b.ready) || b.aiConfigured !== false;
+  let st = pieceStatus_(MEMOIR_POSTER_KEY);
+  return `<div class="stage-page" style="--acc:${color}">
+    <div class="page-head"><div class="eyebrow">Finish</div><h1 class="page-title">Memoir Poster</h1>
+      <p class="page-sub">Your title and name at the top, then your whole memoir. <strong>None of your writing is changed</strong> — every word is placed exactly as you wrote it, flowing as one piece with no stage labels. <span class="graded-badge">Graded · complete / incomplete</span></p></div>
+    <div class="poster-grid">
+      <section class="card poster-form">
+        <div class="field"><label for="posterTitle">Title</label><div class="field-row"><input id="posterTitle" maxlength="90" value="${esc(p.title)}" placeholder="Type your own title">${ai && aiReady ? `<button type="button" class="btn btn-ghost" id="suggestTitleBtn">Suggest a title <span class="ai-tag">AI</span></button>` : ""}</div></div>
+        <div class="field"><label for="posterAuthor">Your name <small>shown as “By ___”</small></label><input id="posterAuthor" maxlength="60" value="${esc(p.author)}" placeholder="e.g. Jamie K."></div>
+        ${ai && aiReady ? `<div class="field"><label for="posterHint">A feeling, colour or image for the background <small>optional</small></label><input id="posterHint" maxlength="200" value="${esc(p.hint)}" placeholder="e.g. a quiet gym, late light, nervous excitement"></div>` : ""}
+        <div class="poster-actions">${ai && aiReady ? `<button type="button" class="btn btn-primary" id="paintBtn">${icon("image")} Paint a background <span class="ai-tag">AI</span></button>` : ""}<button type="button" class="btn ${ai && aiReady ? "" : "btn-primary"}" id="plainBtn">${ai && aiReady ? "Use a plain background" : "Make my poster"}</button></div>
+        <p class="poster-status" id="posterStatus" aria-live="polite"></p>
+        <div class="poster-turnin">${statusChip_(st)}${saved ? `<span class="muted-note">Last turned in ${esc(new Date(saved.savedAt).toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }))}</span>` : ""}</div>
+        <div class="poster-actions"><button type="button" class="btn" id="downloadPosterBtn" disabled>${icon("download")} Download PNG</button><button type="button" class="btn btn-primary" id="turnInPosterBtn" disabled>Turn in poster</button></div>
+        ${ai && aiReady ? `<p class="muted-note">The background comes from a free image service and can take up to 30 seconds. It allows about one picture every 15 seconds.</p>` : ""}
+      </section>
+      <section class="poster-preview" id="posterPreview">${saved ? `<p class="muted-note">Loading the poster you turned in…</p>` : `<div class="poster-empty">${icon("image", "ic-lg")}<p>Your poster appears here.</p></div>`}</section>
+    </div>
+    <div class="nav-row"><button type="button" class="btn" data-view="review">${icon("left")} Review &amp; Turn In</button><span class="nav-row-right"><button type="button" class="btn" data-view="grades">Your Grades ${icon("right")}</button></span></div>
+  </div>`;
+}
+function setPosterStatus_(text, kind) {
+  let el = document.getElementById("posterStatus");
+  if (el) { el.textContent = text || ""; el.className = "poster-status " + (kind || ""); }
+}
+function wrapCanvasText_(ctx, text, maxWidth) {
+  let lines = [];
+  String(text).split(/\n+/).forEach((para, idx, all) => {
+    let line = "";
+    para.split(/\s+/).filter(Boolean).forEach((word) => {
+      let test = line ? line + " " + word : word;
+      if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = word; }
+      else line = test;
+    });
+    if (line) lines.push(line);
+    if (idx < all.length - 1) lines.push("");
+  });
+  return lines;
+}
+async function posterFontsReady_() {
+  try {
+    await Promise.all([document.fonts.load('400 54px "Instrument Serif"'), document.fonts.load('400 19px "Literata"'), document.fonts.load('italic 400 20px "Literata"')]);
+  } catch (e) {}
+}
+async function drawPoster_(bgImg) {
+  await posterFontsReady_();
+  let wrap = document.getElementById("posterPreview");
+  if (!wrap) return;
+  let canvas = document.getElementById("posterCanvas");
+  if (!canvas) { wrap.innerHTML = `<canvas id="posterCanvas" class="poster-canvas" role="img" aria-label="Your memoir poster"></canvas>`; canvas = document.getElementById("posterCanvas"); }
+  let ctx = canvas.getContext("2d");
+  let W = 1000, pad = 76, maxW = W - pad * 2, lh = 31, pgap = 20;
+  let title = (state.memoir.poster.title || "").trim() || "My Memoir";
+  let byline = (state.memoir.poster.author || "").trim();
+  let titleFont = '400 54px "Instrument Serif", Georgia, serif';
+  let bodyFont = '400 19px "Literata", Georgia, serif';
+  ctx.font = titleFont;
+  let titleLines = wrapCanvasText_(ctx, title, maxW).filter(Boolean);
+  ctx.font = bodyFont;
+  let paras = STAGE_KEYS.map((k) => stageText_(k).trim()).filter(Boolean);
+  if (!paras.length) paras = ["(Nothing written yet — write your memoir first.)"];
+  let wrapped = paras.map((t) => wrapCanvasText_(ctx, t, maxW));
+  let h = pad + titleLines.length * 60 + (byline ? 44 : 10) + 44;
+  wrapped.forEach((ls) => { h += ls.length * lh + pgap; });
+  h = Math.max(1300, Math.round(h + pad));
+  canvas.width = W; canvas.height = h;
+  if (bgImg) {
+    let sc = Math.max(W / bgImg.width, h / bgImg.height);
+    let sw = W / sc, sh = h / sc;
+    ctx.drawImage(bgImg, (bgImg.width - sw) / 2, (bgImg.height - sh) / 2, sw, sh, 0, 0, W, h);
+    let g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, "rgba(14,16,21,0.50)"); g.addColorStop(0.25, "rgba(14,16,21,0.66)"); g.addColorStop(1, "rgba(14,16,21,0.74)");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, h);
+  } else {
+    let g = ctx.createLinearGradient(0, 0, 0, h);
+    g.addColorStop(0, "#1C2029"); g.addColorStop(1, "#12141A");
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, h);
+    // The unit's story arc, faint, behind the title.
+    ctx.save(); ctx.globalAlpha = 0.22; ctx.strokeStyle = "#E9A94B"; ctx.lineWidth = 3;
+    let p = new Path2D("M90,118 C135,113 275,104 360,90 C445,76 540,48 600,36 C660,24 677,5 720,16 C763,27 837,86 860,100");
+    ctx.translate(40, 40); ctx.stroke(p); ctx.restore();
+  }
+  ctx.textAlign = "center"; ctx.fillStyle = "#F3EFE7"; ctx.font = titleFont;
+  let y = pad + 44;
+  titleLines.forEach((l) => { ctx.fillText(l, W / 2, y); y += 60; });
+  if (byline) { ctx.font = 'italic 400 20px "Literata", Georgia, serif'; ctx.fillStyle = "#D8D3C8"; ctx.fillText("By " + byline, W / 2, y + 2); y += 44; }
+  ctx.fillStyle = "rgba(233,169,75,0.85)"; ctx.fillRect(W / 2 - 28, y - 6, 56, 2); y += 44;
+  ctx.textAlign = "left"; ctx.font = bodyFont; ctx.fillStyle = "#EFEBE3";
+  wrapped.forEach((ls) => { ls.forEach((l) => { ctx.fillText(l, pad, y); y += lh; }); y += pgap; });
+  posterDrawn_ = true;
+  ["downloadPosterBtn", "turnInPosterBtn"].forEach((id) => { let bt = document.getElementById(id); if (bt) bt.disabled = false; });
+}
+// A copy small enough to store with the class: a JPEG that fits in the
+// POSTERS tab's eight cells.
+function posterJpeg_() {
+  let canvas = document.getElementById("posterCanvas");
+  if (!canvas) return null;
+  let tries = [[900, 0.82], [820, 0.76], [720, 0.72], [640, 0.66], [560, 0.6], [480, 0.55]];
+  for (let i = 0; i < tries.length; i++) {
+    let [w, q] = tries[i];
+    let scale = Math.min(1, w / canvas.width);
+    let c2 = document.createElement("canvas");
+    c2.width = Math.round(canvas.width * scale); c2.height = Math.round(canvas.height * scale);
+    c2.getContext("2d").drawImage(canvas, 0, 0, c2.width, c2.height);
+    let url = c2.toDataURL("image/jpeg", q);
+    let b64 = url.slice(url.indexOf(",") + 1);
+    if (b64.length <= 350000) return { image: b64, mimeType: "image/jpeg", width: c2.width, height: c2.height };
+  }
+  return null;
+}
+function downloadBlob_(blob, name) {
+  let url = URL.createObjectURL(blob);
+  let a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1500);
+}
+function downloadDraft_() {
+  let content = ((state.memoir.poster.title || "").trim() || "My Memoir") + "\n" + "=".repeat(40) + "\n\n";
+  STAGES.forEach((s) => {
+    let label = s.label.toUpperCase();
+    content += label + "\n" + "-".repeat(label.length) + "\n" + (stageText_(s.key).trim() || "(not written yet)") + "\n\n";
+  });
+  downloadBlob_(new Blob([content], { type: "text/plain" }), "memoir-draft.txt");
+}
+
+// ---- Your Grades ---------------------------------------------------------------------------------
+// Same rules as the teacher's gradebook: not started is "Not started yet",
+// never 0; left out of the grade says so; turned-in work nobody has marked yet
+// is named as waiting for the teacher.
+function gradesPage() {
+  let b = backend_();
+  let gs = b && b.gradeSummary && b.gradeSummary.memoir;
+  let cards = MEMOIR_GRADE_KEYS.map((key) => {
+    let label = MEMOIR_GRADE_LABELS[key];
+    let color = pieceColor(key);
+    let head = `<span class="grade-eyebrow">${esc(worthLabel_(key))}</span><span class="grade-name">${esc(label)}</span>`;
+    if (!gs) return `<div class="grade-card is-quiet" style="--acc:${color}">${head}<span class="grade-status">${isStudent_() ? "Connect to your class to see grades" : "Students see their scores here"}</span></div>`;
+    if (key === MEMOIR_FINAL_KEY) {
+      let t = gs.finalTotal || {};
+      if (!t.possible) return `<div class="grade-card is-quiet" style="--acc:${color}">${head}<span class="grade-status">Not graded</span><p class="grade-note">Your teacher left this out of the grade.</p></div>`;
+      if (t.hasAnyResult) return `<div class="grade-card" style="--acc:${color}">${head}<strong class="grade-score">${t.earned}<small>/${t.possible}</small></strong>${t.unmarked ? `<p class="grade-note">${t.unmarked} criteri${t.unmarked === 1 ? "on" : "a"} still to be scored</p>` : ""}</div>`;
+      if (t.submitted) return `<div class="grade-card is-waiting" style="--acc:${color}">${head}<span class="grade-status">Waiting for your teacher</span><p class="grade-note">Turned in ${esc(new Date(t.submittedAt).toLocaleDateString())}</p></div>`;
+      return `<div class="grade-card is-quiet" style="--acc:${color}">${head}<span class="grade-status">Not turned in yet</span></div>`;
+    }
+    let r = (gs.steps || {})[key];
+    if (!r) return "";
+    if (r.excluded) return `<div class="grade-card is-quiet" style="--acc:${color}">${head}<span class="grade-status">Not graded</span><p class="grade-note">Your teacher left this out of the grade.</p></div>`;
+    if (hasNum_(r.score)) {
+      let val = r.passFail ? (Number(r.score) > 0 ? "Complete" : "Not complete") : `${r.score}<small>/${r.possible}</small>`;
+      return `<div class="grade-card" style="--acc:${color}">${head}<strong class="grade-score ${r.passFail ? "is-word" : ""}">${val}</strong>${r.editedAfterGrading && r.submitted ? `<p class="grade-note">You revised this — waiting for your teacher to look again.</p>` : ""}</div>`;
+    }
+    if (r.submitted) return `<div class="grade-card is-waiting" style="--acc:${color}">${head}<span class="grade-status">Waiting for your teacher</span></div>`;
+    return `<div class="grade-card is-quiet" style="--acc:${color}">${head}<span class="grade-status">${r.draft ? "In progress — not turned in" : "Not started yet"}</span></div>`;
+  }).join("");
+  return `<div class="stage-page">
+    <div class="page-head"><div class="eyebrow">Your work</div><h1 class="page-title">Your Grades</h1>
+      <p class="page-sub">Each piece is graded on its own. Your teacher may leave a piece out of the grade; that never counts against you.</p></div>
+    <div class="grade-grid">${cards}</div>
+    <div class="nav-row"><span></span><span class="nav-row-right"><button type="button" class="btn" id="refreshMyWork">${icon("refresh")} Refresh</button></span></div>
+  </div>`;
+}
+
+// ---- Teacher screens (offline preview) -------------------------------------------------------------
+// BackendClient replaces these once a class is connected.
+function manage() {
+  return `<div class="page-head"><h1 class="page-title">Teacher Dashboard</h1><p class="page-sub">The dashboard, grading tiles and gradebook appear here when the app is opened from its deployed web-app link and you are signed in as an authorized teacher.</p></div>`;
+}
+function gradeScreen() { return manage(); }
+function admin() { return manage(); }
+
+// ===========================================================================
+// bind(): re-attach every handler after each render
+// ===========================================================================
+function autoGrow_(el, min) {
+  if (!el) return;
+  el.style.height = "auto";
+  el.style.height = Math.max(min || 160, el.scrollHeight + 3) + "px";
+}
+function refreshStatusUI_(key) {
+  let st = pieceStatus_(key);
+  let chip = document.getElementById("stageStatus");
+  if (chip) chip.innerHTML = statusChip_(st);
+  let rc = document.getElementById("reviewChip-" + key);
+  if (rc) rc.innerHTML = statusChip_(st);
+  let area = document.getElementById("turnInArea");
+  if (area) { area.innerHTML = turnInAreaHtml_(key, flowNeighbours_("stage:" + key).next); bindViewButtons_(area); bindTurnIn_(); }
+  // The sidebar only needs redrawing when a status actually changes.
+  refreshStatusUI_.last = refreshStatusUI_.last || {};
+  let sig = st.kind + "|" + pieceStatus_(MEMOIR_FINAL_KEY).kind;
+  if (refreshStatusUI_.last[key] !== sig) { refreshStatusUI_.last[key] = sig; sidebar(); }
+}
+function bindViewButtons_(root) {
+  (root || document).querySelectorAll("button[data-view], a[data-view]").forEach((b) => {
+    if (b.closest("#sidebar")) return;
+    b.onclick = (e) => { e.preventDefault(); go_(b.dataset.view); };
+  });
+}
+function bindTurnIn_() {
+  let t = document.getElementById("turnInBtn");
+  if (t) t.onclick = () => {
+    let key = t.dataset.stage;
+    if (!submissionOf_(key).text) return showToast("Write something first, then turn it in.");
+    markSubmitted_(key);
+    save();
+    renderKeepScroll_();
+    showToast(STAGE_BY_KEY[key].label + " turned in. You can keep revising — turn it in again if you change it.");
+  };
+}
+function bindStageWriter_(key) {
+  let box = document.getElementById("writerBox");
+  if (!box) return;
+  let back = document.getElementById("writerBackdrop");
+  const log = () => (state.memoir.cadence[key] = Array.isArray(state.memoir.cadence[key]) ? state.memoir.cadence[key] : []);
+  const paint = () => {
+    back.innerHTML = highlightedHtml_(stageText_(key), highlightOn_() ? log() : []);
+    let c = cadenceCounts_(log());
+    let bal = document.getElementById("hlBalance");
+    if (bal) bal.innerHTML = hlBalanceHtml_(c);
+    let u = document.getElementById("tagUndo");
+    if (u) u.disabled = !log().length;
+    let tip = document.getElementById("hlTip");
+    if (tip) { let t = cadenceTip_(log()); tip.textContent = t; tip.classList.toggle("show", !!t); }
+  };
+  autoGrow_(box, 240);
+  attachWritingBox_(box, key, {
+    onEdit: (prev, next) => { state.memoir.cadence[key] = shiftLog_(log(), prev, next); },
+    afterEdit: () => { autoGrow_(box, 240); paint(); refreshProcessLine_(key); refreshStatusUI_(key); }
+  });
+  const tag = (type) => {
+    let s = box.selectionStart, e = box.selectionEnd;
+    let v = box.value;
+    while (s < e && /\s/.test(v[s])) s++;
+    while (e > s && /\s/.test(v[e - 1])) e--;
+    if (s === e) return showToast("Select a phrase or sentence in your writing first, then choose Internal or External.");
+    let cand = { start: s, end: e };
+    state.memoir.cadence[key] = cutOverlap_(log(), cand).concat([{ type, start: s, end: e }]);
+    save();
+    paint();
+    box.focus();
+    box.setSelectionRange(e, e);
+  };
+  ["tagInternal", "tagExternal", "tagUndo"].forEach((id) => {
+    let b = document.getElementById(id);
+    // Keep the student's selection alive while they reach for the button.
+    if (b) b.onmousedown = (ev) => ev.preventDefault();
+  });
+  let ti = document.getElementById("tagInternal"); if (ti) ti.onclick = () => tag("internal");
+  let te = document.getElementById("tagExternal"); if (te) te.onclick = () => tag("external");
+  let tu = document.getElementById("tagUndo");
+  if (tu) tu.onclick = () => { let l = log(); if (!l.length) return; l.pop(); save(); paint(); };
+}
+function bindReview_() {
+  document.querySelectorAll(".review-input").forEach((ta) => {
+    let key = ta.dataset.stage;
+    autoGrow_(ta, 120);
+    attachWritingBox_(ta, key, {
+      onEdit: (prev, next) => { state.memoir.cadence[key] = shiftLog_(state.memoir.cadence[key] || [], prev, next); },
+      afterEdit: () => { autoGrow_(ta, 120); refreshProcessLine_(key); refreshStatusUI_(key); refreshFinalUI_(); }
+    });
+  });
+  let re = document.getElementById("reviewEdit");
+  if (re) re.onclick = () => { state.memoir.reviewMode = "edit"; save(); renderKeepScroll_(); };
+  let rr = document.getElementById("reviewRead");
+  if (rr) rr.onclick = () => { state.memoir.reviewMode = "read"; save(); renderKeepScroll_(); };
+  document.querySelectorAll(".band-btn").forEach((b) => (b.onclick = () => {
+    let c = b.dataset.crit;
+    state.memoir.selfEval[c] = b.dataset.band;
+    save();
+    b.parentElement.querySelectorAll(".band-btn").forEach((x) => x.classList.toggle("selected", x === b));
+    let d = document.getElementById("bandDesc-" + c.replace(/[^A-Za-z]/g, ""));
+    if (d) d.textContent = MEMOIR_RUBRIC[c][Number(b.dataset.band)];
+  }));
+  document.querySelectorAll(".self-comment").forEach((t) => (t.oninput = () => { state.memoir.selfComments[t.dataset.crit] = t.value; save(); }));
+  let tf = document.getElementById("turnInFinalBtn");
+  if (tf) tf.onclick = () => {
+    if (!assembledText_()) return showToast("Write your memoir first.");
+    markSubmitted_(MEMOIR_FINAL_KEY);
+    save();
+    renderKeepScroll_();
+    showToast("Final Memoir turned in.");
+  };
+  let dd = document.getElementById("downloadDraftBtn");
+  if (dd) dd.onclick = downloadDraft_;
+}
+function refreshFinalUI_() {
+  let tf = document.getElementById("turnInFinalBtn");
+  if (!tf) return;
+  let fin = submissionOf_(MEMOIR_FINAL_KEY);
+  tf.disabled = !fin.text || fin.submitted;
+  tf.className = "btn " + (fin.submitted ? "btn-done" : "btn-primary");
+  tf.innerHTML = fin.submitted ? icon("check") + " Final Memoir turned in" : fin.changed ? "Turn in again" : "Turn in Final Memoir";
+}
+function bindPoster_() {
+  let redraw = () => { if (posterDrawn_) { clearTimeout(bindPoster_._t); bindPoster_._t = setTimeout(() => drawPoster_(posterBg_), 250); } };
+  [["posterTitle", "title"], ["posterAuthor", "author"], ["posterHint", "hint"]].forEach(([id, f]) => {
+    let el = document.getElementById(id);
+    if (el) el.oninput = () => { state.memoir.poster[f] = el.value; save(); if (f !== "hint") redraw(); };
+  });
+  let plain = document.getElementById("plainBtn");
+  if (plain) plain.onclick = () => { posterBg_ = null; drawPoster_(null); setPosterStatus_(""); };
+  let dl = document.getElementById("downloadPosterBtn");
+  if (dl) dl.onclick = () => {
+    let c = document.getElementById("posterCanvas");
+    if (!c) return;
+    try { c.toBlob((blob) => blob ? downloadBlob_(blob, "memoir-poster.png") : showToast("Couldn't prepare the download — right-click the poster and choose Save Image."), "image/png"); }
+    catch (e) { showToast("Couldn't download — right-click the poster and choose Save Image."); }
+  };
+  let paint = document.getElementById("paintBtn");
+  if (paint) paint.onclick = () => showToast("Painted backgrounds work once the app is opened from your class link.");
+  let st = document.getElementById("suggestTitleBtn");
+  if (st) st.onclick = () => showToast("Title ideas work once the app is opened from your class link.");
+  let tp = document.getElementById("turnInPosterBtn");
+  if (tp) tp.onclick = () => showToast("Turning in a poster works once the app is opened from your class link. You can still download it.");
+  if (!posterDrawn_ && !(backend_() && backend_().poster && backend_().poster.savedAt)) { /* nothing drawn yet */ }
+}
+function bindShareLocal_() {
+  let post = document.getElementById("postLeadBtn");
+  if (post) post.onclick = () => {
+    let text = stageText_("lead").trim();
+    if (!text) return;
+    state.localShare = Array.isArray(state.localShare) ? state.localShare : [];
+    let mine = state.localShare.find((p) => p.email === "you@local");
+    let now = new Date().toISOString();
+    if (mine) { mine.text = text; mine.updatedAt = now; }
+    else state.localShare.push({ id: "local-" + Date.now(), name: "You", email: "you@local", text, date: now, updatedAt: now, replies: [] });
+    save(); renderKeepScroll_();
+  };
+  document.querySelectorAll(".replyToggle").forEach((b) => (b.onclick = () => {
+    let f = b.parentElement.querySelector(".reply-compose");
+    if (f) { f.classList.remove("hide"); b.classList.add("hide"); let t = f.querySelector("textarea"); if (t) t.focus(); }
+  }));
+  document.querySelectorAll(".replyCancel").forEach((b) => (b.onclick = () => {
+    let f = b.closest(".reply-compose");
+    if (f) { f.classList.add("hide"); let t = f.parentElement.querySelector(".replyToggle"); if (t) t.classList.remove("hide"); }
+  }));
+  document.querySelectorAll(".replySubmit").forEach((b) => (b.onclick = () => {
+    let ta = b.closest(".reply-compose").querySelector("textarea");
+    let p = (state.localShare || []).find((x) => x.id === b.dataset.postid);
+    if (!p || !ta.value.trim()) return;
+    p.replies.push({ id: "r" + Date.now(), name: "You", email: "you@local", text: ta.value.trim(), date: new Date().toISOString() });
+    save(); renderKeepScroll_();
+  }));
+  let rf = document.getElementById("refreshShareBtn");
+  if (rf) rf.onclick = () => renderKeepScroll_();
+}
+function bind() {
+  document.querySelectorAll("[data-role]").forEach((b) => {
+    b.classList.toggle("active", b.dataset.role === state.role);
+    b.onclick = () => { state.role = b.dataset.role; save(); render(); };
+  });
+  let nt = document.getElementById("navToggle");
+  if (nt) nt.onclick = () => document.body.classList.toggle("nav-open");
+  bindViewButtons_(document.getElementById("app"));
+  document.querySelectorAll(".arc-node").forEach((g) => {
+    g.onclick = () => go_(g.dataset.view);
+    g.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go_(g.dataset.view); } };
+  });
+  let ft = document.getElementById("focusToggle");
+  if (ft) ft.onclick = () => { state.focus = !state.focus; saveNav_(); renderKeepScroll_(); if (state.focus) { let w = document.getElementById("writerBox"); if (w) w.focus({ preventScroll: true }); } };
+  let sm = document.getElementById("supportMore");
+  if (sm) sm.onclick = () => { state.scaffold = "more"; save(); renderKeepScroll_(); };
+  let sl = document.getElementById("supportLess");
+  if (sl) sl.onclick = () => { state.scaffold = "less"; save(); renderKeepScroll_(); };
+  document.querySelectorAll(".checkBox").forEach((c) => (c.onchange = () => {
+    let key = c.dataset.stage, i = Number(c.dataset.idx);
+    state.memoir.checks[key][i] = c.checked;
+    c.closest(".check-item").classList.toggle("is-checked", c.checked);
+    save();
+  }));
+  let v = String(state.view || "");
+  if (v.indexOf("stage:") === 0) bindStageWriter_(v.slice(6));
+  bindTurnIn_();
+  let coach = document.getElementById("coachBtn");
+  if (coach) coach.onclick = () => showToast("The writing coach works once the app is opened from your class link.");
+  if (v === "review") bindReview_();
+  if (v === "poster") bindPoster_();
+  if (v === "share") bindShareLocal_();
+  let rm = document.getElementById("refreshMyWork");
+  if (rm) rm.onclick = () => renderKeepScroll_();
+  bindReleaseControls_();
+}
+
+// Every release control on the page, in one place, so anything that repaints
+// part of the page on its own (the grading tiles recount every minute) can
+// re-attach them without re-running bind(). Assigning twice is harmless.
+function bindReleaseControls_() {
+  document.querySelectorAll(".stepRelease").forEach((c) => (c.onchange = (ev) => {
+    if (ev) ev.stopPropagation();
+    state.releasedSteps = Object.assign({}, state.releasedSteps || {});
+    state.releasedSteps[c.dataset.step] = c.checked;
+    save();
+    renderKeepScroll_();
+  }));
+  document.querySelectorAll(".classToggle").forEach((c) => (c.onchange = (ev) => {
+    if (ev) ev.stopPropagation();
+    state[c.dataset.flag] = c.checked;
+    save();
+    renderKeepScroll_();
+  }));
+}
+
+function render() {
+  sidebar();
+  let app = document.getElementById("app");
+  let v = String(state.view || "home");
+  document.body.dataset.view = v.split(":")[0];
+  // Focus belongs to the writing page, not to the viewer: a teacher previewing
+  // a stage sees exactly what a student sees.
+  document.body.classList.toggle("focus-mode", !!state.focus && v.indexOf("stage:") === 0 && released_(v.slice(6)));
+  if (v.indexOf("stage:") === 0) app.innerHTML = stagePage(v.slice(6));
+  else if (v === "share") app.innerHTML = sharePage();
+  else if (v === "review") app.innerHTML = reviewPage();
+  else if (v === "poster") app.innerHTML = posterPage();
+  else if (v === "grades") app.innerHTML = gradesPage();
+  else if (v === "manage") app.innerHTML = manage();
+  else if (v === "grade") app.innerHTML = gradeScreen();
+  else if (v === "admin") app.innerHTML = admin();
+  else { state.view = "home"; app.innerHTML = home(); }
+  if (v !== "poster") posterDrawn_ = false;
+  bind();
+  navSync_();
+}
+
+(function bindModalBackdropDismiss() {
+  const root = document.getElementById("modalRoot");
+  if (!root) return;
+  root.addEventListener("click", (e) => {
+    if (e.target && e.target.classList && e.target.classList.contains("modal")) {
+      const dismiss = e.target.querySelector(".modal-dismiss");
+      if (dismiss) dismiss.click(); else root.innerHTML = "";
+    }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !root.innerHTML && document.body.classList.contains("focus-mode")) {
+      state.focus = false; saveNav_(); renderKeepScroll_(); return;
+    }
+    if (e.key !== "Escape" || !root.innerHTML) return;
+    const dismiss = root.querySelector(".modal-dismiss");
+    if (dismiss) dismiss.click(); else root.innerHTML = "";
+  });
+})();
+__MB.AppLogic = 'ok';
+</script>

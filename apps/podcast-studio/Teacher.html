@@ -1,0 +1,511 @@
+<script>
+// ============================================================================
+// Teacher dashboard: class banner → class switcher → Grading → Gradebook → Students (folded)
+// → Release & Resources (week switches, Canva template links, Canvas). Plus the Admin page.
+// ============================================================================
+(function () {
+  var T = PC.T = { dash: null, loadingFor: '', gbPushStatus: '', gbPushBusy: false, busy: {}, msgs: {}, weekMsgs: {}, modules: {}, lastRedos: null, openWeeks: {}, drafts: {}, hubTimer: null };
+  var A = PC.act = PC.act || {};
+  function esc(s) { return PC.esc(s); }
+  function cid() { return T.classId; }
+  // Each tile's top stripe is its week's colour (the same colours as the student week cards).
+  var WEEK_ACC = { 1: '#285f59', 2: '#9d3826', 3: '#79500b' };
+
+  /** The class used last (remembered on the server, so any computer), then this browser's copy, then
+   *  the class with the most students. */
+  function pickClass() {
+    var cl = PC.boot.classes || [], has = function (id) { return !!id && cl.some(function (c) { return c.classId === id; }); };
+    if (has(T.classId)) return T.classId;
+    var saved = PC.store.get('pcTClass_' + PC.boot.email, '');
+    T.classId = has(PC.boot.lastClassId) ? PC.boot.lastClassId : has(saved) ? saved : has(PC.boot.defaultClassId) ? PC.boot.defaultClassId : ((cl[0] || {}).classId || '');
+    return T.classId;
+  }
+  function rememberClass(id) {
+    PC.store.set('pcTClass_' + PC.boot.email, id); PC.boot.lastClassId = id;
+    PC.rpc('rememberTeacherClass', { classId: id }).catch(function () {});
+  }
+  PC.loadDash = function (cb) {
+    PC.rpc('getTeacherDashboard', { classId: cid() }, { retry: true }).then(function (d) { T.dash = d; if (cb) cb(null, d); }).catch(function (e) { if (cb) cb(e); });
+  };
+
+  // ---------------------------------------------------------------- dashboard
+  PC.views.dashboard = function (app) {
+    clearInterval(T.hubTimer);
+    if (!pickClass()) { app.innerHTML = newClassCard(true); bindNewClass(); return; }
+    if (!T.dash || T.dash.klass.classId !== cid()) app.innerHTML = '<section class="pc-card pc-skeleton"><p>Opening your class…</p></section>';
+    else drawDash(app);
+    PC.loadDash(function (err) {
+      if (PC.state.view !== 'dashboard') return;
+      if (err) return PC.fail(app, err);
+      drawDash(app);
+      T.lastRedos = T.dash.hub ? T.dash.hub.needsRegradeTotal : 0;
+      T.hubTimer = setInterval(refreshHub, 60000);
+    });
+  };
+  function refreshHub(manual) {
+    if (PC.state.view !== 'dashboard' || document.visibilityState !== 'visible' || !T.dash) return;
+    PC.rpc('getGradingHub', { classId: cid() }).then(function (h) {
+      if (!T.dash) return;
+      var before = T.lastRedos || 0; T.dash.hub = h; T.lastRedos = h.needsRegradeTotal;
+      if (h.needsRegradeTotal > before && !manual) PC.toast('↻ Student redo needs grading');
+      // A background refresh never repaints anything the teacher is typing in.
+      var tiles = PC.byId('pcHubTiles'), head = PC.byId('pcHubHead');
+      if (tiles && !tiles.contains(document.activeElement) && !tiles.querySelector('details[open]')) { tiles.innerHTML = hubTilesHtml(); }
+      if (head) head.innerHTML = hubHeadline();
+      if (manual) PC.toast('Counts are up to date.');
+    }).catch(function (e) { if (manual) PC.toast(e.message, 'error'); });
+  }
+  function drawDash(app) {
+    var focused = document.activeElement && app.contains(document.activeElement) && /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    if (focused && app.querySelector('.pc-dash')) return;   // never repaint a field being typed in
+    var rel = (T.dash.settings || {}).release || {}, nothingOpen = !Object.keys(rel).some(function (k) { return rel[k] === true; });
+    app.innerHTML = '<div class="pc-dash">' + bannerHtml() + switcherHtml() + gradingCard() + gradebookCard() + studentsCard() +
+      '<details class="pc-card pc-fold" id="pcSetup"' + (nothingOpen || T.setupOpen ? ' open' : '') + '><summary><h2>Release &amp; Resources</h2><span class="pc-muted">Open each week to students, your Canva template links, and the Canvas link</span></summary>' +
+      releaseCard() + canvaCard() + canvasCard() + '</details></div>';
+    var s = PC.byId('pcSetup'); if (s) s.addEventListener('toggle', function () { T.setupOpen = s.open; });
+  }
+
+  function bannerHtml() {
+    var d = T.dash, k = d.klass, wk = currentWeek();
+    var roster = d.roster.filter(function (s) { return !s.demo; }), n = roster.length, shows = d.shows || {};
+    var named = roster.filter(function (s) { return (shows[s.email] || {}).name; }).length, crews = roster.filter(function (s) { return (shows[s.email] || {}).crew === 'Crew'; }).length;
+    return '<section class="pc-banner"><div class="pc-banner-main"><div class="pc-eyebrow">' + esc(k.className) + (k.period ? ' · Period ' + esc(k.period) : '') + '</div>' +
+      '<h1>Podcast Studio</h1><div class="pc-book-author">' + (wk ? 'Students are on <b>Week ' + wk.n + ': ' + esc(wk.title) + '</b>' : 'No week is open to students yet. Open Week 1 in Release &amp; Resources (bottom of this page).') + '</div>' +
+      '<div class="pc-banner-sora"><span class="pc-chip">Shows named: <b>' + named + '</b> of ' + n + '</span><span class="pc-chip">In a crew: <b>' + crews + '</b></span></div></div>' +
+      '<div class="pc-banner-side"><div class="pc-joincode" title="Students join with this code"><span>Class code</span><b>' + esc(k.joinCode) + '</b></div>' +
+      '<div class="pc-row"><button type="button" class="pc-btn small" data-act="studentView">Student view</button><button type="button" class="pc-btn small ghost" data-act="renameClass">Rename</button></div></div></section>';
+  }
+  function pct(a, n) { return n ? Math.round(a / n * 1000) / 10 : 0; }
+  /** The week students are on: the newest week with anything open. */
+  function currentWeek() {
+    var rel = (T.dash.settings || {}).release || {}, best = null;
+    ((T.dash.study || {}).units || []).forEach(function (u) { if (u.activities.some(function (a) { return rel['w' + u.n + '_' + a.id] === true; })) best = u; });
+    return best;
+  }
+  function switcherHtml() {
+    var cl = PC.boot.classes || [];
+    return '<nav class="pc-switcher" aria-label="Your classes">' + cl.map(function (c) {
+      var on = c.classId === cid();
+      return '<button type="button" class="pc-class-pill' + (on ? ' is-on' : '') + '" data-act="switchClass" data-class="' + esc(c.classId) + '" aria-pressed="' + on + '">' + esc(c.className) + (c.period ? '<span class="pc-class-pill-period">P' + esc(c.period) + '</span>' : '') + '</button>';
+    }).join('') + '<button type="button" class="pc-class-pill is-add" data-act="newClass">+ New class</button></nav>';
+  }
+  A.switchClass = function (el) { T.classId = el.dataset.class; rememberClass(T.classId); T.dash = null; PC.render(); };
+  A.studentView = function () { PC.state.role = 'student'; PC.state.classId = cid(); PC.state.as = ''; PC.go('home'); };
+  function newClassCard(first) {
+    return '<section class="pc-card"><h1>' + (first ? 'Make your first class' : 'New class') + '</h1><p class="pc-muted">Each class gets its own join code, release switches and Canvas link.</p>' +
+      '<form id="pcNewClass" class="pc-inline-form"><label class="pc-field"><span>Class name</span><input class="pc-input" id="ncName" maxlength="120" required placeholder="English 9"></label>' +
+      '<label class="pc-field pc-field-sm"><span>Period</span><input class="pc-input" id="ncPeriod" maxlength="30" placeholder="2"></label><button class="pc-btn primary" type="submit">Make class</button></form><p class="pc-form-msg" id="ncMsg" role="alert"></p></section>';
+  }
+  function bindNewClass() {
+    var f = PC.byId('pcNewClass'); if (!f) return;
+    f.onsubmit = function (e) {
+      e.preventDefault(); var b = f.querySelector('button'); b.disabled = true;
+      PC.rpc('createClass', { className: PC.byId('ncName').value, period: PC.byId('ncPeriod').value }, { retry: true }).then(function (r) {
+        PC.boot.classes = r.classes; T.classId = r.classId; T.dash = null; PC.closeModal(); rememberClass(r.classId); PC.go('dashboard');
+      }).catch(function (err) { b.disabled = false; PC.byId('ncMsg').textContent = err.message; });
+    };
+  }
+  A.newClass = function () { PC.modal(newClassCard(false).replace('<section class="pc-card">', '<div>').replace(/<\/section>$/, '</div>') + '<p><button class="pc-btn ghost" onclick="PC.closeModal()">Cancel</button></p>'); bindNewClass(); };
+  A.renameClass = function () {
+    var k = T.dash.klass;
+    PC.modal('<h2 id="pcModalTitle">Rename class</h2><label class="pc-field"><span>Class name</span><input class="pc-input" id="rnName" maxlength="120" value="' + esc(k.className) + '"></label><label class="pc-field"><span>Period</span><input class="pc-input" id="rnPeriod" maxlength="30" value="' + esc(k.period) + '"></label><div class="pc-row"><button class="pc-btn primary" id="rnSave">Save</button><button class="pc-btn" onclick="PC.closeModal()">Cancel</button></div>');
+    PC.byId('rnSave').onclick = function () { this.disabled = true; PC.rpc('renameClass', { classId: cid(), className: PC.byId('rnName').value, period: PC.byId('rnPeriod').value }, { retry: true }).then(function (r) { PC.boot.classes = r.classes; PC.closeModal(); T.dash = null; PC.render(); }).catch(function (e) { PC.toast(e.message, 'error'); }); };
+  };
+
+  // ---------------------------------------------------------------- Grading card
+  function hubHeadline() {
+    var h = T.dash.hub; if (!h) return '';
+    return h.needsGradingTotal > 0 ? '<span class="pc-chip is-needs">' + h.needsGradingTotal + ' to grade' + (h.needsRegradeTotal ? ' · ↻ ' + PC.plural(h.needsRegradeTotal, 'redo') : '') + '</span>' : '<span class="pc-chip is-ok">Nothing waiting on you</span>';
+  }
+  function gradingCard() {
+    return '<section class="pc-card pc-dash-card" id="gradingCard"><div class="pc-card-head"><div class="pc-card-title"><h2>Grading</h2><span id="pcHubHead">' + hubHeadline() + '</span></div>' +
+      '<div class="pc-card-actions"><button type="button" class="pc-btn small" data-act="refreshHub" title="Recount everything">↻ Refresh</button></div></div>' +
+      '<p class="pc-card-sub">Open an assignment to grade it. A red number is work waiting on you; ↻ means a student redid something after you graded it.</p><div id="pcHubTiles">' + hubTilesHtml() + '</div></section>';
+  }
+  A.refreshHub = function () { refreshHub(true); };
+  function hubTilesHtml() {
+    var h = T.dash.hub;
+    if (!h) return '<div class="pc-loading"><span class="pc-spinner" aria-hidden="true"></span>Counting what needs grading…</div>';
+    var out = h.groups.map(function (g) {
+      var waiting = g.items.reduce(function (n, t) { return n + (t.allExcluded ? 0 : t.needsGrading); }, 0);
+      return '<div class="pc-group-head"><h3>' + esc(g.unitLabel) + (g.date ? ' · ' + esc(PC.fmtDay(g.date)) : '') + (g.title ? ' · ' + esc(g.title) : '') + '</h3><span class="pc-group-count">' + PC.plural(g.items.length, 'assignment') + '</span>' +
+        (waiting ? '<span class="pc-group-waiting">' + waiting + ' to grade</span>' : '<span class="pc-group-clear">Nothing waiting</span>') +
+        '<button type="button" class="pc-btn small pc-week-canvas" data-act="weekCanvas" data-week="' + g.week + '" title="Due dates, “available from” dates and Canvas modules for every ' + esc(g.unitLabel) + ' assignment, saved to Canvas in one go">' + (canvasLinked() ? 'Due dates &amp; Canvas…' : 'Set up Canvas…') + '</button></div>' +
+        (T.weekMsgs[g.week] ? '<p class="pc-week-msg" role="status">' + esc(T.weekMsgs[g.week]) + ' <button type="button" class="pc-link" data-act="weekMsgClose" data-week="' + g.week + '">Dismiss</button></p>' : '') + '<div class="pc-tile-grid">' + g.items.map(function (t) { return tileHtml(t, g); }).join('') + '</div>';
+    }).join('');
+    return out;
+  }
+  function canvasLinked() { return !!(T.dash.canvas && T.dash.canvas.connected && (T.dash.settings.canvas || {}).courseId) || !!(T.dash.lmsHub && (T.dash.settings.canvas || {}).courseId); }
+  function tileHtml(t, g) {
+    var total = t.totalItems, done = t.graded, todo = t.needsGrading, rest = Math.max(0, total - done - todo);
+    var status = t.allExcluded ? 'excluded' : todo ? 'needs' : 'done';
+    var badge = status === 'needs' ? '<span class="pc-badge is-needs' + (t.needsRegrade ? ' has-redo' : '') + '" title="' + (t.needsRegrade ? t.needsRegrade + ' redone after grading · ' : '') + t.fresh + ' new · ' + todo + ' waiting on you">' + (t.needsRegrade ? '↻ ' : '') + todo + '</span>'
+      : status === 'done' ? '<span class="pc-badge is-done" title="Nothing waiting on you here">✓</span>' : '<span class="pc-badge is-excluded" title="Left out of every student’s grade. Scores already entered are kept.">Not graded</span>';
+    var worth = t.allExcluded ? 'Excluded for this class' : t.max + ' pts';
+    var note = t.kind === 'quiz' ? 'Multiple choice scores itself · ' + t.answered + ' of ' + total + ' answered' : t.type === 'rubric' ? 'Scored on a 7-level rubric' : t.type === 'criteria' ? 'Your Final Episode rubric: each criterion out of 7' : t.kind === 'discussion' ? 'Complete / partly / incomplete · a post or reply counts as turned in' : 'Complete / partly / incomplete, or any score';
+    var action = status === 'needs' ? '<button type="button" class="pc-btn primary pc-tile-open" data-act="openMarking" data-key="' + esc(t.key) + '">Grade ' + todo + (t.needsRegrade ? ' <span class="pc-tile-open-sub">· ' + PC.plural(t.needsRegrade, 'redo') + '</span>' : '') + '<span aria-hidden="true"> →</span></button>'
+      : '<button type="button" class="pc-btn pc-tile-open" data-act="openMarking" data-key="' + esc(t.key) + '">' + (status === 'done' && done ? 'Review graded work' : 'Open') + '<span aria-hidden="true"> →</span></button>';
+    var body = t.allExcluded ? '<p class="pc-excluded-note">Left out of the grade for this class. Any scores you entered are kept; choose <b>Count it again</b> in the ⋯ menu to bring it back.</p>'
+      : '<div class="pc-bar" role="img" aria-label="' + done + ' graded, ' + todo + ' to grade, ' + rest + ' not submitted, of ' + total + ' students"><span class="pc-bar-done" style="width:' + pct(done, total) + '%"></span><span class="pc-bar-todo" style="width:' + pct(todo, total) + '%"></span></div>' +
+        '<dl class="pc-stats3"><div class="' + (todo ? 'is-todo' : '') + '"><dt>To grade</dt><dd>' + todo + '</dd></div><div><dt>Graded</dt><dd>' + done + '</dd></div><div><dt>Not submitted</dt><dd>' + rest + '</dd></div></dl>' +
+        '<p class="pc-tile-note">Of ' + total + ' students' + (note ? ' · ' + esc(note) : '') + '</p>';
+    var due = t.due ? '<span title="' + esc(new Date(t.due).toLocaleString()) + '">Due ' + esc(PC.fmtDate(t.due)) + '</span>' : '';
+    var linked = canvasLinked(), cv = !linked ? ['Canvas not linked', ''] : !t.canvas.linked ? ['Not in Canvas yet', 'is-pending'] : t.canvas.lastPushAt ? ['Pushed ' + PC.fmtDate(t.canvas.lastPushAt), 'is-ok'] : ['In Canvas', 'is-ok'];
+    var hides = 'students cannot open ' + (g.unitLabel || 'this') + '’s ' + t.kindLabel;
+    var sw = '<label class="pc-switch' + (t.released ? ' is-on' : '') + '" title="' + (t.released ? 'Students can open this. Turn off and ' + hides + '; their work is kept.' : 'Hidden: ' + hides + '. Turn on to open it.') + '"><input type="checkbox" class="pcRelease" data-key="' + esc(t.key) + '"' + (t.released ? ' checked' : '') + '><span class="pc-switch-track" aria-hidden="true"></span><span class="pc-switch-text">' + (t.released ? 'Open to students' : 'Hidden from students') + '</span></label>';
+    var busy = T.busy[t.key];
+    var menu = '<details class="pc-more"><summary aria-label="More actions for ' + esc(t.label) + '" title="More actions">⋯</summary><div class="pc-menu" role="menu">' +
+      '<button type="button" role="menuitem" data-act="tileCanvas" data-key="' + esc(t.key) + '">' + (linked ? 'Due dates &amp; Canvas (' + esc(g.unitLabel) + ')…' : 'Set up Canvas…') + '</button>' +
+      '<button type="button" role="menuitem" data-act="tileCsv" data-key="' + esc(t.key) + '"' + (busy ? ' disabled' : '') + '>Download Canvas CSV</button><hr>' +
+      '<button type="button" role="menuitem" class="' + (t.allExcluded ? 'is-count' : 'is-nograde') + '" data-act="tileNoGrade" data-key="' + esc(t.key) + '" data-on="' + (!t.allExcluded) + '">' + (t.allExcluded ? '↺ Count it again' : 'Don’t grade for this class') + '</button></div></details>';
+    return '<article class="pc-tile pc-tile-' + t.kind + (t.released ? ' is-released' : ' is-hidden') + (status === 'needs' ? ' has-needs' : '') + (t.allExcluded ? ' is-nograde' : '') + '" style="--acc:' + (WEEK_ACC[t.week] || '#4a4f7a') + '" aria-label="' + esc(t.label) + '">' +
+      '<header class="pc-tile-head" data-act="openMarking" data-key="' + esc(t.key) + '"><div class="pc-tile-id"><span class="pc-eyebrow">' + esc(g.unitLabel) + ' · ' + esc(t.kind === 'quiz' ? 'Quiz' : t.kind === 'discussion' ? 'Discussion' : t.type === 'criteria' ? 'Your rubric' : t.type === 'rubric' ? '7-level rubric' : 'Complete / incomplete') + '</span><h4 class="pc-tile-title">' + esc((t.icon ? t.icon + ' ' : '') + t.kindLabel) + '</h4>' +
+      '<span class="pc-tile-meta"><span>' + esc(worth) + '</span>' + due + '</span></div>' + badge + '</header>' +
+      '<div class="pc-tile-body" data-act="openMarking" data-key="' + esc(t.key) + '">' + body + '</div>' + action +
+      '<footer class="pc-tile-foot">' + sw + '<div class="pc-canvas-row"><span class="pc-canvas-state ' + cv[1] + '"' + (linked && t.canvas.linked ? ' title="' + esc(t.canvas.moduleName ? 'In the Canvas module “' + t.canvas.moduleName + '”' : 'Not in a Canvas module') + '"' : '') + '>' + esc(cv[0]) + '</span><span class="pc-canvas-actions">' +
+      (linked ? '<button type="button" class="pc-btn small" data-act="tilePush" data-key="' + esc(t.key) + '"' + (busy ? ' disabled' : '') + ' title="Send scores, excused work and new comments to Canvas now. The assignment is made the first time and reused after that.">↗ Push</button>' : '') + menu + '</span></div>' +
+      '<div class="pc-tile-msg" id="msg_' + esc(t.key) + '" aria-live="polite">' + esc(T.msgs[t.key] || '') + '</div></footer></article>';
+  }
+  document.addEventListener('change', function (e) {
+    var r = e.target.closest('.pcRelease'); if (!r) return;
+    var key = r.dataset.key, on = r.checked; r.disabled = true;
+    PC.rpc('setRelease', { classId: cid(), itemKey: key, on: on }, { retry: true }).then(function (res) {
+      T.dash.settings.release = res.release;
+      (T.dash.hub.groups || []).forEach(function (g) { g.items.forEach(function (t) { if (t.key === key) t.released = on; }); });
+      var tiles = PC.byId('pcHubTiles'); if (tiles) tiles.innerHTML = hubTilesHtml();
+      var rc = PC.byId('pcReleaseCard'); if (rc) rc.outerHTML = releaseCard();
+      var bn = document.querySelector('.pc-banner'); if (bn) bn.outerHTML = bannerHtml();
+      PC.toast(on ? 'Open to students.' : 'Hidden from students. Their work is kept.');
+    }).catch(function (err) { r.checked = !on; r.disabled = false; PC.toast(err.message, 'error'); });
+  });
+  A.openMarking = function (el) { PC.leave(function () { PC.go('marking', { itemKey: el.dataset.key, focusEmail: el.dataset.email || '' }); }); };
+  function closeMenu(el) { var d = el.closest('details'); if (d) d.open = false; var t = el.closest('.pc-tile'); if (t) t.classList.remove('menu-open'); }
+  A.tileNoGrade = function (el) {
+    closeMenu(el);
+    var on = el.dataset.on === 'true';
+    if (on && !confirm('Leave this out of every student’s grade in this class? Scores you already entered are kept.')) return;
+    PC.rpc('setNoGrade', { classId: cid(), itemKey: el.dataset.key, on: on }, { retry: true }).then(function (r) { T.dash.settings.noGrade = r.noGrade; refreshHub(true); refreshGradebook(); })
+      .catch(function (e) { PC.toast(e.message, 'error'); });
+  };
+  function pushSummary(r) {
+    if (r.notInCanvas) return 'Not in Canvas yet.';
+    var bits = ['Sent ' + PC.plural(r.sent || 0, 'score') + (r.comments ? ' and ' + PC.plural(r.comments, 'comment') : '') + ' to Canvas' + (r.created ? ' (made the assignment)' : '') + '.'];
+    if (r.excused && r.excused.length) bits.push(PC.plural(r.excused.length, 'student') + ' marked Excused.');
+    if (r.unexcused && r.unexcused.length) bits.push('Excusal lifted for ' + r.unexcused.join(', ') + '.');
+    if (r.unmarked && r.unmarked.length) bits.push('Not marked yet (left blank): ' + r.unmarked.join(', ') + '.');
+    if (r.unmatched && r.unmatched.length) bits.push('Not found in the Canvas course: ' + r.unmatched.join(', ') + '.');
+    (r.warnings || []).forEach(function (w) { bits.push(w); });
+    return bits.join(' ');
+  }
+  A.tilePush = function (el) {
+    var key = el.dataset.key; T.busy[key] = true; el.disabled = true; setMsg(key, 'Sending to Canvas…');
+    PC.rpc('pushCanvasGrades', { classId: cid(), itemKey: key }).then(function (r) {
+      T.busy[key] = false; setMsg(key, pushSummary(r));
+      (T.dash.hub.groups || []).forEach(function (g) { g.items.forEach(function (t) { if (t.key === key) t.canvas = { linked: true, lastPushAt: r.lastPushAt, htmlUrl: r.htmlUrl }; }); });
+      refreshTilesKeepMsgs();
+    }).catch(function (e) { T.busy[key] = false; setMsg(key, e.message); refreshTilesKeepMsgs(); });
+  };
+  function setMsg(key, m) { T.msgs[key] = m; var el = PC.byId('msg_' + key); if (el) el.textContent = m; }
+  function refreshTilesKeepMsgs() { var tiles = PC.byId('pcHubTiles'); if (tiles) tiles.innerHTML = hubTilesHtml(); }
+  A.tileCsv = function (el) {
+    closeMenu(el);
+    var key = el.dataset.key;
+    PC.rpc('exportCanvasCsv', { classId: cid(), itemKey: key }).then(function (r) {
+      var blob = new Blob([r.csv], { type: 'text/csv' }), a = document.createElement('a');
+      a.href = URL.createObjectURL(blob); a.download = r.filename; document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      setMsg(key, 'Downloaded ' + r.filename + '. Import it in Canvas: Grades → Import.');
+    }).catch(function (e) { setMsg(key, e.message); });
+  };
+  // ---------------------------------------------------------------- Week N · Due dates & Canvas (2026-10-22a, from Lit Circles)
+  // One window per week: every graded assignment's due date and "available from" date, the week's
+  // Canvas module and (if it differs) each assignment's own module. Save makes or updates them all in
+  // Canvas. A tile's "Due dates & Canvas…" opens its week here.
+  function openCanvasSetup() { T.setupOpen = true; var s = PC.byId('pcSetup'); if (s) { s.open = true; var c = PC.byId('pcCanvasCard'); if (c) c.scrollIntoView({ behavior: 'smooth' }); } }
+  A.tileCanvas = function (el) {
+    var key = el.dataset.key; closeMenu(el);
+    if (!canvasLinked()) return openCanvasSetup();
+    openWeekCanvas(Number((/^w(\d+)_/.exec(key) || [])[1]), key);
+  };
+  A.weekCanvas = function (el) { if (!canvasLinked()) return openCanvasSetup(); openWeekCanvas(Number(el.dataset.week), ''); };
+  A.weekMsgClose = function (el) { delete T.weekMsgs[el.dataset.week]; refreshTilesKeepMsgs(); };
+  var DUE_TIME = '23:59', OPEN_TIME = '00:00';
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function isoParts(iso) { var d = iso ? new Date(iso) : null; if (!d || isNaN(d.getTime())) return { date: '', time: '' }; return { date: d.getFullYear() + '-' + pad2(d.getMonth() + 1) + '-' + pad2(d.getDate()), time: pad2(d.getHours()) + ':' + pad2(d.getMinutes()) }; }
+  function isoFromParts(date, time, fallback) {
+    var dm = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(date || '')); if (!dm) return '';
+    var tm = /^(\d{1,2}):(\d{2})/.exec(String(time || '')) || /^(\d{1,2}):(\d{2})/.exec(fallback);
+    var d = new Date(+dm[1], +dm[2] - 1, +dm[3], +tm[1], +tm[2], 0, 0); return isNaN(d.getTime()) ? '' : d.toISOString();
+  }
+  function dtField(id, label, iso, defTime) {
+    var p = isoParts(iso);
+    return '<div class="pc-wk-dt"><span class="pc-wk-dt-label" id="' + id + '-l">' + label + '</span><span class="pc-wk-dt-in"><input type="date" class="pc-input" id="' + id + '" value="' + esc(p.date) + '" aria-labelledby="' + id + '-l"><input type="time" class="pc-input" id="' + id + '-t" step="60" value="' + esc(p.time || defTime) + '" aria-label="' + esc(label) + ' time"></span></div>';
+  }
+  function readDT(id, defTime) { var d = PC.byId(id), t = PC.byId(id + '-t'); return isoFromParts(d ? d.value : '', t ? t.value : '', defTime); }
+  function modOptions(mods, first, sel) { return first.map(function (o) { return '<option value="' + esc(o[0]) + '"' + (o[0] === sel ? ' selected' : '') + '>' + esc(o[1]) + '</option>'; }).join('') + mods.map(function (m) { return '<option value="' + esc(m.id) + '"' + (String(m.id) === sel ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join(''); }
+  function choiceValue(m, inherit) { return !m ? inherit : m.moduleId ? String(m.moduleId) : '__none'; }
+  function moduleNameOf(r, id) { var m = (r.modules || []).filter(function (x) { return String(x.id) === String(id); })[0]; return m ? m.name : ''; }
+  function openWeekCanvas(week, focusKey) {
+    PC.modal('<h2 id="pcModalTitle">Week ' + week + ' · Due dates &amp; Canvas</h2><div class="pc-loading"><span class="pc-spinner" aria-hidden="true"></span>Asking Canvas…</div>', { wide: true });
+    PC.rpc('getCanvasWeekSetup', { classId: cid(), week: week }).then(function (r) {
+      var um = r.unitModule && r.unitModule.moduleId ? r.unitModule : null;
+      var unitText = um ? 'Unit default: ' + (moduleNameOf(r, um.moduleId) || um.moduleName) : 'Unit default: no module';
+      var weekSel = choiceValue(r.weekModule, '__unit');
+      var rows = r.items.map(function (it) {
+        var id = it.key.replace(/[^A-Za-z0-9_]/g, ''), l = it.link, state = l ? '<a href="' + esc(l.htmlUrl) + '" target="_blank" rel="noopener">In Canvas ↗</a>' + (l.moduleName ? ' · module “' + esc(l.moduleName) + '”' : ' · no module') : 'Not in Canvas yet';
+        var flags = (it.noGrade ? ' · <b>Not graded for this class</b>' + (l ? '' : ' (Save skips it)') : '') + (!it.released ? ' · Hidden from students, so it stays unpublished' : '');
+        return '<div class="pc-wk-row' + (it.key === focusKey ? ' is-focus' : '') + '" data-key="' + esc(it.key) + '"><div class="pc-wk-name"><b>' + esc((it.icon ? it.icon + ' ' : '') + it.label) + '</b><small>' + it.points + ' pts · ' + state + flags + '</small></div>' +
+          dtField('wkDue_' + id, 'Due', it.dueAt, DUE_TIME) + dtField('wkOpen_' + id, 'Available from', it.unlockAt, OPEN_TIME) +
+          '<div style="display:flex;flex-direction:column;gap:6px;min-width:0"><label class="pc-wk-mod"><span>Module</span><select class="pc-input pc-wk-itemmod" data-key="' + esc(it.key) + '" data-orig="' + esc(choiceValue(it.itemModule, '__week')) + '">' + modOptions(r.modules || [], [['__week', 'Week’s module'], ['__none', '(No module)']], choiceValue(it.itemModule, '__week')) + '</select></label>' +
+          // Assignment group for this assignment: preselected with where it is in Canvas now; sent only when changed.
+          ((r.groups || []).length ? '<label class="pc-wk-mod"><span>Assignment group</span><select class="pc-input pc-wk-group" data-key="' + esc(it.key) + '" data-orig="' + esc(it.groupId || '') + '">' + (it.groupId ? '' : '<option value="">Course default</option>') + (r.groups || []).map(function (g) { return '<option value="' + esc(g.id) + '"' + (String(g.id) === String(it.groupId || '') ? ' selected' : '') + '>' + esc(g.name) + '</option>'; }).join('') + '</select></label>' : '') + '</div></div>';
+      }).join('');
+      PC.modal('<h2 id="pcModalTitle">Week ' + week + ' · Due dates &amp; Canvas</h2>' +
+        '<p class="pc-muted">' + esc(r.course.courseName || 'Your Canvas course') + '. Save makes or updates every graded Week ' + week + ' assignment in Canvas, with these dates, in its module. Assignments that are open to students are published; hidden ones stay unpublished until you open them. Pick a date and the due time is 11:59 PM that day unless you change it.</p>' +
+        ((r.deletedInCanvas || []).length ? '<p class="pc-ainote"><b>Deleted in Canvas:</b> ' + esc(r.deletedInCanvas.join(', ')) + '. Save makes ' + (r.deletedInCanvas.length === 1 ? 'it' : 'them') + ' again, with these dates, in the module below.</p>' : '') +
+        '<div class="pc-wk-week"><label class="pc-field"><span>Canvas module for Week ' + week + '</span><select class="pc-input" id="wkModule" data-orig="' + esc(weekSel) + '">' + modOptions(r.modules || [], [['__unit', unitText], ['__none', '(No module)']], weekSel) + '</select></label>' +
+        '<p class="pc-small pc-muted">Every assignment below goes here unless you pick another module on its row. ' + (r.modulesError ? '<b class="pc-error">Couldn’t load the modules: ' + esc(r.modulesError) + '</b>' : 'The unit default is on the Canvas card (Release &amp; Resources).') + '</p></div>' +
+        ((r.groups || []).length ? '<p class="pc-small pc-muted">Assignment group: change one on its row and Save moves it in Canvas. Pushing grades never changes the group, so you can also move assignments in Canvas.</p>' : (r.groupsError ? '<p class="pc-small pc-muted">' + esc(r.groupsError) + '</p>' : '')) +
+        '<div class="pc-wk-rows">' + rows + '</div><p class="pc-form-msg" id="wkMsg" role="status"></p>' +
+        '<div class="pc-row pc-wk-foot"><button type="button" class="pc-btn ghost" onclick="PC.closeModal()">Cancel</button><button type="button" class="pc-btn primary" id="wkSave">Save to Canvas</button></div>', { wide: true });
+      var f = focusKey && document.querySelector('.pc-wk-row.is-focus input'); if (f) setTimeout(function () { f.focus(); f.closest('.pc-wk-row').scrollIntoView({ block: 'nearest' }); }, 40);
+      PC.byId('wkSave').onclick = function () { saveWeekCanvas(week, r, this); };
+    }).catch(function (e) { PC.modal('<h2 id="pcModalTitle">Week ' + week + ' · Due dates &amp; Canvas</h2><p class="pc-error">' + esc(e.message) + '</p><div class="pc-row"><button type="button" class="pc-btn" onclick="PC.closeModal()">Close</button></div>'); });
+  }
+  function choiceToModule(v, r) { return v === '__none' ? { moduleId: '', moduleName: '' } : { moduleId: v, moduleName: moduleNameOf(r, v) }; }
+  function saveWeekCanvas(week, r, btn) {
+    var schedules = {}, clash = '';
+    r.items.forEach(function (it) {
+      var id = it.key.replace(/[^A-Za-z0-9_]/g, ''), due = readDT('wkDue_' + id, DUE_TIME), open = readDT('wkOpen_' + id, OPEN_TIME);
+      if (due && open && open > due && !clash) clash = it.label + ' opens after it is due. Change its “Available from” date or its due date.';
+      schedules[it.key] = { dueAt: due, unlockAt: open };
+    });
+    if (clash) { PC.byId('wkMsg').textContent = clash; return; }
+    var payload = { classId: cid(), week: week, schedules: schedules }, ws = PC.byId('wkModule');
+    if (ws && ws.value !== ws.dataset.orig) payload.weekModule = ws.value === '__unit' ? null : choiceToModule(ws.value, r);
+    document.querySelectorAll('.pc-wk-group').forEach(function (sel) { if (sel.value && sel.value !== sel.dataset.orig) { payload.itemGroups = payload.itemGroups || {}; payload.itemGroups[sel.dataset.key] = sel.value; } });
+    document.querySelectorAll('.pc-wk-itemmod').forEach(function (sel) { if (sel.value !== sel.dataset.orig) { payload.itemModules = payload.itemModules || {}; payload.itemModules[sel.dataset.key] = sel.value === '__week' ? null : choiceToModule(sel.value, r); } });
+    btn.disabled = true; btn.textContent = 'Saving to Canvas…'; PC.byId('wkMsg').textContent = '';
+    PC.rpc('syncCanvasWeek', payload).then(function (res) {
+      T.dash.settings.due = res.due; T.dash.settings.unlock = res.unlock; T.dash.settings.canvas = res.canvas;
+      var bits = [];
+      if (res.created.length) bits.push('Made in Canvas: ' + res.created.join(', ') + '.');
+      if (res.adopted.length) bits.push('Reused (another class on this course had made them): ' + res.adopted.join(', ') + '.');
+      if (res.remade.length) bits.push('Made again (deleted in Canvas): ' + res.remade.join(', ') + '.');
+      if (res.skipped.length) bits.push('Skipped: ' + res.skipped.join(', ') + '.');
+      res.warnings.forEach(function (w) { bits.push(w); });
+      T.weekMsgs[week] = 'Week ' + week + ' saved to Canvas' + (res.done.length ? ' (' + PC.plural(res.done.length, 'assignment') + ')' : '') + '. ' + bits.join(' ');
+      PC.closeModal(); PC.toast(res.warnings.length ? 'Saved, with ' + PC.plural(res.warnings.length, 'warning') + ' (see Week ' + week + ').' : 'Week ' + week + ' is set up in Canvas.', res.warnings.length ? 'error' : 'ok');
+      refreshTilesKeepMsgs(); refreshHub();
+    }).catch(function (e) { btn.disabled = false; btn.textContent = 'Save to Canvas'; PC.byId('wkMsg').textContent = e.message; });
+  }
+  document.addEventListener('toggle', function (e) { var d = e.target; if (d.classList && d.classList.contains('pc-more')) { var t = d.closest('.pc-tile'); if (t) t.classList.toggle('menu-open', d.open); } }, true);
+  document.addEventListener('click', function (e) { document.querySelectorAll('.pc-more[open]').forEach(function (d) { if (!d.contains(e.target)) d.open = false; }); });
+
+  // ---------------------------------------------------------------- Gradebook
+  function gradebookCard() {
+    var gb = T.dash.gradebook;
+    var head = '<div class="pc-card-head"><div class="pc-card-title"><h2>Gradebook</h2><span class="pc-chip">' + (gb ? PC.plural(gb.students.length, 'student') + ' · ' + PC.plural(gb.items.length, 'assignment') : '') + '</span></div>' +
+      '<div class="pc-card-actions"><button type="button" class="pc-btn small" id="pcPushAll" data-act="pushAll"' + (T.gbPushBusy ? ' disabled' : '') + (canvasLinked() ? '' : ' title="Link the class to Canvas first (Release & Resources → Canvas)"') + '>↗ Push all to Canvas</button></div></div>' +
+      '<p class="pc-card-sub pc-push-status" id="pcPushStatus" aria-live="polite"' + (T.gbPushStatus ? '' : ' hidden') + '>' + esc(T.gbPushStatus) + '</p>';
+    if (!gb || !gb.items.length) return '<section class="pc-card pc-dash-card" id="gradebookCard">' + head + '<p class="pc-empty">No graded assignments.</p></section>';
+    return '<section class="pc-card pc-dash-card" id="gradebookCard">' + head + '<p class="pc-card-sub"><b>3/3</b> earned/possible · <b class="pc-dot">•</b> done but not graded yet · <b>—</b> not done · <b>ex</b> excused. Click any cell to open that student’s work. <b>Unit</b> totals only the work each student has started. <b>↗ Push all to Canvas</b> sends every open assignment that is already in Canvas.</p>' +
+      '<div class="pc-gb-scroll" id="pcGbScroll">' + gradebookTable(gb) + '</div></section>';
+  }
+  function gradebookTable(gb) {
+    var weeks = []; gb.items.forEach(function (it) { if (weeks.indexOf(it.week) < 0) weeks.push(it.week); });
+    var h = '<table class="pc-gb"><thead><tr><th class="pc-gb-name" rowspan="2">Student</th>' + weeks.map(function (w) { var n = gb.items.filter(function (i) { return i.week === w; }).length; return '<th colspan="' + n + '" class="pc-gb-week">' + esc((gb.unitWord || 'Week') + ' ' + w) + '</th>'; }).join('') + '<th class="pc-gb-total" rowspan="2">Unit</th></tr><tr>' +
+      gb.items.map(function (it) { return '<th class="pc-gb-item' + (it.released ? '' : ' is-hidden') + '" title="' + esc(it.label) + (it.released ? '' : ' · hidden from students') + '">' + esc((it.icon ? it.icon + ' ' : '') + (it.kindLabel.length > 10 ? it.kindLabel.slice(0, 9) + '…' : it.kindLabel)) + '</th>'; }).join('') + '</tr></thead><tbody>';
+    h += gb.students.map(function (s) {
+      return '<tr><th class="pc-gb-name" scope="row">' + esc(s.name) + (s.demo ? ' <small class="pc-demo-tag">demo</small>' : '') + '</th>' + gb.items.map(function (it) {
+        var c = s.cells[it.key] || { t: 'none' }, txt;
+        if (c.t === 'ex') txt = '<span class="pc-gb-ex">ex</span>';
+        else if (c.t === 'complete') txt = '✓' + (c.redo ? '<b class="pc-dot">•</b>' : '');
+        else if (c.t === 'incomplete') txt = '✗' + (c.redo ? '<b class="pc-dot">•</b>' : '');
+        else if (c.t === 'score') txt = c.e + '/' + c.p + (c.redo ? '<b class="pc-dot">•</b>' : '');
+        else if (c.t === 'unmarked') txt = '<b class="pc-dot">•</b>';
+        else txt = '<span class="pc-gb-none">—</span>';
+        return '<td><button type="button" class="pc-gb-cell" data-act="openMarking" data-key="' + esc(it.key) + '" data-email="' + esc(s.email) + '" aria-label="' + esc(s.name + ', ' + it.label) + '">' + txt + '</button></td>';
+      }).join('') + '<td class="pc-gb-total">' + (s.unit.possible ? s.unit.earned + '/' + s.unit.possible + ' <small>' + s.unit.pct + '%</small>' : '—') + (s.unit.unmarked ? '<b class="pc-dot" title="Something is still unmarked">•</b>' : '') + '</td></tr>';
+    }).join('') + '</tbody></table>';
+    return h;
+  }
+  function refreshGradebook() {
+    PC.rpc('getGradebook', { classId: cid() }).then(function (gb) { T.dash.gradebook = gb; var c = PC.byId('gradebookCard'); if (c && !c.contains(document.activeElement)) c.outerHTML = gradebookCard(); }).catch(function () {});
+  }
+  A.pushAll = function (el) {
+    if (!canvasLinked()) { PC.toast('Link this class to Canvas first (Release & Resources → Canvas).'); return; }
+    T.gbPushBusy = true; el.disabled = true; setPush('Sending every open assignment that’s in Canvas…');
+    // Pending teacher marks go first.
+    (PC.flushMarks ? PC.flushMarks() : Promise.resolve()).then(function () { return PC.rpc('pushCanvasGradebook', { classId: cid() }); }).then(function (r) {
+      T.gbPushBusy = false;
+      var bits = [];
+      if (r.message) bits.push(r.message);
+      if (r.items && r.items.length) bits.push('Sent ' + PC.plural(r.sent, 'score') + (r.comments ? ' and ' + PC.plural(r.comments, 'comment') : '') + ' across ' + PC.plural(r.items.length, 'assignment') + '.' + (r.excused ? ' ' + PC.plural(r.excused, 'student') + ' excused.' : ''));
+      if (r.notInCanvas && r.notInCanvas.length) bits.push('Not in Canvas yet (use ↗ Push on its tile once): ' + r.notInCanvas.join(', ') + '.');
+      if (r.hidden && r.hidden.length) bits.push('Hidden from students, not sent: ' + r.hidden.join(', ') + '.');
+      if (r.noGrade && r.noGrade.length) bits.push('Not graded for this class: ' + r.noGrade.join(', ') + '.');
+      if (r.unmarked && r.unmarked.length) bits.push('Not marked yet (left blank): ' + r.unmarked.join(', ') + '.');
+      if (r.unmatched && r.unmatched.length) bits.push('Not found in Canvas: ' + r.unmatched.join(', ') + '.');
+      (r.failures || []).forEach(function (f) { bits.push(f.label + ' failed: ' + f.message); });
+      if (r.notReached && r.notReached.length) bits.push('Ran out of time before: ' + r.notReached.join(', ') + '. Press Push all again.');
+      (r.warnings || []).forEach(function (w) { bits.push(w); });
+      setPush(bits.join(' ')); var b = PC.byId('pcPushAll'); if (b) b.disabled = false;
+      refreshHub(true);
+    }).catch(function (e) { T.gbPushBusy = false; setPush(e.message); var b = PC.byId('pcPushAll'); if (b) b.disabled = false; });
+  };
+  function setPush(m) { T.gbPushStatus = m; var el = PC.byId('pcPushStatus'); if (el) { el.textContent = m; el.hidden = !m; } }
+
+  // ---------------------------------------------------------------- Students
+  function studentsCard() {
+    var d = T.dash, shows = d.shows || {};
+    var rows = d.roster.map(function (s) {
+      var sh = shows[s.email] || {};
+      return '<tr><td>' + esc(s.name) + (s.demo ? ' <small class="pc-demo-tag">demo</small>' : '') + '<div class="pc-small pc-muted">' + esc(s.email) + '</div></td><td>' + (sh.name ? esc(sh.name) + (sh.turnedIn ? '' : ' <small class="pc-muted">(draft)</small>') : '<span class="pc-muted">—</span>') + '</td>' +
+        '<td>' + (sh.crew === 'Crew' ? '<span class="pc-chip">Crew</span>' + (sh.members ? '<div class="pc-small">' + esc(sh.members) + '</div>' : '') : sh.crew ? 'Solo' : '<span class="pc-muted">—</span>') + '</td>' +
+        '<td class="pc-roster-actions"><button type="button" class="pc-btn small" data-act="openAs" data-email="' + esc(s.email) + '" data-name="' + esc(s.name) + '">' + (s.demo ? 'Use as this student' : 'View (read-only)') + '</button>' +
+        '<button type="button" class="pc-btn small ghost" data-act="renameStudent" data-email="' + esc(s.email) + '" data-name="' + esc(s.name) + '">Rename</button><button type="button" class="pc-btn small ghost is-danger" data-act="removeStudent" data-email="' + esc(s.email) + '" data-name="' + esc(s.name) + '">Remove</button></td></tr>';
+    }).join('');
+    return '<details class="pc-card pc-fold" id="pcStudents"' + (T.studentsOpen ? ' open' : '') + '><summary><h2>Students</h2><span class="pc-muted">' + PC.plural(d.roster.filter(function (s) { return !s.demo; }).length, 'student') + ' · join code <b>' + esc(d.klass.joinCode) + '</b></span></summary>' +
+      '<p class="pc-card-sub">Students go to this app’s link, sign in with their school account, and type the class code <b>' + esc(d.klass.joinCode) + '</b>. Their show name and crew come from their Show Concept (Week 2). Demo students let you try every step without touching real students.</p>' +
+      (rows ? '<div class="pc-table-wrap"><table class="pc-table"><thead><tr><th>Student</th><th>Show</th><th>Solo / crew</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<p class="pc-empty">No students yet.</p>') +
+      '<div class="pc-row"><button type="button" class="pc-btn small" data-act="addDemo">Add demo students</button></div></details>';
+  }
+  document.addEventListener('toggle', function (e) { if (e.target.id === 'pcStudents') T.studentsOpen = e.target.open; }, true);
+  A.openAs = function (el) { PC.state.role = 'student'; PC.state.classId = cid(); PC.state.as = el.dataset.email; PC.state.asName = el.dataset.name; PC.go('home'); };
+  A.addDemo = function (el) { el.disabled = true; PC.rpc('addDemoStudents', { classId: cid() }, { retry: true }).then(function (r) { T.dash.roster = r.roster; T.studentsOpen = true; PC.toast(r.added ? 'Added ' + PC.plural(r.added, 'demo student') + '.' : 'The demo students are already here.'); PC.loadDash(function () { drawDash(PC.byId('app')); }); }).catch(function (e) { el.disabled = false; PC.toast(e.message, 'error'); }); };
+  A.renameStudent = function (el) {
+    var n = prompt('Name for ' + el.dataset.email, el.dataset.name); if (!n || n === el.dataset.name) return;
+    PC.rpc('renameStudent', { classId: cid(), email: el.dataset.email, name: n }, { retry: true }).then(function () { PC.loadDash(function () { drawDash(PC.byId('app')); }); }).catch(function (e) { PC.toast(e.message, 'error'); });
+  };
+  A.removeStudent = function (el) {
+    if (!confirm('Remove ' + el.dataset.name + ' from this class? Their work is kept, and they can rejoin with the code.')) return;
+    PC.rpc('removeStudent', { classId: cid(), email: el.dataset.email }, { retry: true }).then(function () { PC.loadDash(function () { drawDash(PC.byId('app')); }); }).catch(function (e) { PC.toast(e.message, 'error'); });
+  };
+
+  // ---------------------------------------------------------------- Release (every activity, lessons too)
+  function releaseCard() {
+    var rel = (T.dash.settings || {}).release || {}, units = (T.dash.study || {}).units || [];
+    return '<section class="pc-sub" id="pcReleaseCard"><h3>Open to students</h3><p class="pc-small pc-muted">A week appears for students once anything in it is open. Turning something off only hides it: nothing students wrote is ever deleted, and grades are kept.</p>' +
+      '<div class="pc-rel-weeks">' + units.map(function (u) {
+        var keys = u.activities.map(function (a) { return 'w' + u.n + '_' + a.id; }), openN = keys.filter(function (k) { return rel[k] === true; }).length;
+        return '<article class="pc-rel-week" style="--acc:' + (WEEK_ACC[u.n] || '#4a4f7a') + '"><header><div><span class="pc-eyebrow">Week ' + u.n + '</span><h4>' + esc(u.title) + '</h4><span class="pc-small pc-muted">' + openN + ' of ' + keys.length + ' open</span></div>' +
+          '<div class="pc-row">' + (openN < keys.length ? '<button type="button" class="pc-btn small primary" data-act="weekOpen" data-week="' + u.n + '" data-on="true">Open all of Week ' + u.n + '</button>' : '') + (openN ? '<button type="button" class="pc-btn small ghost" data-act="weekOpen" data-week="' + u.n + '" data-on="false">Hide all</button>' : '') + '</div></header>' +
+          '<ul class="pc-rel-list">' + u.activities.map(function (a) {
+            var k = 'w' + u.n + '_' + a.id, on = rel[k] === true, what = a.form === 'lesson' ? 'students can’t read this lesson' : 'students can’t open or turn in “' + a.title + '”';
+            return '<li><span class="pc-rel-name">' + esc(a.icon + ' ' + a.title) + '<small>' + (a.form === 'lesson' ? 'Lesson · not graded' : a.form === 'quiz' ? 'Quiz · ' + a.points + ' pts' : a.points + ' pts') + '</small></span>' +
+              '<label class="pc-switch' + (on ? ' is-on' : '') + '" title="' + (on ? 'Open. Turn off and ' + what + '; their work is kept.' : 'Hidden: ' + what + '. Turn on to open it.') + '"><input type="checkbox" class="pcRelItem" data-key="' + esc(k) + '"' + (on ? ' checked' : '') + '><span class="pc-switch-track" aria-hidden="true"></span><span class="pc-switch-text">' + (on ? 'Open to students' : 'Hidden from students') + '</span></label></li>';
+          }).join('') + '</ul></article>';
+      }).join('') + '</div></section>';
+  }
+  function afterRelease(release) {
+    T.dash.settings.release = release;
+    (T.dash.hub.groups || []).forEach(function (g) { g.items.forEach(function (t) { t.released = release[t.key] === true; }); });
+    var tiles = PC.byId('pcHubTiles'); if (tiles) tiles.innerHTML = hubTilesHtml();
+    var rc = PC.byId('pcReleaseCard'); if (rc) rc.outerHTML = releaseCard();
+    var b = document.querySelector('.pc-banner'); if (b) b.outerHTML = bannerHtml();
+  }
+  document.addEventListener('change', function (e) {
+    var r = e.target.closest('.pcRelItem'); if (!r) return;
+    var key = r.dataset.key, on = r.checked; r.disabled = true;
+    PC.rpc('setRelease', { classId: cid(), itemKey: key, on: on }, { retry: true }).then(function (res) { afterRelease(res.release); PC.toast(on ? 'Open to students.' : 'Hidden from students. Their work is kept.'); })
+      .catch(function (err) { r.checked = !on; r.disabled = false; PC.toast(err.message, 'error'); });
+  });
+  A.weekOpen = function (el) {
+    var on = el.dataset.on === 'true'; el.disabled = true;
+    PC.rpc('setWeekRelease', { classId: cid(), week: Number(el.dataset.week), on: on }, { retry: true }).then(function (res) { afterRelease(res.release); PC.toast(on ? 'Week ' + el.dataset.week + ' is open to students.' : 'Week ' + el.dataset.week + ' is hidden. Students’ work is kept.'); })
+      .catch(function (e) { el.disabled = false; PC.toast(e.message, 'error'); });
+  };
+
+  // ---------------------------------------------------------------- Canva template links
+  function canvaCard() {
+    var c = T.dash.canva || {};
+    return '<section class="pc-sub" id="pcCanvaCard"><h3>Ready-to-use resources</h3><p class="pc-small pc-muted">The cover maker, printable run-sheet starter, research notebook and question preparation are built into the student pages. No template setup is needed. You can optionally add your own Canva template links below; these appear alongside the built-in resources.</p>' +
+      '<div class="pc-form-grid"><label class="pc-field"><span>Optional Canva cover template</span><input class="pc-input" id="cvaCover" placeholder="https://www.canva.com/design/…" value="' + esc(c.cover || '') + '"></label>' +
+      '<label class="pc-field"><span>Optional Canva run-sheet template</span><input class="pc-input" id="cvaRun" placeholder="https://www.canva.com/design/…" value="' + esc(c.runsheet || '') + '"></label></div>' +
+      '<div class="pc-row"><button type="button" class="pc-btn small primary" data-act="saveCanva">Save template links</button><span class="pc-form-msg" id="cvaMsg" role="status"></span></div></section>';
+  }
+  A.saveCanva = function (el) {
+    el.disabled = true;
+    PC.rpc('saveCanvaLinks', { classId: cid(), links: { cover: PC.byId('cvaCover').value, runsheet: PC.byId('cvaRun').value } }, { retry: true }).then(function (r) {
+      el.disabled = false; T.dash.canva = r.canva; PC.byId('cvaMsg').textContent = 'Saved.';
+    }).catch(function (e) { el.disabled = false; PC.byId('cvaMsg').textContent = e.message; });
+  };
+
+  // ---------------------------------------------------------------- Canvas card
+  function canvasCard() {
+    var d = T.dash, c = d.canvas || {}, s = (d.settings || {}).canvas || {};
+    var h = '<section class="pc-sub" id="pcCanvasCard"><h3>Canvas</h3>';
+    if (d.lmsHub) h += '<p class="pc-small pc-chip is-ok">Pushes go through your LMS Hub.</p>';
+    if (!c.connected) {
+      h += '<p class="pc-muted">Connect once with a Canvas access token (Canvas → Account → Settings → New Access Token). Your token is stored for you only.</p><div class="pc-form-grid"><label class="pc-field"><span>Canvas address</span><input class="pc-input" id="cvUrl" placeholder="https://yourschool.instructure.com"></label><label class="pc-field"><span>Access token</span><input class="pc-input" id="cvToken" type="password" autocomplete="off"></label></div><div class="pc-row"><button class="pc-btn primary" data-act="cvConnect">Connect Canvas</button><span class="pc-form-msg" id="cvMsg" role="status"></span></div>';
+    } else {
+      h += '<p>Connected to <b>' + esc(c.baseUrl) + '</b>. <button type="button" class="pc-link" data-act="cvDisconnect">Disconnect</button></p>';
+      h += s.courseId ? '<p>This class pushes to <b>' + esc(s.courseName || s.courseId) + '</b>' + (s.assignmentGroupName ? ', assignment group <b>' + esc(s.assignmentGroupName) + '</b>' : '') + '. <button type="button" class="pc-link" data-act="cvUnlink">Change course</button></p><p class="pc-small pc-muted">Each assignment is made in Canvas the first time you press ↗ Push on its tile (or Save in a week’s Due dates &amp; Canvas…), and reused after that. Excluded work is sent as Excused.</p>' + unitModuleHtml(s)
+        : '<div class="pc-row"><button class="pc-btn" data-act="cvCourses">Choose the Canvas course…</button><span class="pc-form-msg" id="cvMsg" role="status"></span></div><div id="cvPick"></div>';
+    }
+    return h + '</section>';
+  }
+  // The module every Podcast Studio assignment goes in (a week or one assignment can differ).
+  function unitModuleHtml(s) {
+    var mods = T.modules[s.courseId], cur = s.unitModule && s.unitModule.moduleId ? String(s.unitModule.moduleId) : '';
+    if (!mods) setTimeout(loadUnitModules, 0);
+    var opts = mods ? '<option value="">(No module)</option>' + mods.map(function (m) { return '<option value="' + esc(m.id) + '"' + (String(m.id) === cur ? ' selected' : '') + '>' + esc(m.name) + '</option>'; }).join('')
+      : '<option value="' + esc(cur) + '">' + esc(cur ? (s.unitModule.moduleName || 'Loading…') : 'Loading modules…') + '</option>';
+    return '<div class="pc-unit-module"><label class="pc-field"><span>Canvas module for Podcast Studio assignments</span><select class="pc-input" id="cvUnitModule">' + opts + '</select></label>' +
+      '<button type="button" class="pc-btn small" data-act="cvSaveModule"' + (mods ? '' : ' disabled') + '>Save module</button><span class="pc-form-msg" id="cvModMsg" role="status"></span></div>' +
+      '<p class="pc-small pc-muted">Assignments go in this module when they’re made in Canvas, unless a week or one assignment is set to a different module (each week’s <b>Due dates &amp; Canvas…</b> on the Grading card). Saving also moves the assignments already in Canvas that use this default.</p>';
+  }
+  var loadingMods = false;
+  function loadUnitModules() {
+    var s = (T.dash.settings || {}).canvas || {}; if (loadingMods || !s.courseId || T.modules[s.courseId]) return;
+    loadingMods = true;
+    PC.rpc('listCanvasModules', { classId: cid() }).then(function (r) {
+      loadingMods = false; T.modules[s.courseId] = r.modules;
+      var box = document.querySelector('.pc-unit-module'); if (box && document.activeElement !== PC.byId('cvUnitModule')) box.outerHTML = unitModuleHtml(s).replace(/<p class="pc-small pc-muted">[\s\S]*$/, '');
+    }).catch(function (e) { loadingMods = false; var m = PC.byId('cvModMsg'); if (m) m.textContent = 'Couldn’t load the modules: ' + e.message; });
+  }
+  A.cvSaveModule = function (el) {
+    var sel = PC.byId('cvUnitModule'), id = sel.value, name = id ? sel.options[sel.selectedIndex].text : '';
+    el.disabled = true; PC.byId('cvModMsg').textContent = 'Saving…';
+    PC.rpc('saveUnitModule', { classId: cid(), module: { moduleId: id, moduleName: name } }).then(function (r) {
+      el.disabled = false; if (r.canvas) T.dash.settings.canvas = r.canvas; else T.dash.settings.canvas.unitModule = r.unitModule;
+      PC.byId('cvModMsg').textContent = 'Saved.' + (r.moved.length ? ' Moved ' + PC.plural(r.moved.length, 'assignment') + ' already in Canvas.' : '') + (r.warnings.length ? ' ' + r.warnings.join(' ') : '');
+      refreshHub();
+    }).catch(function (e) { el.disabled = false; PC.byId('cvModMsg').textContent = e.message; });
+  };
+  A.cvConnect = function (el) { el.disabled = true; PC.rpc('saveCanvasConnection', { baseUrl: PC.byId('cvUrl').value, token: PC.byId('cvToken').value }).then(function (r) { T.dash.canvas = r.canvas; PC.boot.canvas = r.canvas; T.setupOpen = true; drawDash(PC.byId('app')); PC.toast('Canvas is connected' + (r.canvas.name ? ' as ' + r.canvas.name : '') + '.'); }).catch(function (e) { el.disabled = false; PC.byId('cvMsg').textContent = e.message; }); };
+  A.cvDisconnect = function () { if (!confirm('Disconnect Canvas for your account?')) return; PC.rpc('clearCanvasConnection', {}).then(function (r) { T.dash.canvas = r.canvas; drawDash(PC.byId('app')); }); };
+  A.cvUnlink = function () { if (!confirm('Unlink this class from its Canvas course? Assignments already in Canvas stay there.')) return; PC.rpc('unlinkCanvasCourse', { classId: cid() }).then(function () { PC.loadDash(function () { T.setupOpen = true; drawDash(PC.byId('app')); }); }); };
+  A.cvCourses = function (el) {
+    el.disabled = true; PC.byId('cvMsg').textContent = 'Loading your courses…';
+    PC.rpc('listCanvasCourses', {}).then(function (r) {
+      PC.byId('cvMsg').textContent = '';
+      PC.byId('cvPick').innerHTML = '<div class="pc-form-grid"><label class="pc-field"><span>Course</span><select class="pc-input" id="cvCourse"><option value="">Choose…</option>' + r.courses.map(function (c) { return '<option value="' + esc(c.id) + '">' + esc(c.name) + (c.term ? ' (' + esc(c.term) + ')' : '') + '</option>'; }).join('') + '</select></label><label class="pc-field"><span>Assignment group <small>(optional)</small></span><select class="pc-input" id="cvGroup"><option value="">Canvas default</option></select></label></div><button class="pc-btn primary" data-act="cvLink">Link this class</button>';
+      PC.byId('cvCourse').onchange = function () { var id = this.value; if (!id) return; PC.rpc('listCanvasGroups', { courseId: id }).then(function (g) { PC.byId('cvGroup').innerHTML = '<option value="">Canvas default</option>' + g.groups.map(function (x) { return '<option value="' + esc(x.id) + '">' + esc(x.name) + '</option>'; }).join(''); }); };
+    }).catch(function (e) { el.disabled = false; PC.byId('cvMsg').textContent = e.message; });
+  };
+  A.cvLink = function (el) {
+    var c = PC.byId('cvCourse').value; if (!c) return PC.toast('Choose a course.');
+    el.disabled = true; PC.rpc('linkCanvasCourse', { classId: cid(), courseId: c, assignmentGroupId: PC.byId('cvGroup').value }).then(function (r) { T.dash.settings.canvas = r.canvas; T.setupOpen = true; drawDash(PC.byId('app')); PC.toast('Linked to ' + r.canvas.courseName + '.'); }).catch(function (e) { el.disabled = false; PC.toast(e.message, 'error'); });
+  };
+
+  // ---------------------------------------------------------------- Admin
+  PC.views.admin = function (app) {
+    app.innerHTML = '<section class="pc-card pc-skeleton"><p>Loading access…</p></section>';
+    PC.rpc('adminListAccess', {}, { retry: true }).then(function (r) { drawAdmin(app, r); }).catch(function (e) { PC.fail(app, e); });
+  };
+  function drawAdmin(app, r) {
+    app.innerHTML = '<section class="pc-card"><h1>Admin</h1><p class="pc-muted">Teachers listed here can make classes and use the Teacher view. Everyone else who signs in is a student.</p>' +
+      '<form id="adForm" class="pc-inline-form"><label class="pc-field"><span>School email</span><input class="pc-input" id="adEmail" type="email" required></label><label class="pc-field"><span>Name</span><input class="pc-input" id="adName"></label><label class="pc-field pc-field-sm"><span>Role</span><select class="pc-input" id="adRole"><option value="teacher">Teacher</option><option value="admin">Admin</option></select></label><button class="pc-btn primary" type="submit">Add or update</button></form><p class="pc-form-msg" id="adMsg" role="alert"></p>' +
+      '<div class="pc-table-wrap"><table class="pc-table"><thead><tr><th>Person</th><th>Role</th><th>Access</th><th></th></tr></thead><tbody>' + r.users.map(function (u) {
+        return '<tr><td>' + esc(u.name) + '<div class="pc-small pc-muted">' + esc(u.email) + '</div></td><td>' + esc(u.role) + '</td><td>' + (u.status === 'active' ? '<span class="pc-chip is-ok">Active</span>' : '<span class="pc-chip">Off</span>') + '</td><td><button class="pc-btn small" data-act="adToggle" data-email="' + esc(u.email) + '" data-name="' + esc(u.name) + '" data-role="' + esc(u.role) + '" data-status="' + (u.status === 'active' ? 'inactive' : 'active') + '">' + (u.status === 'active' ? 'Turn off' : 'Turn on') + '</button></td></tr>';
+      }).join('') + '</tbody></table></div></section>' +
+      '<section class="pc-card"><h2>Every class</h2>' + (r.classes.length ? '<ul class="pc-plain">' + r.classes.map(function (c) { return '<li><b>' + esc(c.className) + '</b>' + (c.period ? ' · Period ' + esc(c.period) : '') + ' · ' + esc(c.teacherEmail) + ' · code ' + esc(c.joinCode) + '</li>'; }).join('') + '</ul>' : '<p class="pc-muted">No classes yet.</p>') + '</section>';
+    PC.byId('adForm').onsubmit = function (e) { e.preventDefault(); PC.rpc('adminSetAccess', { email: PC.byId('adEmail').value, name: PC.byId('adName').value, role: PC.byId('adRole').value, status: 'active' }).then(function (x) { drawAdmin(app, x); PC.toast('Saved.'); }).catch(function (err) { PC.byId('adMsg').textContent = err.message; }); };
+  }
+  A.adToggle = function (el) { PC.rpc('adminSetAccess', { email: el.dataset.email, name: el.dataset.name, role: el.dataset.role, status: el.dataset.status }).then(function (x) { drawAdmin(PC.byId('app'), x); }).catch(function (e) { PC.toast(e.message, 'error'); }); };
+
+  PC.teacher = { hubTilesHtml: hubTilesHtml, refreshHub: refreshHub, refreshGradebook: refreshGradebook, pushSummary: pushSummary };
+  window.__MB.Teacher = 'ok';
+})();
+</script>

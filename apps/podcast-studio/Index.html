@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Podcast Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+
+<style>
+  /* Structure only; the look is in PodcastTheme (included last). */
+  html,body{margin:0}
+  #pcBoot{padding:48px 20px;text-align:center;font:16px system-ui,sans-serif;color:#444}
+  .pc-missing{margin:12px;padding:12px 14px;border:2px solid #b42318;border-radius:10px;background:#fff4f2;color:#7a1a12;font:600 14px system-ui,sans-serif}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div id="pcUpdateBar" class="pc-update" hidden role="status"></div>
+<header class="pc-top" id="pcTop" hidden>
+  <div class="pc-top-inner">
+    <div class="pc-brand"><span class="pc-brand-mark" aria-hidden="true"></span><span class="pc-brand-name">Podcast Studio</span></div>
+    <div class="pc-roles" id="pcRoles" role="group" aria-label="View as"></div>
+    <div class="pc-account" id="pcAccount"></div>
+  </div>
+</header>
+<main id="app" class="pc-app" aria-live="polite"><div id="pcBoot">Loading Podcast Studio…</div></main>
+<div id="pcToast" class="pc-toast" role="status" aria-live="polite" hidden></div>
+<div id="pcModal" class="pc-modal" hidden><div class="pc-modal-card" role="dialog" aria-modal="true" aria-labelledby="pcModalTitle"><div id="pcModalBody"></div></div></div>
+<div id="pcDidntSave" class="pc-didnt" hidden></div>
+
+<script>
+// ============================================================================
+// Podcast Studio -- page core: state, server calls, top bar, routing, small helpers.
+// Feature files (WritingStats, SaveGuard, Student, Teacher, Marking, ReadAloud) add views to PC.views.
+// ============================================================================
+window.__MB = window.__MB || {};
+var PC = window.PC = {
+  BUILD: '2026-10-23a',
+  boot: null,
+  state: { role: 'student', view: 'loading', classId: '', as: '', asName: '', week: 0, step: '', itemKey: '' },
+  views: {},
+  tabId: (function () { try { return sessionStorage.getItem('pcTabId') || (function () { var t = Math.random().toString(36).slice(2, 10); sessionStorage.setItem('pcTabId', t); return t; })(); } catch (e) { return Math.random().toString(36).slice(2, 10); } })()
+};
+
+// ---------- helpers ----------
+PC.esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
+PC.attr = PC.esc;
+PC.byId = function (id) { return document.getElementById(id); };
+PC.store = {
+  get: function (k, fb) { try { var v = localStorage.getItem(k); return v == null ? fb : JSON.parse(v); } catch (e) { return fb; } },
+  set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+  del: function (k) { try { localStorage.removeItem(k); } catch (e) {} },
+  keys: function (prefix) { var out = []; try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(prefix) === 0) out.push(k); } } catch (e) {} return out; }
+};
+PC.fmtDate = function (iso, withTime) {
+  if (!iso) return ''; var d = new Date(iso); if (isNaN(d)) return '';
+  var o = { month: 'short', day: 'numeric' }; if (withTime) { o.hour = 'numeric'; o.minute = '2-digit'; }
+  return d.toLocaleString(undefined, o);
+};
+PC.fmtDay = function (ymd) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || '')); if (!m) return ''; var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])); return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
+PC.words = function (s) { var m = String(s || '').trim().match(/\S+/g); return m ? m.length : 0; };
+PC.plural = function (n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); };
+
+PC.toast = function (msg, kind) {
+  var t = PC.byId('pcToast'); t.textContent = msg; t.className = 'pc-toast' + (kind ? ' is-' + kind : ''); t.hidden = false;
+  clearTimeout(PC._toastT); PC._toastT = setTimeout(function () { t.hidden = true; }, kind === 'error' ? 7000 : 3500);
+};
+PC.modal = function (html, opts) {
+  var m = PC.byId('pcModal'); PC.byId('pcModalBody').innerHTML = html; m.hidden = false;
+  m.dataset.locked = opts && opts.locked ? '1' : '';
+  m.querySelector('.pc-modal-card').classList.toggle('is-wide', !!(opts && opts.wide));
+  var f = m.querySelector('[autofocus], button, input, textarea'); if (f) setTimeout(function () { f.focus(); }, 30);
+};
+PC.closeModal = function () { PC.byId('pcModal').hidden = true; PC.byId('pcModalBody').innerHTML = ''; };
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && !PC.byId('pcModal').hidden && !PC.byId('pcModal').dataset.locked) PC.closeModal();
+});
+
+// ---------- server calls ----------
+// One handler chain per call. Busy/network errors retry by themselves when opts.retry is set.
+PC.isRetryable = function (msg) { return /busy|timed out|try again in a moment|network|NetworkError|Failed to fetch|server error|Service unavailable|Internal error/i.test(String(msg || '')); };
+PC.rpc = function (name, payload, opts) {
+  opts = opts || {};
+  var tries = opts.retry ? 3 : 1;
+  return new Promise(function (resolve, reject) {
+    function attempt(n) {
+      var done = false, timer = null;
+      if (opts.timeoutMs) timer = setTimeout(function () { if (done) return; done = true; if (n + 1 < tries) attempt(n + 1); else reject(new Error('The server didn’t answer. Check your connection.')); }, opts.timeoutMs);
+      google.script.run
+        .withSuccessHandler(function (res) { if (done) return; done = true; clearTimeout(timer); resolve(res); })
+        .withFailureHandler(function (err) {
+          if (done) return; done = true; clearTimeout(timer);
+          var msg = String(err && err.message || err || 'Something went wrong.').replace(/^(Exception|Error):\s*/, '');
+          if (n + 1 < tries && PC.isRetryable(msg)) return setTimeout(function () { attempt(n + 1); }, 700 * (n + 1));
+          var e = new Error(msg); e.server = true; reject(e);
+        })[name](payload);
+    }
+    attempt(0);
+  });
+};
+
+// ---------- top bar: Student · Teacher · Admin, always on top ----------
+PC.renderTop = function () {
+  var b = PC.boot || {}, top = PC.byId('pcTop'); top.hidden = false;
+  var roles = b.role === 'admin' ? ['student', 'teacher', 'admin'] : b.role === 'teacher' ? ['student', 'teacher'] : [];
+  PC.byId('pcRoles').hidden = !roles.length;
+  PC.byId('pcRoles').innerHTML = roles.map(function (r) {
+    var on = PC.state.role === r;
+    return '<button type="button" class="pc-role' + (on ? ' is-on' : '') + '" data-role="' + r + '" aria-pressed="' + on + '">' + r.charAt(0).toUpperCase() + r.slice(1) + '</button>';
+  }).join('');
+  PC.byId('pcAccount').innerHTML = b.email ? '<span class="pc-account-email" title="Signed in">' + PC.esc(b.email) + '</span><span class="pc-build" title="App version">v' + PC.esc(PC.BUILD) + '</span>' : '';
+};
+document.addEventListener('click', function (e) {
+  var r = e.target.closest('.pc-role'); if (!r) return;
+  PC.leave(function () {
+    PC.state.role = r.dataset.role; PC.state.as = ''; PC.state.asName = '';
+    PC.store.set('pcRole', PC.state.role);
+    if (PC.state.role === 'teacher') PC.go('dashboard');
+    else if (PC.state.role === 'admin') PC.go('admin');
+    else PC.go(PC.state.classId ? 'home' : 'classes');
+  });
+});
+
+// ---------- routing ----------
+// PC.leave(fn): anything with unsaved typing is saved first (SaveGuard overrides this).
+PC.leave = function (fn) { fn(); };
+// Record screen changes in the host web app's history, never student writing.
+PC.navigation = (function () {
+  var current = null, restoring = false, pending = false;
+  var host = window.google && google.script && google.script.history;
+  var fields = ['view', 'role', 'classId', 'as', 'asName', 'week', 'step', 'itemKey'];
+  function route() { var r = {}; fields.forEach(function(k) { r[k] = PC.state[k] == null ? '' : PC.state[k]; }); return r; }
+  function write(r, replace) {
+    var state = { podcastRoute: r };
+    if (host) host[replace ? 'replace' : 'push'](state, null, null);
+    else window.history[replace ? 'replaceState' : 'pushState'](state, '');
+  }
+  function record() {
+    var next = route();
+    if (restoring) { current = next; return; }
+    if (JSON.stringify(next) === JSON.stringify(current)) return;
+    write(next, !current); current = next;
+  }
+  function change(e) {
+    var target = e.state && e.state.podcastRoute;
+    if (!current || !target) return;
+    // Old role / preview history cannot switch identity behind the role controls.
+    if (pending || target.role !== current.role || target.as !== current.as || !PC.views[target.view]) { write(current, true); return; }
+    pending = true;
+    PC.leave(function () {
+      pending = false; restoring = true;
+      try { PC.go(target.view, target); } finally { restoring = false; }
+      write(current, true);
+    }, function () { pending = false; write(current, true); });
+  }
+  if (host) host.setChangeHandler(change);
+  else window.addEventListener('popstate', change);
+  return { record: record };
+})();
+PC.go = function (view, patch) {
+  Object.assign(PC.state, patch || {}); PC.state.view = view;
+  PC.renderTop();
+  PC.render();
+  PC.navigation.record();
+  try { window.scrollTo(0, 0); } catch (e) {}
+};
+
+PC.render = function () {
+  var v = PC.views[PC.state.view], app = PC.byId('app');
+  try { document.body.setAttribute('data-view', PC.state.view || ''); } catch (e) {}   // page-level styling (the theme keeps writing pages at a readable width)
+  if (!v) { app.innerHTML = '<section class="pc-card"><p>Loading…</p></section>'; return; }
+  try { v(app); } catch (e) { console.error(e); app.innerHTML = '<section class="pc-card pc-error"><h2>Something went wrong on this page.</h2><p>' + PC.esc(e.message) + '</p><p><button class="pc-btn" onclick="location.reload()">Reload</button></p></section>'; }
+};
+PC.fail = function (el, err) {
+  var msg = err && err.message ? err.message : String(err);
+  if (el) el.innerHTML = '<section class="pc-card pc-error" role="alert"><h2>That didn’t load.</h2><p>' + PC.esc(msg) + '</p><p><button type="button" class="pc-btn" data-act="reloadView">Try again</button></p></section>';
+  else PC.toast(msg, 'error');
+};
+document.addEventListener('click', function (e) { if (e.target.closest('[data-act="reloadView"]')) PC.render(); });
+
+// ---------- versions: the update bar compares against the build THIS link serves ----------
+PC.checkVersion = function () {
+  if (!window.google || !google.script) return;
+  PC.rpc('getAppVersion', {}).then(function (v) {
+    var bar = PC.byId('pcUpdateBar'), url = v.url || '';
+    var teacher = PC.boot && PC.boot.role && PC.boot.role !== 'student';
+    if (v.serverBuild && v.serverBuild !== PC.BUILD && PC.cmpVer(v.serverBuild, PC.BUILD) > 0) {
+      var reloaded = PC.store.get('pcReloadedFor', '') === v.serverBuild;
+      if (reloaded && teacher) {
+        bar.innerHTML = 'This link is still running v' + PC.esc(PC.BUILD) + '. In the Apps Script editor: Deploy → Manage deployments → pencil → Version: New version → Deploy.';
+        bar.hidden = false;
+      } else if (!reloaded) {
+        PC._latestBuild = v.serverBuild;
+        bar.innerHTML = 'A new version of Podcast Studio is ready. <a class="pc-btn small" id="pcReloadLink" target="_top" href="' + PC.esc(url) + '">Reload</a>';
+        bar.hidden = false;
+      }
+    } else {
+      if (PC.cmpVer(PC.BUILD, PC.store.get('pcReloadedFor', '')) >= 0) PC.store.del('pcReloadedFor');
+    }
+    if (teacher && v.version && v.serverBuild === PC.BUILD && PC.cmpVer(v.version, PC.BUILD) > 0) {
+      bar.innerHTML = 'This link runs v' + PC.esc(PC.BUILD) + ', but v' + PC.esc(v.version) + ' is live elsewhere. To update this link: Deploy → Manage deployments → pencil → New version.';
+      bar.hidden = false;
+    }
+  }).catch(function () {});
+};
+PC.cmpVer = function (a, b) { a = String(a); b = String(b); return a === b ? 0 : (a > b ? 1 : -1); };
+document.addEventListener('click', function (e) {
+  var a = e.target.closest('#pcReloadLink'); if (!a) return;
+  // The bar waits for saves: Reload goes only when nothing is unsaved.
+  if (PC.hasUnsaved && PC.hasUnsaved()) { e.preventDefault(); PC.toast('Saving your work first. Press Reload again in a moment.'); if (PC.flushAll) PC.flushAll(); return; }
+  PC.store.set('pcReloadedFor', PC._latestBuild || '');
+});
+
+// ---------- start ----------
+PC.start = function () {
+  PC.rpc('getBootstrap', {}, { retry: true }).then(function (b) {
+    PC.boot = b;
+    if (b.needsSetup) { PC.byId('app').innerHTML = '<section class="pc-card"><h1>Podcast Studio isn’t set up yet</h1><p>In the Apps Script editor, run <b>setupPodcastStudio</b> once while signed in with your school account, then reload this page.</p></section>'; return; }
+    if (!b.email) { PC.byId('app').innerHTML = '<section class="pc-card"><h1>Sign in with your school account</h1><p>Podcast Studio couldn’t tell who is signed in. Open it in a browser signed in to your school Google account.</p></section>'; return; }
+    var saved = PC.store.get('pcRole', '');
+    if (b.role === 'student') PC.state.role = 'student';
+    else PC.state.role = (saved === 'admin' && b.role === 'admin') || saved === 'student' ? saved : 'teacher';
+    var sc = b.studentClasses || [];
+    if (PC.state.role === 'student') {
+      var last = PC.store.get('pcClass_' + b.email, '');
+      if (sc.length === 1) PC.state.classId = sc[0].classId;
+      else if (last && sc.some(function (c) { return c.classId === last; })) PC.state.classId = last;
+      PC.go(PC.state.classId ? 'home' : 'classes');
+    } else if (PC.state.role === 'admin') PC.go('admin');
+    else PC.go('dashboard');
+    setInterval(PC.checkVersion, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') PC.checkVersion(); });
+    setTimeout(PC.checkVersion, 4000);
+  }).catch(function (e) {
+    PC.byId('app').innerHTML = '<section class="pc-card pc-error"><h1>Podcast Studio couldn’t start</h1><p>' + PC.esc(e.message) + '</p><p><button class="pc-btn" onclick="location.reload()">Try again</button></p></section>';
+  });
+};
+window.__MB.Index = 'ok';
+</script>
+<?!= include_('WritingStats'); ?>
+<?!= include_('SaveGuard'); ?>
+<?!= include_('Student'); ?>
+<?!= include_('Teacher'); ?>
+<?!= include_('Marking'); ?>
+<?!= include_('ReadAloud'); ?>
+<?!= include_('PodcastTheme'); ?>
+<script>
+(function () {
+  var want = ['Index', 'WritingStats', 'SaveGuard', 'Student', 'Teacher', 'Marking', 'ReadAloud', 'PodcastTheme'];
+  var missing = want.filter(function (f) { return window.__MB[f] !== 'ok'; });
+  if (missing.length) {
+    var d = document.createElement('div'); d.className = 'pc-missing'; d.setAttribute('role', 'alert');
+    d.textContent = 'Part of Podcast Studio didn’t load (' + missing.join(', ') + '). Reload the page; if it keeps happening, tell your teacher.';
+    document.body.insertBefore(d, document.body.firstChild);
+  }
+  PC.start();
+})();
+</script>
+</body>
+</html>

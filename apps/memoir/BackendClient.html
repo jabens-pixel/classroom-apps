@@ -1,0 +1,1965 @@
+<script>
+window.__MB = window.__MB || {}; __MB.BackendClient = 'started';
+window.addEventListener("error", function (event) {
+  try {
+    const app = document.getElementById("app");
+    if (app && !(window.MEMOIR_BACKEND && window.MEMOIR_BACKEND.ready))
+      app.innerHTML = '<div class="card"><h2 class="card-title">Memoir could not finish loading</h2><p>' + String(event.message || "A browser error occurred.").replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m]) + '</p><p class="muted-note">Open the app from its web-app link in a new tab, signed into your school Google account.</p></div>';
+  } catch (e) {}
+});
+// ===========================================================================
+// BACKEND CLIENT
+//
+// Connects the app to the class backend. Every function it replaces is kept in
+// `original`, and each override falls back to it when there is no backend --
+// that is how one codebase gives a working offline preview AND a class-backed
+// app. Keep that pattern; do not fold the two branches together.
+// ===========================================================================
+(function () {
+  if (typeof save !== "function" || typeof render !== "function" || typeof bind !== "function") {
+    const appRoot = document.getElementById("app");
+    if (appRoot) appRoot.innerHTML = '<div class="card"><h2 class="card-title">Memoir could not start</h2><p>AppLogic did not load. Check the include lines in Index.html.</p></div>';
+    return;
+  }
+  const backend = {
+    enabled: typeof google !== "undefined" && google.script && google.script.run,
+    ready: false,
+    user: null,
+    classes: [],
+    activeClassId: "",
+    dashboard: null,
+    dashboardCache: {},
+    access: [],
+    discussion: [],
+    gradeSummary: null,
+    poster: null,
+    posterImage: null,
+    aiConfigured: true,
+    saveTimer: null, saveRetryTimer: null, saveInFlight: false, saveDirty: false, saveFails: 0,
+    serverUpdatedAt: "",
+    needsName: false,
+    gradingHub: null, gradingHubCache: {}, gradingHubPending: {},
+    gradeKey: "", gradeCache: {}, gradePending: {}, hideUnsubmitted: false, markView: "paste", gradeFocusEmail: "",
+    teacherSavePromises: new Set(),
+    rosterOpen: false,
+    canvas: null,
+    asgBusy: {},
+    posterImages: {}
+  };
+  window.MEMOIR_BACKEND = backend;
+  const original = { save, render, bind, manage, gradeScreen, admin };
+
+  function rpc(name, arg) {
+    return new Promise((resolve, reject) => {
+      if (!backend.enabled) return reject(new Error("The class backend is only available in the deployed web app."));
+      const runner = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler((e) => reject(new Error(e && e.message ? e.message : String(e))));
+      try { if (arg === undefined) runner[name](); else runner[name](arg); } catch (e) { reject(e); }
+    });
+  }
+  backend.rpc = rpc;
+  // Grading saves are asynchronous. Navigation, recounts and Canvas pushes wait
+  // for the exact saves the teacher just made, instead of racing them.
+  function trackTeacherSave_(p) {
+    if (!p || typeof p.then !== "function") return p;
+    backend.teacherSavePromises.add(p);
+    const clear = () => backend.teacherSavePromises.delete(p);
+    p.then(clear, clear);
+    return p;
+  }
+  async function waitForTeacherSaves_() {
+    while (backend.teacherSavePromises.size) await Promise.allSettled(Array.from(backend.teacherSavePromises));
+  }
+
+  // ---- Normalise at the door ---------------------------------------------------
+  // Apps Script hands the browser `undefined` where the server returned null,
+  // and Sheets turns numeric-looking text into numbers. Everything is
+  // normalised the moment it arrives, so no comparison downstream has to know.
+  function hasScore_(v) { return v !== null && v !== undefined && v !== "" && !Number.isNaN(Number(v)); }
+  function normScore_(v) { return hasScore_(v) ? Number(v) : null; }
+  function normalizeGradeSummary_(gs) {
+    let m = gs && gs.memoir;
+    if (!m) return gs || null;
+    Object.keys(m.steps || {}).forEach((k) => {
+      let r = m.steps[k];
+      r.score = normScore_(r.score); r.teacherScore = normScore_(r.teacherScore);
+      ["excluded", "auto", "submitted", "draft", "teacherGradedDraft", "editedAfterGrading", "markedBlank", "passFail"].forEach((f) => (r[f] = r[f] === true));
+      r.comment = String(r.comment || "");
+    });
+    Object.keys(m.criteria || {}).forEach((c) => {
+      let r = m.criteria[c];
+      r.score = normScore_(r.score); r.teacherScore = normScore_(r.teacherScore);
+      r.excluded = r.excluded === true; r.pending = r.pending === true;
+      r.selfEvalIdx = r.selfEvalIdx === undefined || r.selfEvalIdx === null ? "" : r.selfEvalIdx;
+      r.comment = String(r.comment || "");
+    });
+    let t = m.finalTotal || (m.finalTotal = {});
+    t.earned = Number(t.earned || 0); t.possible = Number(t.possible || 0);
+    ["hasAnyResult", "submitted", "complete", "teacherGradedDraft", "editedAfterGrading", "draft"].forEach((f) => (t[f] = t[f] === true));
+    return gs;
+  }
+  backend.__normalizeGradeSummary = normalizeGradeSummary_;
+
+  function localKey() {
+    return backend.user && backend.activeClassId && backend.user.role === "student"
+      ? `${APP_KEY}:${backend.user.email}:${backend.activeClassId}` : APP_KEY + ":teacher";
+  }
+  function safeLSGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function safeLSSet(k, v) { try { localStorage.setItem(k, v); return true; } catch (e) { return false; } }
+  function currentClass() { return backend.classes.find((c) => c.classId === backend.activeClassId) || null; }
+  function parseSettings(json, fallback) {
+    if (fallback) return fallback;
+    try { return JSON.parse(json || "{}"); } catch (e) { return {}; }
+  }
+  function applyClassSettings_(s) {
+    s = s || {};
+    state.releasedSteps = Object.assign({}, s.releasedSteps || {});
+    state.aiCoach = s.aiCoach !== false;
+    state.aiPoster = s.aiPoster !== false;
+    state.leadPaste = s.leadPaste !== false;
+    state.highlighting = s.highlighting === true;
+  }
+  function classLabel_(c) { return c ? c.className + (c.period !== "" && c.period !== undefined && c.period !== null ? " · " + c.period : "") : ""; }
+
+  // ---- App version guard --------------------------------------------------------
+  // A deployed web app can stay open, or be served from cache, after a new
+  // version goes live. Compare the build baked into this page with the shared
+  // live marker before loading any work, and send stale tabs to the current one.
+  function newestAppUrl_(baseUrl, version) {
+    let base = String(baseUrl || window.location.href || "").replace(/([?&])mmv=[^&#]*(&?)/, (_, lead, tail) => (lead === "?" && tail ? "?" : tail ? "&" : "")).replace(/[?&]$/, "");
+    return base + (base.indexOf("?") >= 0 ? "&" : "?") + "mmv=" + encodeURIComponent(String(version || Date.now()));
+  }
+  function showAppUpdatePrompt_(info) {
+    const root = document.getElementById("modalRoot");
+    if (!root) return;
+    const target = newestAppUrl_(info && info.url, (info && info.version) || "new");
+    root.innerHTML = `<div class="modal"><div class="modalbox" role="dialog" aria-modal="true" aria-labelledby="updTitle"><div class="eyebrow">Update available</div><h3 id="updTitle">There's a newer version of the Memoir app</h3><p>Your teacher published an update. Your saved work is safe.</p><p class="muted-note">Load the newest version before you continue, so every page and writing tool matches your class.</p><div class="modal-actions"><button type="button" class="btn btn-primary" id="loadNewestApp">Load newest version</button></div></div></div>`;
+    document.getElementById("loadNewestApp").onclick = () => {
+      try { if (window.top && window.top !== window) window.open(target, "_top"); else window.location.replace(target); }
+      catch (e) { window.location.href = target; }
+    };
+  }
+  async function appVersionIsCurrent_() {
+    if (!backend.enabled) return true;
+    try {
+      const info = await rpc("getAppVersion");
+      const serverVersion = String((info && info.version) || "");
+      const clientVersion = String(window.MEMOIR_CLIENT_VERSION || "");
+      if (serverVersion && clientVersion && serverVersion !== clientVersion) { showAppUpdatePrompt_(info); return false; }
+      const prev = String(safeLSGet("memoirAppVersion") || "");
+      if (clientVersion) safeLSSet("memoirAppVersion", clientVersion);
+      if (prev && clientVersion && prev !== clientVersion) setTimeout(() => showToast("The app was updated since your last visit. Your work carried over."), 400);
+      return true;
+    } catch (e) {
+      console.warn("Could not check the app version:", e);
+      return true;   // never strand a class over a brief network blip
+    }
+  }
+  let lastVersionWatchAt_ = 0;
+  async function checkVersionOnReturn_() {
+    if (!backend.enabled || !backend.ready || document.hidden) return;
+    if (Date.now() - lastVersionWatchAt_ < 120000) return;
+    lastVersionWatchAt_ = Date.now();
+    await appVersionIsCurrent_();
+  }
+  window.addEventListener("focus", checkVersionOnReturn_);
+  document.addEventListener("visibilitychange", checkVersionOnReturn_);
+
+  // ---- Account and save state in the top bar -----------------------------------------
+  function setAccountHeader() {
+    const roleSwitch = document.querySelector(".role-switch");
+    if (roleSwitch) roleSwitch.style.display = backend.enabled ? "none" : "";
+    let old = document.getElementById("accountPill");
+    if (old) old.remove();
+    if (!backend.user) return;
+    const el = document.createElement("div");
+    el.id = "accountPill";
+    el.className = "account-pill";
+    const initials = String(backend.user.name || backend.user.email || "?").split(/\s+/).map((w) => w[0] || "").join("").slice(0, 2).toUpperCase();
+    el.innerHTML = `<span class="save-state" id="saveState"><span class="sync-dot" id="syncDot"></span><span id="saveLabel">Saved</span></span><span class="avatar" title="${esc(backend.user.name)} · ${esc(backend.user.email)}">${esc(initials)}</span><span class="account-role">${esc(backend.user.role === "student" ? "" : backend.user.role)}</span>`;
+    document.querySelector(".topbar").appendChild(el);
+  }
+  function saveBusy_() { return !!(backend.saveInFlight || backend.saveDirty || backend.saveTimer); }
+  // Everything that can tell a student their work did or did not save is
+  // painted here, from one place, off the backend's own counters.
+  function paintSaveState_() {
+    const failing = backend.saveFails > 0, busy = saveBusy_();
+    const d = document.getElementById("syncDot"), l = document.getElementById("saveLabel");
+    if (d) { d.classList.toggle("saving", busy && !failing); d.classList.toggle("error", failing); }
+    if (l) l.textContent = failing ? "Reconnecting — work is safe here" : busy ? "Saving…" : (backend.user && backend.user.role !== "student" ? "Settings saved" : "Saved");
+    let toast = document.getElementById("saveTrouble");
+    if (failing && backend.saveFails >= 2) {
+      if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "saveTrouble";
+        toast.className = "save-toast warn";
+        toast.setAttribute("role", "status");
+        toast.innerHTML = "<strong>Still trying to save to your account.</strong><span>Your work is safe in this browser. Leave this tab open and it will send itself as soon as the connection comes back.</span>";
+        document.body.appendChild(toast);
+      }
+    } else if (toast) toast.remove();
+  }
+  function adoptMergedState_(merged) {
+    const m = normalizeMemoir_(merged && merged.memoir);
+    const changed = STAGE_KEYS.some((k) => m.texts[k] !== state.memoir.texts[k]);
+    state.memoir = m;
+    safeLSSet(localKey(), JSON.stringify(state));
+    if (changed) renderKeepScroll_(); else sidebar();
+  }
+  function noteSaveMerge_(kept) {
+    let n = document.getElementById("saveMerged");
+    if (!n) { n = document.createElement("div"); n.id = "saveMerged"; n.className = "save-toast"; document.body.appendChild(n); }
+    n.innerHTML = "<strong>Another window had newer work.</strong><span>The two copies were combined and nothing was overwritten. If a stage looks different, that's the newer writing from your other window.</span>";
+    const b = document.createElement("button");
+    b.type = "button"; b.className = "btn btn-sm"; b.textContent = "Got it"; b.onclick = () => n.remove();
+    n.appendChild(b);
+    console.warn("Merged on save; kept from the other copy:", kept);
+  }
+
+  // ---- Bootstrap ------------------------------------------------------------------------
+  async function bootstrap() {
+    if (!backend.enabled) return;
+    document.getElementById("app").innerHTML = '<section class="card boot-card"><h2 class="card-title">Connecting to your class…</h2><p class="muted-note">Checking your school Google account and loading your saved work.</p></section>';
+    try {
+      if (!(await appVersionIsCurrent_())) return;
+      const data = await rpc("getBootstrap");
+      if (!data || !data.ok) throw new Error(data && data.message ? data.message : "Could not load your account.");
+      const bootVersion = String(data.appVersion || ""), clientVersion = String(window.MEMOIR_CLIENT_VERSION || "");
+      if (bootVersion && clientVersion && bootVersion !== clientVersion) { showAppUpdatePrompt_({ version: bootVersion, url: data.appUrl || "" }); return; }
+      backend.ready = true;
+      backend.user = { email: data.email, name: data.name, role: data.role, status: data.accessStatus };
+      backend.classes = data.classes || [];
+      backend.aiConfigured = data.aiConfigured !== false;
+      backend.aiFeatures = data.aiFeatures === true;
+      backend.access = data.access || [];
+      backend.needsName = data.role === "student" && !!data.needsName;
+      if (data.role === "student") {
+        backend.activeClassId = data.activeClassId || "";
+        if (backend.activeClassId) {
+          const klass = currentClass() || backend.classes[0];
+          const cached = JSON.parse(safeLSGet(localKey()) || "null");
+          state = normalizeAppState_(Object.keys(data.state || {}).length ? data.state : cached || {});
+          applyClassSettings_(parseSettings(klass.settingsJson, data.classSettings));
+          state.className = klass.className;
+          state.role = "student";
+          backend.serverUpdatedAt = data.stateUpdatedAt || "";
+          backend.discussion = data.discussion || [];
+          backend.gradeSummary = normalizeGradeSummary_(data.gradeSummary);
+          backend.poster = data.poster || null;
+          if (["manage", "grade", "admin"].indexOf(state.view) !== -1) state.view = "home";
+          safeLSSet(localKey(), JSON.stringify(state));
+        } else {
+          state = normalizeAppState_({});
+          state.role = "student";
+        }
+      } else {
+        const cached = JSON.parse(safeLSGet(localKey()) || "null");
+        if (cached) { let keep = normalizeAppState_(cached); state.memoir = keep.memoir; state.scaffold = keep.scaffold; }
+        state.role = data.role;
+        state.view = "manage";
+        backend.activeClassId = safeLSGet("memoirActiveClass") || (backend.classes[0] || {}).classId || "";
+        if (!backend.classes.some((c) => c.classId === backend.activeClassId)) backend.activeClassId = (backend.classes[0] || {}).classId || "";
+        if (backend.activeClassId) { await loadDashboard(backend.activeClassId, false); loadCanvasStatus(); }
+      }
+      setAccountHeader();
+      render();
+    } catch (e) {
+      backend.ready = true;
+      setAccountHeader();
+      document.getElementById("sidebar").innerHTML = "";
+      const msg = String(e.message || e);
+      document.getElementById("app").innerHTML = `<section class="card"><h2 class="card-title">${/set up yet|setupMemoirBackend/i.test(msg) ? "Backend setup needed" : "Couldn't connect"}</h2><p>${esc(msg)}</p>
+        <p class="muted-note">Signed into more than one Google account? Open a new tab, go to google.com, click your profile picture, choose <strong>Sign out of all accounts</strong>, sign back in with only your school account, then reload this page.</p>
+        <p class="muted-note">Teachers: if this is the first deployment, run <strong>setupMemoirBackend()</strong> once in the Apps Script editor, then deploy a new version.</p>
+        <button type="button" class="btn btn-primary" onclick="location.reload()">Try again</button></section>`;
+    }
+  }
+
+  // ---- Saving ------------------------------------------------------------------------------
+  save = function () {
+    safeLSSet(localKey(), JSON.stringify(state));
+    if (!backend.enabled || !backend.ready || !backend.activeClassId || !backend.user) return original.save();
+    if (backend.user.role !== "student") { backend.settingsEditedAt = Date.now(); backend.settingsEditedFor = backend.activeClassId; }
+    backend.saveDirty = true;
+    clearTimeout(backend.saveTimer);
+    backend.saveTimer = setTimeout(() => { backend.saveTimer = null; flushSave_(); }, 650);
+    paintSaveState_();
+  };
+  backend.saveLocal = () => safeLSSet(localKey(), JSON.stringify(state));
+  // One sender, nothing dropped: a failure puts the work straight back on the
+  // dirty pile and retries with backoff; anything typed while a save is in the
+  // air goes the moment it lands.
+  function settingsSig_(s) {
+    return JSON.stringify([MEMOIR_GRADE_KEYS.map((k) => (s.releasedSteps || {})[k] !== false), s.aiCoach !== false, s.aiPoster !== false, s.leadPaste !== false, s.highlighting === true]);
+  }
+  async function flushSave_() {
+    clearTimeout(backend.saveTimer); backend.saveTimer = null;
+    clearTimeout(backend.saveRetryTimer); backend.saveRetryTimer = null;
+    if (!backend.enabled || !backend.ready || !backend.activeClassId || !backend.user) return { ok: false, skipped: true };
+    if (!backend.saveDirty || backend.saveInFlight) return { ok: !backend.saveFails, skipped: true };
+    backend.saveInFlight = true;
+    backend.saveDirty = false;
+    paintSaveState_();
+    try {
+      if (backend.user.role === "student") {
+        const res = await rpc("saveStudentState", { classId: backend.activeClassId, state: state, baseUpdatedAt: backend.serverUpdatedAt || "" });
+        if (res && res.merged && res.state) {
+          // Another window or device had newer work and the server combined
+          // the two. Take the combined copy unless something was typed while
+          // this save was in the air; then keep the old base, so the next
+          // save is merged too, and take it when that one lands.
+          if (!backend.saveDirty) { adoptMergedState_(res.state); backend.serverUpdatedAt = res.updatedAt; }
+          noteSaveMerge_(res.kept || []);
+        } else if (res && res.updatedAt) backend.serverUpdatedAt = res.updatedAt;
+      } else if (backend.dashboard && settingsSig_(state) !== settingsSig_(backend.dashboard.settings || {})) {
+        // Only a real change to a switch is sent; opening pages never resaves.
+        const forClass = backend.activeClassId;
+        const res = await rpc("saveClassSettings", { classId: forClass, settings: {
+          releasedSteps: Object.assign({}, state.releasedSteps || {}), aiCoach: state.aiCoach !== false,
+          aiPoster: state.aiPoster !== false, leadPaste: state.leadPaste !== false, highlighting: state.highlighting === true } });
+        backend.settingsSavedAt = Date.now(); backend.settingsSavedFor = forClass;
+        if (res && res.settings) {
+          [backend.dashboard, backend.dashboardCache[forClass]].forEach((d) => { if (d && d.classInfo && d.classInfo.classId === forClass) d.settings = res.settings; });
+          const k = backend.classes.find((c) => c.classId === forClass);
+          if (k) k.settingsJson = JSON.stringify(res.settings);
+        }
+      }
+      backend.saveFails = 0;
+      backend.saveInFlight = false;
+      paintSaveState_();
+      if (backend.saveDirty) flushSave_();
+      return { ok: true };
+    } catch (e) {
+      backend.saveInFlight = false;
+      backend.saveDirty = true;
+      backend.saveFails = (backend.saveFails || 0) + 1;
+      console.error(e);
+      paintSaveState_();
+      backend.saveRetryTimer = setTimeout(() => flushSave_(), Math.min(30000, 800 * Math.pow(2, Math.min(backend.saveFails, 6))));
+      return { ok: false, error: e };
+    }
+  }
+  backend.__flushSave = flushSave_;
+  function sleep_(ms) { return new Promise((r) => setTimeout(r, ms)); }
+  // A turn-in is only shown as turned in once the account has confirmed it.
+  async function forceStudentSaveNow_() {
+    if (!backend.enabled || !backend.ready || !backend.activeClassId || !backend.user || backend.user.role !== "student") return true;
+    save();
+    clearTimeout(backend.saveTimer); backend.saveTimer = null;
+    let spins = 0;
+    while (backend.saveInFlight && spins++ < 160) await sleep_(50);
+    let result = await flushSave_();
+    spins = 0;
+    while (backend.saveInFlight && spins++ < 160) await sleep_(50);
+    if (backend.saveDirty && !backend.saveInFlight) result = await flushSave_();
+    if (!result || !result.ok || backend.saveFails > 0 || backend.saveDirty || backend.saveInFlight)
+      throw new Error("Your writing is safe in this browser, but your account couldn't confirm it yet. Check your connection and try again.");
+    return true;
+  }
+  backend.__forceSave = forceStudentSaveNow_;
+  // The gap between the last keystroke and the save is 650 ms. Send the
+  // pending save the moment the page stops being looked at.
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") flushSave_(); });
+  window.addEventListener("pagehide", () => flushSave_());
+  window.addEventListener("blur", () => flushSave_());
+  window.addEventListener("beforeunload", (e) => {
+    if (!backend.enabled || !backend.ready || !backend.activeClassId) return;
+    flushSave_();
+    if (backend.saveFails > 0) { e.preventDefault(); e.returnValue = ""; return ""; }
+  });
+
+  // ---- Joining a class, and names -----------------------------------------------------------
+  function splitStoredName_(name) {
+    let parts = String(name || "").trim().replace(/\s+/g, " ").split(" ");
+    if (parts.length < 2 || /\d/.test(String(name || ""))) return { first: "", last: "" };
+    return { first: parts.shift(), last: parts.join(" ") };
+  }
+  function nameFieldsHtml_(name) {
+    let n = splitStoredName_(name);
+    return `<div class="name-fields"><div class="field"><label for="joinFirst">First name</label><input id="joinFirst" value="${esc(n.first)}" autocomplete="given-name"></div><div class="field"><label for="joinLast">Last name</label><input id="joinLast" value="${esc(n.last)}" autocomplete="family-name"></div></div>`;
+  }
+  function readNameFields_() {
+    return { firstName: ((document.getElementById("joinFirst") || {}).value || "").trim(), lastName: ((document.getElementById("joinLast") || {}).value || "").trim() };
+  }
+  function studentJoinView() {
+    return `<section class="card join-card"><div class="eyebrow">Student access</div><h1 class="page-title">Join your Memoir class</h1><p>Use your real first and last name — it's how your teacher finds your work when grading.</p>${nameFieldsHtml_(backend.user.name)}<div class="field"><label for="joinCode">Class code</label><input id="joinCode" maxlength="8" class="code-input" placeholder="ABC123" autocomplete="off"></div><button type="button" class="btn btn-primary" id="joinClassBtn">Join class</button><p id="joinMsg" class="muted-note" role="status"></p></section>`;
+  }
+  async function joinCurrent() {
+    let b = document.getElementById("joinClassBtn"), msg = document.getElementById("joinMsg"), name = readNameFields_();
+    if (!name.firstName || !name.lastName) { msg.textContent = "Please enter both your first name and your last name."; (name.firstName ? document.getElementById("joinLast") : document.getElementById("joinFirst")).focus(); return; }
+    b.disabled = true; msg.textContent = "Joining…";
+    try {
+      await rpc("joinClass", { code: document.getElementById("joinCode").value, firstName: name.firstName, lastName: name.lastName });
+      backend.user.name = name.firstName + " " + name.lastName;
+      backend.needsName = false;
+      await bootstrapStudentAgain_();
+    } catch (e) { msg.textContent = e.message; b.disabled = false; }
+  }
+  async function bootstrapStudentAgain_() {
+    const d = await rpc("getBootstrap");
+    backend.classes = d.classes || [];
+    backend.activeClassId = d.activeClassId || "";
+    const k = currentClass();
+    state = normalizeAppState_(Object.keys(d.state || {}).length ? d.state : {});
+    state.role = "student";
+    if (k) { applyClassSettings_(parseSettings(k.settingsJson, d.classSettings)); state.className = k.className; }
+    backend.serverUpdatedAt = d.stateUpdatedAt || "";
+    backend.discussion = d.discussion || [];
+    backend.gradeSummary = normalizeGradeSummary_(d.gradeSummary);
+    backend.poster = d.poster || null;
+    state.view = "home";
+    safeLSSet(localKey(), JSON.stringify(state));
+    render();
+  }
+  function confirmNameView() {
+    return `<section class="card join-card"><div class="eyebrow">One quick thing</div><h1 class="page-title">What's your name?</h1><p>Your teacher grades by name, so enter your real first and last name. You only need to do this once.</p>${nameFieldsHtml_(backend.user.name)}<button type="button" class="btn btn-primary" id="confirmNameBtn">Save my name</button><p id="confirmNameMsg" class="muted-note" role="status"></p></section>`;
+  }
+  async function confirmNameCurrent() {
+    let b = document.getElementById("confirmNameBtn"), msg = document.getElementById("confirmNameMsg"), name = readNameFields_();
+    if (!name.firstName || !name.lastName) { msg.textContent = "Please enter both your first name and your last name."; return; }
+    b.disabled = true; msg.textContent = "Saving…";
+    try {
+      let r = await rpc("updateMyName", name);
+      backend.user.name = (r && r.name) || name.firstName + " " + name.lastName;
+      backend.needsName = false;
+      render();
+    } catch (e) { msg.textContent = e.message; b.disabled = false; }
+  }
+
+  // ===========================================================================
+  // Teacher Dashboard: class pills + Canvas chip → Grading → Gradebook →
+  // Students → Release & Resources. Every card uses the same header pattern.
+  // ===========================================================================
+  function cardHead_(title, chip, actions, sub) {
+    return `<div class="dash-card-head"><div class="dash-card-title"><h2 class="card-title">${title}</h2>${chip || ""}</div>${actions ? `<div class="dash-card-actions">${actions}</div>` : ""}</div>${sub ? `<p class="dash-card-sub">${sub}</p>` : ""}`;
+  }
+  // One switch, used on the tiles and in Release & Resources alike. The real
+  // checkbox stays in the DOM (focusable, and the element bind() listens to).
+  function switchHtml_(cls, attr, on, text) {
+    return `<label class="switch ${on ? "is-on" : ""}"><input type="checkbox" class="${cls}" ${attr} ${on ? "checked" : ""}><span class="switch-track" aria-hidden="true"></span><span class="switch-text">${esc(text)}</span></label>`;
+  }
+  function accessItemHtml_(cls, attr, on, name, detail, offMeans, color) {
+    return `<label class="access-item ${on ? "is-on" : ""}" style="--acc:${color || "var(--line-2)"}" title="${cls === "classToggle" ? (on ? "On for this class" : "Off for this class") : on ? "Open to students" : "Hidden from students"}">
+      <span class="switch ${on ? "is-on" : ""}"><input type="checkbox" class="${cls}" ${attr} ${on ? "checked" : ""}><span class="switch-track" aria-hidden="true"></span></span>
+      <span class="access-copy"><strong>${esc(name)}</strong><small>${esc(detail)}</small>${offMeans ? `<small class="access-off">${on ? "Turn off: " : "Off: "}${esc(offMeans)}</small>` : ""}</span>
+      <span class="access-state">${cls === "classToggle" ? (on ? "On" : "Off") : on ? "Open" : "Hidden"}</span></label>`;
+  }
+  function releaseCardHtml_() {
+    let rel = state.releasedSteps || {};
+    let items = RELEASE_ITEMS_().map((it) => accessItemHtml_("stepRelease", `data-step="${it.key}"`, rel[it.key] !== false, it.name, it.detail, "", it.color)).join("");
+    let open = RELEASE_ITEMS_().filter((it) => rel[it.key] !== false).length;
+    let aiNote = !backend.aiFeatures || backend.aiConfigured ? "" : `<p class="muted-note warn-note">No GEMINI_API_KEY is set, so the writing coach and title ideas stay hidden from students until you add one (Project Settings → Script Properties). Painted poster backgrounds work without it.</p>`;
+    let tools = [
+      accessItemHtml_("classToggle", 'data-flag="highlighting"', state.highlighting === true, "Internal / external highlighting", "Students mark their own sentences as internal or external to see the balance in their writing. Turn it on once rough drafts are written.", "the highlighter and highlighted view are hidden. Highlights students already made are kept.", "var(--peri)"),
+      accessItemHtml_("classToggle", 'data-flag="leadPaste"', state.leadPaste !== false, "Pasting into The Lead", "For students who wrote their lead as a discussion post first.", "outside paste is blocked in The Lead too, like every other box.", "var(--peri)")
+    ].join("");
+    let res = !backend.aiFeatures ? "" : [
+      accessItemHtml_("classToggle", 'data-flag="aiCoach"', state.aiCoach !== false, "Writing coach (AI)", "A button under each stage for feedback on the draft. It never rewrites student words.", "the coach button disappears for students; replies they already got stay in their work.", "var(--peri)"),
+      accessItemHtml_("classToggle", 'data-flag="aiPoster"', state.aiPoster !== false, "Poster art & title ideas (AI)", "A painted background and a suggested title on the Poster page.", "students make posters with a plain background and their own title.", "var(--peri)")
+    ].join("");
+    return `<section class="card dash-card" id="releaseCard">
+      ${cardHead_("Release &amp; Resources", `<span class="chip">${open} of ${RELEASE_ITEMS_().length} open</span>`, "", "What students can open. Turning something off hides it; it never deletes their work, and it comes back when you turn it on.")}
+      <div class="access-group"><h3 class="access-title">The memoir</h3><div class="access-grid">${items}</div></div>
+      <div class="access-group"><h3 class="access-title">Writing tools</h3><div class="access-grid">${tools}</div></div>
+      ${res ? `<div class="access-group"><h3 class="access-title">AI</h3>${aiNote}<div class="access-grid">${res}</div></div>` : ""}
+    </section>`;
+  }
+  function RELEASE_ITEMS_() {
+    let out = [];
+    STAGES.forEach((s, i) => {
+      out.push({ key: s.key, name: s.label, detail: `Stage ${i + 1} · ${s.note}`, color: s.color });
+      if (s.key === "lead") out.push({ key: "share", name: "Lead Share board", detail: "Post the Lead, reply to classmates", color: pieceColor("share") });
+    });
+    out.push({ key: "final", name: "Review & Turn In", detail: "All six stages together, self-rating, final turn-in", color: pieceColor("final") });
+    out.push({ key: "poster", name: "Memoir Poster", detail: "Title, byline and the whole memoir as a poster", color: pieceColor("poster") });
+    return out;
+  }
+
+  manage = function () {
+    if (!backend.enabled || !backend.ready) return original.manage();
+    let pills = backend.classes.map((c) => `<span class="class-pill-wrap"><button type="button" class="class-pill ${c.classId === backend.activeClassId ? "active" : ""}" data-classid="${esc(c.classId)}" title="${esc(classLabel_(c))} · code ${esc(c.joinCode)}">${esc(c.className)}${c.period !== "" && c.period !== null && c.period !== undefined ? `<span class="class-pill-period">${esc(c.period)}</span>` : ""}</button><button type="button" class="icon-btn classEditBtn" data-classid="${esc(c.classId)}" aria-label="Edit ${esc(c.className)}" title="Edit">${icon("pen")}</button></span>`).join("");
+    let head = `<div class="page-head dash-head"><h1 class="page-title">Teacher Dashboard</h1></div>
+      <div class="class-row">${pills}<button type="button" class="btn btn-dashed" id="toggleNewClass">+ New class</button><span class="class-row-right">${canvasChip_()}</span></div>
+      <div id="newClassPanel" class="hide">${createClassCard()}</div>`;
+    if (!backend.classes.length) return `<div class="page-head"><h1 class="page-title">Teacher Dashboard</h1><p class="page-sub">Your teacher access is active. Create your first class to get a join code for students.</p></div>${createClassCard()}`;
+    let dash = backend.dashboard;
+    if (!dash) return head + `<div class="hub-loading"><span class="spinner" aria-hidden="true"></span>Loading this class…</div>`;
+    let k = currentClass();
+    let banner = `<section class="class-banner"><div><strong>${esc(classLabel_(k))}</strong><span>${dash.students.length} student${dash.students.length === 1 ? "" : "s"} enrolled</span></div><div class="join-code">Class code <strong>${esc(dash.classInfo.joinCode)}</strong></div></section>`;
+    return head + banner + gradingHubCard() + (dash.students.length ? gradebookCard(dash) : "") + studentsCard(dash) + releaseCardHtml_();
+  };
+  function createClassCard() {
+    return `<section class="card create-card"><h2 class="card-title">Create a class</h2><div class="name-fields"><div class="field"><label for="newClassName">Class name</label><input id="newClassName" placeholder="English 2"></div><div class="field"><label for="newClassPeriod">Period / section</label><input id="newClassPeriod" placeholder="Period 2"></div></div><button type="button" class="btn btn-primary" id="createClassBtn">Create class</button><p id="createClassMsg" class="muted-note" role="status"></p></section>`;
+  }
+
+  // ---- Grading tiles ------------------------------------------------------------------------
+  // Every graded piece is drawn by ONE renderer from ONE model (hubTileModel_),
+  // so no tile can drift from its neighbours. Four zones, in order:
+  //   head      what it is, what it is worth, when it is due, a status badge
+  //   progress  one bar and three counts that always add up: to grade / graded / not submitted
+  //   action    one button through to the marking screen
+  //   foot      student access (a switch), then Canvas (state, Push, ⋯ menu)
+  // The tile itself is not a button; only the Grade button navigates.
+  async function loadGradingHub(classId, force) {
+    classId = classId || backend.activeClassId;
+    if (!classId) return;
+    let cached = backend.gradingHubCache[classId];
+    if (cached && !force) { backend.gradingHub = cached; return; }
+    if (backend.gradingHubPending[classId]) return;
+    backend.gradingHubPending[classId] = true;
+    try {
+      let prevRedo = cached ? Number(cached.needsRegradeTotal || 0) : null;
+      let fresh = await rpc("getGradingHubSummary", { classId });
+      backend.gradingHubCache[classId] = fresh;
+      if (backend.activeClassId !== classId) return;
+      backend.gradingHub = fresh;
+      if (prevRedo !== null && Number(fresh.needsRegradeTotal || 0) > prevRedo) showToast("A student redid work you'd graded — it's at the top of that piece's list.", "warn");
+      repaintTiles_(classId);
+    } catch (e) {
+      console.error(e);
+      let mount = document.getElementById("gradingHubTiles");
+      if (mount && !cached) mount.innerHTML = `<p class="muted-note">Couldn't load the grading counts: ${esc(e.message || String(e))}</p>`;
+    } finally { delete backend.gradingHubPending[classId]; }
+  }
+  backend.__loadGradingHub = loadGradingHub;
+  // Repaint just the tiles, so a recount never wipes what the teacher is doing
+  // elsewhere -- and never wipes a Push result they are reading or snaps shut a
+  // menu they have open, or carries either into a different class.
+  function repaintTiles_(classId) {
+    let mount = document.getElementById("gradingHubTiles");
+    if (!mount || state.view !== "manage") return;
+    let notes = {};
+    if (mount.dataset.class === classId) mount.querySelectorAll(".tile-msg").forEach((m) => { if (m.textContent.trim()) notes[m.id] = m.textContent; });
+    let openMenu = mount.querySelector(".tile-more[open]");
+    let openKey = openMenu ? openMenu.dataset.key : "";
+    mount.dataset.class = classId;
+    mount.innerHTML = hubTilesHtml_();
+    Object.keys(notes).forEach((id) => { let m = document.getElementById(id); if (m) m.textContent = notes[id]; });
+    if (openKey) { let d = mount.querySelector(`.tile-more[data-key="${openKey}"]`); if (d) d.open = true; }
+    let head = document.getElementById("hubHeadline");
+    if (head) head.innerHTML = hubHeadline_();
+    bindBackend();
+    // The release switches are AppLogic's controls; a repainted switch must be
+    // re-bound or it would move but save nothing.
+    bindReleaseControls_();
+  }
+  setInterval(() => {
+    if (!backend.ready || !backend.activeClassId || !backend.user || backend.user.role === "student") return;
+    if (document.visibilityState === "hidden" || state.view !== "manage") return;
+    loadGradingHub(backend.activeClassId, true);
+  }, 60000);
+
+  function hubStatus_(r) {
+    if (r.allExcluded) return { kind: "excluded", count: 0, redo: 0 };
+    let total = Number(r.needsGrading || 0), redo = Number(r.needsRegrade || 0);
+    if (total > 0) return { kind: "needs", count: total, redo, fresh: Math.max(0, total - redo) };
+    if (Number(r.submitted || 0) > 0 || Number(r.graded || 0) > 0) return { kind: "done", count: 0, redo: 0 };
+    return { kind: "none", count: 0, redo: 0 };
+  }
+  function shortDate_(iso) {
+    if (!iso) return "";
+    let d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "" : d.toLocaleDateString([], { month: "short", day: "numeric" });
+  }
+  function asgKey_(key) { return "memoir:" + key; }
+  function hubDue_(key) {
+    let link = (canvasSettings_().assignments || {})[asgKey_(key)] || {};
+    let due = (canvasSchedule_()[asgKey_(key)] || {}).dueAt || link.dueAt;
+    if (!due) return null;
+    let d = new Date(due);
+    if (Number.isNaN(d.getTime())) return null;
+    return { short: shortDate_(due), full: d.toLocaleString([], { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }) };
+  }
+  function hubCanvasState_(key) {
+    let c = canvasSettings_();
+    if (!canvasLinked_()) return { text: "Canvas not linked", cls: "is-off", title: "Link this class to a Canvas course to push scores and comments." };
+    let link = (c.assignments || {})[asgKey_(key)] || {};
+    if (!link.assignmentId) return { text: "Not in Canvas yet", cls: "is-pending", title: "Push creates the Canvas assignment the first time, then reuses it." };
+    let bits = [link.name || "Canvas assignment"];
+    if (link.moduleName) bits.push("Module: " + link.moduleName);
+    if (link.lastGradeSyncAt) bits.push("Last pushed " + shortDate_(link.lastGradeSyncAt));
+    return { text: link.lastGradeSyncAt ? "Pushed " + shortDate_(link.lastGradeSyncAt) : "In Canvas", cls: "is-ok", title: bits.join(" · ") };
+  }
+  function hubTileModel_(r) {
+    let key = r.key;
+    let st = STAGE_BY_KEY[key];
+    let label = MEMOIR_GRADE_LABELS[key];
+    return {
+      key, asg: asgKey_(key), name: label, title: label, accent: pieceColor(key),
+      eyebrow: st ? "Stage " + (st.index + 1) : key === "share" ? "After Stage 1" : "Finish",
+      worth: r.allExcluded ? "Excluded for this class" : r.gradingType === "pass_fail" ? "Complete / incomplete" : r.pointsPossible + " pts",
+      note: STEP_TILE_NOTE[key] || "",
+      release: { cls: "stepRelease", attr: `data-step="${key}"`, on: (state.releasedSteps || {})[key] !== false, hides: `students can't open ${label}` },
+      noGrade: { cls: "pieceNoGradeBtn", attr: `data-key="${key}"` }
+    };
+  }
+  function hubTileHtml_(r) {
+    let m = hubTileModel_(r);
+    let st = hubStatus_(r);
+    let total = Math.max(0, Number(r.totalItems || 0)), done = Math.max(0, Number(r.graded || 0)), todo = Math.max(0, Number(r.needsGrading || 0));
+    let rest = Math.max(0, total - done - todo);
+    let pct = (n) => (total ? Math.round((n / total) * 1000) / 10 : 0);
+    let due = hubDue_(m.key), cv = hubCanvasState_(m.key), linked = canvasLinked_();
+    let badge = st.kind === "needs"
+      ? `<span class="tile-badge is-needs" title="${st.redo ? st.redo + " redone after grading · " : ""}${st.fresh} new · ${st.count} waiting on you">${st.redo ? "↻ " : ""}${st.count}</span>`
+      : st.kind === "done" ? `<span class="tile-badge is-done" title="Nothing waiting on you here">${icon("check")}</span>`
+      : st.kind === "excluded" ? `<span class="tile-badge is-excluded" title="Left out of every student's grade. Scores already entered are kept.">Not graded</span>` : "";
+    let action = st.kind === "needs"
+      ? `<button type="button" class="btn btn-primary tile-open" data-hubopen="${m.key}">Grade ${st.count}${st.redo ? ` <span class="tile-open-sub">· ${st.redo} redo${st.redo === 1 ? "" : "s"}</span>` : ""} ${icon("right")}</button>`
+      : `<button type="button" class="btn tile-open" data-hubopen="${m.key}">${st.kind === "done" ? "Review graded work" : "Open"} ${icon("right")}</button>`;
+    let progress = st.kind === "excluded"
+      ? `<p class="tile-excluded-note">Left out of the grade for this class. Any scores you entered are kept; choose <strong>Count it again</strong> in the ⋯ menu to bring it back.</p>`
+      : `<div class="tile-bar" role="img" aria-label="${done} graded, ${todo} to grade, ${rest} not submitted, of ${total} students"><span class="bar-done" style="width:${pct(done)}%"></span><span class="bar-todo" style="width:${pct(todo)}%"></span></div>
+         <dl class="tile-stats"><div class="${todo ? "is-todo" : ""}"><dt>To grade</dt><dd>${todo}</dd></div><div><dt>Graded</dt><dd>${done}</dd></div><div><dt>Not submitted</dt><dd>${rest}</dd></div></dl>
+         <p class="tile-note">${esc(m.note)}${m.release.on ? "" : " · hidden from students"}</p>`;
+    let rel = m.release;
+    let menu = `<details class="tile-more" data-key="${m.key}"><summary class="icon-btn" aria-label="More actions for ${esc(m.name)}" title="More actions">${icon("dots")}</summary>
+      <div class="tile-menu" role="menu">
+        <button type="button" role="menuitem" class="hubCanvasBtn" data-asg="${m.asg}">${linked ? "Due date &amp; Canvas…" : "Set up Canvas…"}</button>
+        <button type="button" role="menuitem" class="exportAsgBtn" data-asg="${m.asg}" ${backend.asgBusy[m.asg] ? "disabled" : ""}>Download Canvas CSV</button>
+        <hr><button type="button" role="menuitem" class="${m.noGrade.cls} ${r.allExcluded ? "is-excluded" : ""}" ${m.noGrade.attr}>${r.allExcluded ? "↺ Count it again" : "Don’t grade for this class"}</button>
+      </div></details>`;
+    return `<article class="tile ${st.kind === "needs" ? "has-needs" : ""} ${r.allExcluded ? "is-nograde" : ""} ${rel.on ? "" : "is-hidden-step"}" style="--acc:${m.accent}" aria-label="${esc(m.name)}">
+      <header class="tile-head"><div class="tile-id"><span class="tile-eyebrow">${esc(m.eyebrow)}</span><h3 class="tile-title">${esc(m.title)}</h3>
+        <span class="tile-meta"><span>${esc(m.worth)}</span>${due ? `<span title="${esc(due.full)}">Due ${esc(due.short)}</span>` : ""}</span></div>${badge}</header>
+      <div class="tile-body">${progress}</div>
+      ${action}
+      <footer class="tile-foot">
+        <label class="switch ${rel.on ? "is-on" : ""}" title="${rel.on ? "Students can open this. Turn off and " + esc(rel.hides) + "; their work is kept." : "Hidden: " + esc(rel.hides) + ". Turn on to release it."}"><input type="checkbox" class="${rel.cls}" ${rel.attr} ${rel.on ? "checked" : ""}><span class="switch-track" aria-hidden="true"></span><span class="switch-text">${rel.on ? "Open to students" : "Hidden from students"}</span></label>
+        <div class="tile-canvas"><span class="canvas-state ${cv.cls}" title="${esc(cv.title)}">${esc(cv.text)}</span><span class="tile-canvas-actions">${linked ? `<button type="button" class="btn btn-sm pushAsgBtn" data-asg="${m.asg}" ${backend.asgBusy[m.asg] ? "disabled" : ""} title="Send these scores and teacher comments to Canvas now">${icon("push")} Push</button>` : ""}${menu}</span></div>
+        <div class="tile-msg" id="asgMsg-${m.key}" aria-live="polite"></div>
+      </footer></article>`;
+  }
+  function hubGroupHead_(title, rows) {
+    let waiting = rows.reduce((n, r) => n + (r.allExcluded ? 0 : Number(r.needsGrading || 0)), 0);
+    return `<div class="hub-group-head"><h3>${esc(title)}</h3><span class="hub-group-count">${rows.length} pieces</span>${waiting ? `<span class="hub-group-waiting">${waiting} to grade</span>` : `<span class="hub-group-clear">Nothing waiting</span>`}</div>`;
+  }
+  function hubTilesHtml_() {
+    let hub = backend.gradingHub;
+    if (!hub) return `<div class="hub-loading"><span class="spinner" aria-hidden="true"></span>Counting what needs grading…</div>`;
+    return `${hubGroupHead_("Drafting", hub.drafting)}<div class="tile-grid">${hub.drafting.map(hubTileHtml_).join("")}</div>
+      ${hubGroupHead_("The finished memoir", hub.finished)}<div class="tile-grid">${hub.finished.map(hubTileHtml_).join("")}</div>`;
+  }
+  function hubHeadline_() {
+    let hub = backend.gradingHub;
+    if (!hub) return "";
+    let redo = Number(hub.needsRegradeTotal || 0);
+    return hub.needsGradingTotal > 0 ? `<span class="chip chip-needs">${hub.needsGradingTotal} to grade${redo ? " · ↻ " + redo + " redo" + (redo === 1 ? "" : "s") : ""}</span>` : `<span class="chip chip-done">Nothing waiting on you</span>`;
+  }
+  function gradingHubCard() {
+    return `<section class="card dash-card" id="gradingCard">
+      ${cardHead_("Grading", `<span id="hubHeadline">${hubHeadline_()}</span>`, `<button type="button" class="btn btn-sm" id="refreshHub">${icon("refresh")} Refresh</button>`, "Open a piece to grade it. A red number is work waiting on you; ↻ means a student redid something after you graded it. Counts update every minute and after anything you grade.")}
+      <div id="gradingHubTiles" data-class="${esc(backend.activeClassId)}">${hubTilesHtml_()}</div></section>`;
+  }
+
+  // ---- Gradebook ------------------------------------------------------------------------------
+  // Everything the unit is worth in one table. "Unit" totals only the pieces
+  // that have a score, like Canvas's current score, so a student who turned
+  // everything in never reads as failing while it waits to be graded.
+  function gradebookCard(dash) {
+    let cols = MEMOIR_GRADE_KEYS.map((k) => `<th style="--acc:${pieceColor(k)}" title="${esc(MEMOIR_GRADE_LABELS[k])} · ${esc(worthLabel_(k))}">${esc(MEMOIR_GRADE_SHORT[k])}</th>`).join("");
+    let rows = dash.students.map((s) => {
+      let m = (s.gradeSummary && s.gradeSummary.memoir) || null;
+      let earned = 0, possible = 0, started = false;
+      let cells = MEMOIR_GRADE_KEYS.map((k) => {
+        if (!m) return `<td><button type="button" class="gb-cell is-empty" disabled>—</button></td>`;
+        if (k === MEMOIR_FINAL_KEY) {
+          let t = m.finalTotal || {};
+          if (!t.possible) return `<td><button type="button" class="gb-cell is-empty gbJump" data-email="${esc(s.email)}" data-key="final" title="${esc(s.name)} is excused from the Final Memoir">ex</button></td>`;
+          if (t.hasAnyResult) { possible += t.possible; earned += t.earned; started = true; }
+          let tip = t.hasAnyResult ? `${s.name} · Final Memoir: ${t.earned} of ${t.possible}${t.unmarked ? " · " + t.unmarked + " criteria not scored yet" : ""}` : t.submitted ? `${s.name} turned in the Final Memoir — not graded yet` : `${s.name} hasn't turned in the Final Memoir`;
+          return `<td><button type="button" class="gb-cell gbJump ${t.hasAnyResult ? "" : "is-empty"}" data-email="${esc(s.email)}" data-key="final" title="${esc(tip)}">${t.hasAnyResult ? t.earned + "/" + t.possible + (t.unmarked ? '<span class="gb-dot">•</span>' : "") : t.submitted ? '<span class="gb-dot">•</span>' : "—"}</button></td>`;
+        }
+        let r = (m.steps || {})[k] || {};
+        if (!r.excluded && hasScore_(r.score)) { possible += Number(r.possible || 0); earned += Number(r.score); started = true; }
+        let val = r.excluded ? "ex" : hasScore_(r.score) ? (r.passFail ? (Number(r.score) > 0 ? "✓" : "✗") : r.score + "/" + r.possible) + (r.editedAfterGrading && r.submitted ? '<span class="gb-redo">↻</span>' : "") : r.submitted ? '<span class="gb-dot">•</span>' : "—";
+        let tip = r.excluded ? `${s.name} is excused from ${MEMOIR_GRADE_LABELS[k]}` : hasScore_(r.score) ? `${s.name} · ${MEMOIR_GRADE_LABELS[k]}: ${r.score} of ${r.possible}${r.auto ? " (marked complete automatically)" : ""}${r.teacherGradedDraft ? " · graded before the student turned it in" : ""}` : r.submitted ? `${s.name} turned this in — not graded yet` : r.draft ? `${s.name} has a draft but hasn't turned it in` : `${s.name} hasn't started this`;
+        return `<td><button type="button" class="gb-cell gbJump ${hasScore_(r.score) ? "" : "is-empty"}" data-email="${esc(s.email)}" data-key="${k}" title="${esc(tip)}">${val}</button></td>`;
+      }).join("");
+      let pct = possible ? Math.round((earned / possible) * 100) : 0;
+      let total = started ? `<td class="gb-total"><span title="${esc(s.name)}: ${Math.round(earned * 100) / 100} of ${possible} across the pieces you've graded. Work that's turned in but not graded yet is left out, the way Canvas works out a current score.">${Math.round(earned * 100) / 100}/${possible}<small>${pct}%</small></span></td>` : `<td class="gb-total"><span class="is-empty">—</span></td>`;
+      return `<tr><th scope="row" class="gb-name">${esc(s.name)}</th>${cells}${total}</tr>`;
+    }).join("");
+    return `<section class="card dash-card" id="gradebookCard">${cardHead_("Gradebook", `<span class="chip">${dash.students.length} students · 9 pieces</span>`, "", "<strong>✓</strong> complete · <strong>•</strong> turned in, not graded yet · <strong>↻</strong> redone since you graded it · <strong>—</strong> not done · <strong>ex</strong> excused. Click any cell to grade that student's work.")}
+      <div class="gb-scroll"><table class="gb-table"><thead><tr><th class="gb-name" scope="col">Student</th>${cols}<th class="gb-total" scope="col">Unit</th></tr></thead><tbody>${rows}</tbody></table></div></section>`;
+  }
+
+  // ---- Students (folded away) -------------------------------------------------------------------
+  function studentsCard(dash) {
+    let body = dash.students.length
+      ? `<div class="table-scroll"><table class="roster-table"><thead><tr><th scope="col">Student</th><th scope="col">Words</th><th scope="col">Stages</th><th scope="col">Lead Share</th><th scope="col">Final</th><th scope="col">Poster</th><th scope="col"><span class="sr-only">Actions</span></th></tr></thead><tbody>${dash.students.map((s) => `<tr>
+          <td><strong>${esc(s.name)}</strong><small>${esc(s.email)}</small></td><td>${Number(s.words || 0)}</td>
+          <td><span class="chip">${s.stagesWritten}/6 written</span> <span class="chip">${s.stagesTurnedIn}/6 turned in</span></td>
+          <td>${s.sharePosted ? "Posted" : "—"}${s.repliesWritten ? ` · ${s.repliesWritten} repl${s.repliesWritten === 1 ? "y" : "ies"}` : ""}</td>
+          <td>${s.finalTurnedIn ? "Turned in" : "—"}${s.selfRated ? ` · self ${s.selfRated}/4` : ""}</td><td>${s.posterTurnedIn ? "Turned in" : "—"}</td>
+          <td><button type="button" class="btn btn-sm viewStudent" data-email="${esc(s.email)}">View work</button></td></tr>`).join("")}</tbody></table></div>`
+      : `<p class="muted-note">No students have joined yet. Give them the class code <strong>${esc(dash.classInfo.joinCode)}</strong>.</p>`;
+    return `<details class="card dash-card roster-card" id="rosterCard" ${backend.rosterOpen ? "open" : ""}>
+      <summary class="roster-summary"><span class="roster-left"><strong>Students</strong><span class="chip">${dash.students.length} enrolled</span></span><span class="muted-note">class code <strong>${esc(dash.classInfo.joinCode)}</strong></span></summary>
+      <div class="roster-body"><div class="roster-actions"><button type="button" class="btn btn-sm" id="importLegacyBtn">Bring in drafts from the old Memoir tool…</button><button type="button" class="btn btn-sm" id="refreshRoster">${icon("refresh")} Refresh</button></div>${body}</div></details>`;
+  }
+
+  // ---- Classes ------------------------------------------------------------------------------------
+  function applyDashboardState_(d) {
+    applyClassSettings_(d.settings || {});
+    state.className = d.classInfo.className;
+    let k = backend.classes.find((c) => c.classId === backend.activeClassId);
+    if (k && d.settings) k.settingsJson = JSON.stringify(d.settings);
+    if (d.aiConfigured !== undefined) backend.aiConfigured = d.aiConfigured !== false;
+    if (d.aiFeatures !== undefined) backend.aiFeatures = d.aiFeatures === true;
+  }
+  function normalizeDash_(d) {
+    (d.students || []).forEach((s) => normalizeGradeSummary_(s.gradeSummary));
+    return d;
+  }
+  // Seen this class before? Draw it from the cache at once, then refresh
+  // quietly. First visits wait for the real fetch.
+  async function loadDashboard(classId, rerender = true) {
+    backend.activeClassId = classId;
+    safeLSSet("memoirActiveClass", classId);
+    let cached = backend.dashboardCache[classId];
+    backend.gradingHub = backend.gradingHubCache[classId] || null;
+    if (cached) { backend.dashboard = cached; applyDashboardState_(cached); if (rerender) render(); loadGradingHub(classId); }
+    else { backend.dashboard = null; if (rerender) render(); }
+    try {
+      let fresh = normalizeDash_(await rpc("getClassDashboard", { classId }));
+      backend.dashboardCache[classId] = fresh;
+      if (backend.activeClassId !== classId) return;
+      backend.dashboard = fresh;
+      applyDashboardState_(fresh);
+      if (rerender) render();
+      loadGradingHub(classId);
+    } catch (e) {
+      console.error(e);
+      if (!cached && rerender) { let app = document.getElementById("app"); if (app) app.insertAdjacentHTML("beforeend", `<p class="muted-note">Couldn't load this class right now: ${esc(e.message || String(e))}</p>`); }
+    }
+  }
+  function invalidateDashboardCache_() {
+    delete backend.dashboardCache[backend.activeClassId];
+    delete backend.gradingHubCache[backend.activeClassId];
+  }
+  // A background refresh must never overwrite a switch the teacher flipped
+  // while it was in flight, and never carry one class's edit into another.
+  function refreshDashboardQuietly_(classId) {
+    backend.dashQuietPending = backend.dashQuietPending || {};
+    if (backend.dashQuietPending[classId]) return;
+    backend.dashQuietPending[classId] = true;
+    let startedAt = Date.now();
+    rpc("getClassDashboard", { classId }).then((fresh) => {
+      normalizeDash_(fresh);
+      backend.dashboardCache[classId] = fresh;
+      if (backend.activeClassId !== classId) return;
+      let editedHere = backend.settingsEditedFor === classId;
+      let edited = editedHere && ((backend.settingsEditedAt || 0) >= startedAt || (backend.settingsSavedFor === classId && (backend.settingsSavedAt || 0) >= startedAt) || backend.saveDirty || backend.saveInFlight || !!backend.saveTimer);
+      let keep = edited ? { releasedSteps: state.releasedSteps, aiCoach: state.aiCoach, aiPoster: state.aiPoster, leadPaste: state.leadPaste, highlighting: state.highlighting } : null;
+      backend.dashboard = fresh;
+      applyDashboardState_(fresh);
+      if (keep) Object.assign(state, keep);
+      if (state.view === "manage") renderKeepScroll_();
+    }).catch((e) => console.error(e)).finally(() => { delete backend.dashQuietPending[classId]; });
+  }
+  function acceptGradeSummary_(email, result) {
+    if (!result || !result.gradeSummary) return;
+    let gs = normalizeGradeSummary_(result.gradeSummary);
+    [backend.dashboard, backend.dashboardCache[backend.activeClassId]].forEach((d) => {
+      if (!d || !d.students) return;
+      let s = d.students.find((x) => String(x.email).toLowerCase() === String(email).toLowerCase());
+      if (s) s.gradeSummary = gs;
+    });
+  }
+  function openEditClass(classId) {
+    let c = backend.classes.find((x) => x.classId === classId);
+    if (!c) return;
+    let root = document.getElementById("modalRoot");
+    root.innerHTML = `<div class="modal"><div class="modalbox" role="dialog" aria-modal="true" aria-labelledby="ecTitle"><h3 id="ecTitle">Edit class</h3>
+      <div class="field"><label for="editClassName">Class name</label><input id="editClassName" value="${esc(c.className)}"></div>
+      <div class="field"><label for="editClassPeriod">Period / section</label><input id="editClassPeriod" value="${esc(c.period)}"></div>
+      <p class="muted-note">Archiving hides the class from your dashboard. Student work stays in the backend spreadsheet.</p>
+      <p id="editClassMsg" class="muted-note" role="status"></p>
+      <div class="modal-actions"><button type="button" class="btn btn-danger-ghost" id="archiveClassBtn">Archive class</button><span class="grow"></span><button type="button" class="btn modal-dismiss" id="cancelEditClass">Cancel</button><button type="button" class="btn btn-primary" id="saveEditClass">Save</button></div></div></div>`;
+    document.getElementById("cancelEditClass").onclick = () => (root.innerHTML = "");
+    document.getElementById("saveEditClass").onclick = async () => {
+      let name = document.getElementById("editClassName").value.trim(), period = document.getElementById("editClassPeriod").value.trim();
+      let msg = document.getElementById("editClassMsg");
+      if (!name) { msg.textContent = "Class name is required."; return; }
+      msg.textContent = "Saving…";
+      try {
+        await rpc("updateClass", { classId, className: name, period });
+        c.className = name; c.period = period;
+        let d = backend.dashboardCache[classId];
+        if (d) { d.classInfo.className = name; d.classInfo.period = period; }
+        root.innerHTML = "";
+        render();
+      } catch (e) { msg.textContent = e.message; }
+    };
+    let arch = document.getElementById("archiveClassBtn");
+    arch.onclick = async () => {
+      if (arch.dataset.armed !== "1") { arch.dataset.armed = "1"; arch.textContent = "Click again to archive"; setTimeout(() => { if (arch) { arch.dataset.armed = "0"; arch.textContent = "Archive class"; } }, 4000); return; }
+      arch.disabled = true;
+      try {
+        await rpc("archiveClass", { classId });
+        backend.classes = backend.classes.filter((x) => x.classId !== classId);
+        delete backend.dashboardCache[classId];
+        root.innerHTML = "";
+        let next = (backend.classes[0] || {}).classId || "";
+        backend.activeClassId = next; backend.dashboard = null;
+        if (next) loadDashboard(next); else render();
+      } catch (e) { document.getElementById("editClassMsg").textContent = e.message; arch.disabled = false; }
+    };
+  }
+  async function createNewClass() {
+    let msg = document.getElementById("createClassMsg");
+    let name = document.getElementById("newClassName").value.trim();
+    if (!name) { msg.textContent = "Enter a class name."; return; }
+    msg.textContent = "Creating…";
+    try {
+      let c = await rpc("createClass", { className: name, period: document.getElementById("newClassPeriod").value });
+      let d = await rpc("getBootstrap");
+      backend.classes = d.classes || [];
+      await loadDashboard(c.classId);
+    } catch (e) { msg.textContent = e.message; }
+  }
+
+  // ===========================================================================
+  // Grade the Memoir -- one marking screen for every piece
+  // ===========================================================================
+  // Buckets: Resubmitted → Ready to Grade → Not Submitted → Graded → Excluded.
+  // The core three always render, even empty, because a group that vanishes
+  // looks like a broken sort. Rows are MOVED between buckets as they are
+  // scored, never re-rendered, so nothing a teacher is typing is destroyed.
+  function rubricFrom_(arr, label) {
+    let levels = [];
+    for (let n = arr.length - 1; n >= 1; n--) {
+      let full = String(arr[n] || ""), dot = full.indexOf(". ");
+      levels.push({ points: n, label: dot > 0 ? full.slice(0, dot) : "Level " + n, text: dot > 0 ? full.slice(dot + 2) : full });
+    }
+    return { label, levels, max: arr.length - 1 };
+  }
+  const PIECE_RUBRICS = {};
+  Object.keys(STEP_RUBRICS).forEach((k) => (PIECE_RUBRICS[k] = rubricFrom_(STEP_RUBRICS[k], MEMOIR_GRADE_LABELS[k])));
+  function gradeKey_() { return backend.gradeKey || "lead"; }
+  function isFinalKey_() { return gradeKey_() === MEMOIR_FINAL_KEY; }
+  function isPassFail_() { return !!MEMOIR_PASS_FAIL[gradeKey_()]; }
+  function pieceMax_() { return MEMOIR_STEP_POINTS[gradeKey_()] || 0; }
+  function gradeCacheKey_(classId, key) { return classId + "::" + key; }
+  function gradeRows_() { return backend.gradeCache[gradeCacheKey_(backend.activeClassId, gradeKey_())]; }
+  function gradeRow_(email) { let l = gradeRows_(); return l ? l.find((r) => r.email === email) : null; }
+
+  function rubricLevelName_(score, rb) {
+    if (!hasScore_(score) || !rb) return "";
+    let l = rb.levels.find((x) => x.points === Number(score));
+    return l ? l.label : "";
+  }
+  function rubricRowHtml_(score, btnClass, attrs, rb) {
+    return `<div class="band-row score-bands">${rb.levels.map((l) => `<button type="button" class="${btnClass} band-btn ${hasScore_(score) && Number(score) === l.points ? "selected" : ""}" ${attrs} data-score="${l.points}" title="${esc(l.text)}"><span class="band-name">${esc(l.label)}</span><span class="band-pts">${l.points}</span></button>`).join("")}</div>`;
+  }
+  function scoreInputHtml_(score, attrs, max) {
+    return `<div class="score-entry"><label><span>Score</span><span>0–${max} · halves allowed</span></label><input type="number" class="pieceManualScore" min="0" max="${max}" step="0.5" value="${hasScore_(score) ? esc(String(score)) : ""}" ${attrs} placeholder="—" aria-label="Score out of ${max}"></div>`;
+  }
+  function readScoreInput_(input, max) {
+    let raw = String(input.value || "").trim();
+    if (!raw) return null;
+    let n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > max) { alert("Enter a score from 0 to " + max + "."); input.focus(); return undefined; }
+    return Math.round(n * 100) / 100;
+  }
+  function rubricLegendHtml_(rb) {
+    return `<details class="rubric-legend" open><summary>${esc(rb.label)} rubric — the full descriptors</summary>${rb.levels.map((l) => `<div class="legend-row"><span class="legend-level">${esc(l.label)} <strong>${l.points}</strong></span><span>${esc(l.text)}</span></div>`).join("")}<small class="muted-note">Click a band beside each response, or type an exact score.</small></details>`;
+  }
+
+  // ---- The writing-process record, as the teacher sees it -------------------------------------
+  function procStat_(value, label, cls, title) {
+    return `<span class="proc-stat ${cls || ""}"${title ? ` title="${esc(title)}"` : ""}>${value !== "" && value !== null && value !== undefined ? `<b class="proc-num">${value}</b>` : ""}<span class="proc-label">${label}</span></span>`;
+  }
+  function timeStat_(t, hasText) {
+    t = t || {};
+    if (!t.timed) return hasText ? procStat_("", "Not timed", "proc-muted", "Written before writing time was recorded, so there's no time for this box.") : "";
+    let lower = Number(t.untimedChars || 0) > 0, s = Number(t.sessions || 0);
+    return procStat_((lower ? "≥ " : "") + esc(writingTimeText_(t.activeMs)), "writing", "proc-time",
+      `${writingTimeText_(t.activeMs)} of active writing${s ? ` across ${s} sitting${s === 1 ? "" : "s"}` : ""}. Counted from the student's own edits; a pause over two minutes isn't counted.${lower ? " Some of this text was here before timing began, so the real total is higher." : ""}`);
+  }
+  function wordsIn_(t) { t = String(t || "").trim(); return t ? t.split(/\s+/).length : 0; }
+  function processStatsHtml_(text, p, opts) {
+    opts = opts || {};
+    text = String(text || ""); p = p || {};
+    let words = opts.words !== undefined ? Number(opts.words || 0) : wordsIn_(text);
+    let total = Number(p.total || text.trim().length || 0);
+    let pasted = Number(p.pasted || 0), moved = Number(p.moved || 0), unknown = Number(p.unknown || 0);
+    let events = Number(p.events || 0), outside = Number(p.outsideEvents || 0), blocked = Number(p.blocked || 0);
+    let pct = total ? Math.round((pasted / total) * 100) : 0;
+    let chips = [procStat_(words, "word" + (words === 1 ? "" : "s"))];
+    if (opts.time !== false) chips.push(timeStat_(p.time, total > 0));
+    chips.push(procStat_(events, "paste event" + (events === 1 ? "" : "s"), events ? (outside ? "proc-warn" : "proc-own") : "",
+      !events ? "No paste recorded in this box." : outside ? "Includes paste from outside the app." : "Every paste was the student moving their own writing within the app."));
+    if (pasted) chips.push(procStat_(pct + "%", `pasted from outside · ${pasted} of ${total} chars`, "proc-warn"));
+    if (moved) chips.push(procStat_(moved, "chars moved from their own writing", "proc-own"));
+    if (blocked) chips.push(procStat_(blocked, "outside paste" + (blocked === 1 ? "" : "s") + " blocked", "proc-muted", "The student tried to paste from outside the app in a box where it's turned off. Nothing was pasted."));
+    if (unknown) chips.push(procStat_(unknown, "chars before tracking", "proc-muted", "Text already in this box when tracking began (for example, brought over from the original Memoir tool). Its origin is unknown, not assumed typed."));
+    if (opts.cadence) chips.push(procStat_(opts.cadence.internal + " / " + opts.cadence.external, "internal / external highlights", "proc-cadence", "How many phrases the student marked as internal and external."));
+    if (opts.checks && opts.checks.total) chips.push(procStat_(opts.checks.ticked + "/" + opts.checks.total, "checklist ticked", "", "The student's own craft checklist for this stage."));
+    let note = "";
+    if (pasted && !opts.leadPaste) note = `<p class="proc-note warn">Outside paste is evidence for a conversation, not a verdict. Read the highlighted passage in context.</p>`;
+    else if (pasted && opts.leadPaste) note = `<p class="proc-note">Pasting is allowed in The Lead, so students can bring it over from a discussion post.</p>`;
+    return `<div class="proc-stats">${chips.join("")}</div>${note}`;
+  }
+  // Text with either the paste record or the student's highlights marked. Each
+  // segment is escaped on its own, so nothing a student types can inject markup.
+  function markedTextHtml_(text, ranges) {
+    text = String(text || "");
+    if (!text) return "<em>Nothing written yet.</em>";
+    let list = (ranges || []).slice().sort((a, b) => a[0] - b[0]);
+    let out = "", at = 0;
+    list.forEach((sp) => {
+      let a = Math.max(at, Number(sp[0]) || 0), b = Math.min(text.length, Number(sp[1]) || 0);
+      if (b <= a) return;
+      if (a > at) out += esc(text.slice(at, a));
+      out += `<mark class="${sp[2]}" title="${esc(sp[3] || "")}">${esc(text.slice(a, b))}</mark>`;
+      at = b;
+    });
+    return out + esc(text.slice(at));
+  }
+  function workTextHtml_(r, text, process) {
+    if (backend.markView === "cadence" && Array.isArray(r.cadenceRanges))
+      return markedTextHtml_(text, r.cadenceRanges.map((c) => [c.start, c.end, c.type === "internal" ? "hl-internal" : "hl-external", c.type === "internal" ? "Marked internal" : "Marked external"]));
+    let spans = (process && process.spans) || [];
+    return markedTextHtml_(text, spans.filter((s) => s[2] === "p" || s[2] === "q").map((s) => [s[0], s[1], s[2] === "p" ? "paste-outside" : "paste-own", s[2] === "p" ? "Pasted from outside the app" : "Moved from the student's own writing"]));
+  }
+  function processLegendHtml_(pasteOnly) {
+    if (backend.markView === "cadence" && !pasteOnly) return `<p class="legend"><span><span class="sw sw-in"></span>marked internal</span><span><span class="sw sw-ex"></span>marked external</span><span>These are the student's own highlights.</span></p>`;
+    return `<p class="legend"><span><span class="sw sw-paste"></span>pasted from outside</span><span><span class="sw sw-own"></span>moved from their own writing</span><span>Unmarked text was typed in the app.</span></p>`;
+  }
+
+  // ---- Rows ------------------------------------------------------------------------------------
+  function pieceRank_(r) {
+    if (r.excluded) return 3;
+    if (r.editedAfterGrading && r.text && r.submitted) return -1;   // redone and turned in again
+    if (hasScore_(r.teacherScore) || (isPassFail_() && hasScore_(r.score))) return 2;
+    if (!r.submitted) return 1;
+    return 0;
+  }
+  function finalRank_(r) {
+    let active = MEMOIR_CRITERIA.filter((c) => !r.criteria[c].excluded);
+    if (!active.length) return 3;
+    let t = r.finalTotal || {};
+    if (t.editedAfterGrading && r.text && t.submitted) return -1;
+    if (active.every((c) => hasScore_(r.criteria[c].teacherScore))) return 2;
+    if (!t.submitted) return 1;
+    return 0;
+  }
+  function groupMeta_(rank) {
+    let pf = isPassFail_();
+    let poster = gradeKey_() === MEMOIR_POSTER_KEY, share = gradeKey_() === "share";
+    if (rank === -1) return { label: "Resubmitted", note: "Revised after you graded it, and turned in again" };
+    if (rank === 0) return { label: "Ready to Grade", note: share ? "Posted to the board" : poster ? "Poster turned in" : "Turned in, waiting for a score" };
+    if (rank === 1) return { label: "Not Submitted", note: share ? "No post yet" : "A draft may exist, but it hasn't been turned in" };
+    if (rank === 2) return { label: pf ? "Complete" : "Graded", note: pf ? "Marked complete — automatically when turned in, or by you" : "Scored" };
+    return { label: "Excluded", note: "Not counted for these students" };
+  }
+  const RANKS = [-1, 0, 1, 2, 3];
+  function groupedListHtml_(rows, rowHtml, rankFn) {
+    let buckets = {};
+    RANKS.forEach((k) => (buckets[k] = []));
+    rows.forEach((r) => { let k = rankFn(r); (buckets[k] || buckets[1]).push(r); });
+    RANKS.forEach((k) => buckets[k].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))));
+    return `<div class="grade-groups">${RANKS.map((rank) => {
+      let items = buckets[rank];
+      if (!items.length && (rank === -1 || rank === 3)) return "";
+      let meta = groupMeta_(rank);
+      return `<section class="grade-group ${items.length ? "" : "is-empty"}" data-group="${rank}"><div class="grade-group-head"><div><strong>${meta.label}</strong><span>${meta.note}</span></div><span class="group-count">${items.length}</span></div><div class="group-list">${items.map(rowHtml).join("")}</div></section>`;
+    }).join("")}</div>`;
+  }
+  function refreshGroupCounts_(root) {
+    if (!root) return;
+    root.querySelectorAll(".grade-group").forEach((g) => {
+      let n = g.querySelectorAll(":scope > .group-list > .grade-row").length;
+      g.querySelector(".group-count").textContent = String(n);
+      g.classList.toggle("is-empty", n === 0);
+    });
+  }
+  function moveRow_(row, rank, name) {
+    if (!row) return;
+    if (RANKS.indexOf(rank) === -1) rank = 1;
+    row.dataset.rank = String(rank);
+    let root = row.closest(".grade-groups");
+    if (!root) return;
+    let target = root.querySelector(`.grade-group[data-group="${rank}"] .group-list`);
+    if (!target) {
+      // Resubmitted / Excluded groups only exist when they have members.
+      let html = `<section class="grade-group" data-group="${rank}"><div class="grade-group-head"><div><strong>${groupMeta_(rank).label}</strong><span>${groupMeta_(rank).note}</span></div><span class="group-count">0</span></div><div class="group-list"></div></section>`;
+      let after = RANKS.slice(0, RANKS.indexOf(rank)).reverse().map((k) => root.querySelector(`.grade-group[data-group="${k}"]`)).find(Boolean);
+      if (after) after.insertAdjacentHTML("afterend", html); else root.insertAdjacentHTML("afterbegin", html);
+      target = root.querySelector(`.grade-group[data-group="${rank}"] .group-list`);
+    }
+    target.appendChild(row);
+    Array.from(target.children).sort((a, b) => String(a.dataset.name || "").localeCompare(String(b.dataset.name || ""))).forEach((el) => target.appendChild(el));
+    refreshGroupCounts_(root);
+  }
+  function statusBadges_(r) {
+    let out = "";
+    if (r.excluded) return `<span class="chip chip-muted">Excluded</span>`;
+    let share = gradeKey_() === "share", poster = gradeKey_() === MEMOIR_POSTER_KEY;
+    if (hasScore_(r.teacherScore) && !r.submitted) out += `<span class="chip chip-done" title="You graded the saved draft before the student turned it in. The score counts and goes to Canvas on the next push.">Graded draft</span>`;
+    else if (!r.text && !(poster && r.poster)) out += `<span class="chip chip-muted">${share ? "No post" : "Not started"}</span>`;
+    else if (!r.submitted) out += `<span class="chip chip-muted">Draft — not turned in</span>`;
+    else out += `<span class="chip">${share ? "Posted" : "Turned in"}${r.submittedAt ? " " + esc(shortDate_(r.submittedAt)) : ""}</span>`;
+    if (isPassFail_()) {
+      if (hasScore_(r.score)) out += `<span class="chip chip-done">${Number(r.score) > 0 ? "Complete" : "Not complete"}${r.auto ? " · automatic" : ""}</span>`;
+    } else if (hasScore_(r.teacherScore)) {
+      let n = rubricLevelName_(r.teacherScore, PIECE_RUBRICS[gradeKey_()]);
+      out += `<span class="chip chip-done">${n ? esc(n) + " " : ""}${r.teacherScore}/${pieceMax_()}</span>`;
+    } else if (r.submitted) out += `<span class="chip chip-needs">Needs grading</span>`;
+    if (r.editedAfterGrading && r.text) out += r.submitted
+      ? `<span class="chip chip-redo" title="This turned-in version changed after you graded it. Your score is still attached to the old version.">↻ ${r.markedBlank ? "Written after grading" : "Resubmitted"} — needs a look</span>`
+      : `<span class="chip chip-muted" title="Changed after grading, but not turned in again yet.">Revised draft — not turned in</span>`;
+    let p = r.process || {};
+    if (Number(p.pasted || 0) && gradeKey_() !== "lead") out += `<span class="chip chip-warn">Paste ${Math.round((Number(p.pasted) / Math.max(1, Number(p.total || 1))) * 100)}%</span>`;
+    return out;
+  }
+  function refBlockHtml_(r) {
+    if (!r.ref) return "";
+    return `<details class="ref-panel ref-teacher"><summary>Their ${esc(r.ref.label)}, for comparison</summary>${r.ref.text ? `<p class="ref-text">${esc(r.ref.text)}</p>` : `<p class="ref-empty">Not written yet.</p>`}</details>`;
+  }
+  function coachBlockHtml_(r) {
+    if (!r.coach || !r.coach.length) return "";
+    return `<details class="coach-older teacher-coach"><summary>What the writing coach told them (${r.coach.length})</summary>${r.coach.slice().reverse().map((e) => `<div class="coach-reply is-old"><div class="coach-when">${esc(new Date(e.at).toLocaleString())}</div><p>${esc(e.text)}</p></div>`).join("")}</details>`;
+  }
+  function keepNoteHtml_(r) {
+    if (!(r.editedAfterGrading && r.text && r.submitted && hasScore_(r.teacherScore))) return "";
+    return `<p class="edited-note">You gave this <strong>${r.teacherScore}/${pieceMax_()}</strong>${r.gradedAt ? " on " + esc(new Date(r.gradedAt).toLocaleDateString()) : ""}, and the student has ${r.markedBlank ? "written it" : "revised it"} since. This is the current version. <button type="button" class="btn btn-sm pieceKeepBtn" data-email="${esc(r.email)}">Keep ${r.teacherScore}/${pieceMax_()}</button></p>`;
+  }
+  function pieceScoreHtml_(r) {
+    let attrs = `data-email="${esc(r.email)}"`;
+    let scoring;
+    if (isPassFail_()) {
+      let v = hasScore_(r.score) ? Number(r.score) : null;
+      scoring = `<div class="band-row score-bands"><button type="button" class="pieceCompleteBtn band-btn ${v === pieceMax_() ? "selected" : ""}" ${attrs} data-score="${pieceMax_()}"><span class="band-name">Complete</span><span class="band-pts">${pieceMax_()}</span></button><button type="button" class="pieceCompleteBtn band-btn ${v === 0 ? "selected" : ""}" ${attrs} data-score="0"><span class="band-name">Not complete</span><span class="band-pts">0</span></button></div>${r.auto && v ? `<p class="muted-note">Marked complete automatically because it was turned in. Click either to decide yourself.</p>` : ""}`;
+    } else {
+      let rb = PIECE_RUBRICS[gradeKey_()];
+      scoring = rubricRowHtml_(r.teacherScore, "pieceScoreBtn", attrs, rb) + scoreInputHtml_(r.teacherScore, attrs, pieceMax_());
+    }
+    return `<div class="score-panel">${scoring}<label class="exclude-toggle"><input type="checkbox" class="pieceExcludeToggle" ${attrs} ${r.excluded ? "checked" : ""}> Exclude from this student's grade</label><label class="sr-only" for="cm-${esc(r.email)}">Comment for ${esc(r.name)}</label><textarea id="cm-${esc(r.email)}" class="pieceComment" ${attrs} placeholder="Comment for the student (goes to Canvas on Push)">${esc(r.comment || "")}</textarea></div>`;
+  }
+  function pieceWorkHtml_(r) {
+    let key = gradeKey_();
+    if (key === "share") {
+      let post = r.post ? `<div class="response-box"><div class="resp-label">Their post${r.post.updatedAt && r.post.updatedAt !== r.post.date ? " · updated " + esc(shortDate_(r.post.updatedAt)) : ""}</div><p>${esc(r.post.text)}</p></div>` : `<div class="response-box"><em>Nothing posted yet.</em></div>`;
+      let reps = (r.replies || []).length
+        ? r.replies.map((x) => `<div class="response-box reply-box"><div class="resp-label">Reply to ${esc(x.to || "a classmate")} · ${esc(shortDate_(x.date))}</div><p>${esc(x.text)}</p></div>`).join("")
+        : `<p class="muted-note">No replies to classmates yet.</p>`;
+      return `${post}<div class="resp-sub">Replies they wrote (${(r.replies || []).length}) · replies they received (${Number(r.repliesReceived || 0)})</div>${reps}`;
+    }
+    if (key === MEMOIR_POSTER_KEY) {
+      let p = r.poster;
+      if (!p) return `<div class="response-box"><em>No poster turned in yet.</em></div>`;
+      return `<div class="poster-thumb" data-email="${esc(r.email)}" id="posterThumb-${esc(r.email).replace(/[^A-Za-z0-9]/g, "")}"><span class="muted-note">Loading poster…</span></div><p class="muted-note"><strong>${esc(p.title || "Untitled")}</strong>${p.author ? " · by " + esc(p.author) : ""} · turned in ${esc(new Date(p.savedAt).toLocaleString())} · ${r.words} words of memoir</p>`;
+    }
+    return `${keepNoteHtml_(r)}${refBlockHtml_(r)}<div class="response-box writing-box">${workTextHtml_(r, r.text, r.process)}</div>${processStatsHtml_(r.text, r.process, { words: r.words, cadence: r.cadence, checks: r.checks, leadPaste: key === "lead" })}${coachBlockHtml_(r)}`;
+  }
+  function pieceRowHtml_(r) {
+    return `<article class="grade-row" data-email="${esc(r.email)}" data-rank="${pieceRank_(r)}" data-name="${esc(r.name || "")}">
+      <h3 class="row-name"><span>${esc(r.name)}</span><span class="row-badges">${statusBadges_(r)}</span></h3>
+      <div class="row-work">${pieceWorkHtml_(r)}</div>
+      ${pieceScoreHtml_(r)}</article>`;
+  }
+  function updatePieceRow_(email) {
+    let r = gradeRow_(email);
+    let row = document.querySelector(`.grade-row[data-email="${CSS.escape(email)}"]`);
+    if (!r || !row) return;
+    row.querySelector(".row-badges").innerHTML = statusBadges_(r);
+    if (!r.editedAfterGrading) { let n = row.querySelector(".edited-note"); if (n) n.remove(); }
+    let inp = row.querySelector(".pieceManualScore");
+    if (inp && document.activeElement !== inp) inp.value = hasScore_(r.teacherScore) ? r.teacherScore : "";
+    row.querySelectorAll(".pieceScoreBtn,.pieceCompleteBtn").forEach((b) => b.classList.toggle("selected", hasScore_(isPassFail_() ? r.score : r.teacherScore) && Number(b.dataset.score) === Number(isPassFail_() ? r.score : r.teacherScore)));
+    let cb = row.querySelector(".pieceExcludeToggle");
+    if (cb) cb.checked = r.excluded;
+    moveRow_(row, pieceRank_(r), r.name);
+  }
+  // ---- The final memoir: read once, score all four criteria ------------------------------------
+  function finalCriterionHtml_(r, c) {
+    let rec = r.criteria[c] || {};
+    let self = rec.selfEvalIdx !== "" && rec.selfEvalIdx !== undefined ? Number(rec.selfEvalIdx) : null;
+    let btns = MEMOIR_RUBRIC[c].map((desc, i) => {
+      let pts = CRITERION_POINTS[i];
+      let official = hasScore_(rec.teacherScore) && Number(rec.teacherScore) === pts;
+      let suggested = !hasScore_(rec.teacherScore) && self === i;
+      return `<button type="button" class="critScoreBtn band-btn ${official ? "selected" : suggested ? "is-suggested" : ""}" data-email="${esc(r.email)}" data-crit="${esc(c)}" data-score="${pts}" title="${esc(desc)}"><span class="band-name">${esc(BAND_LABELS[i])}</span><span class="band-pts">${pts}</span></button>`;
+    }).join("");
+    let selfNote = self !== null
+      ? `<p class="muted-note">They rated themselves <strong>${esc(BAND_LABELS[self])} (${CRITERION_POINTS[self]})</strong>${rec.selfComment ? ": “" + esc(rec.selfComment) + "”" : "."}${hasScore_(rec.teacherScore) ? "" : " Shown dashed until you decide."}</p>`
+      : `<p class="muted-note">No self-rating for this one.</p>`;
+    return `<section class="criterion" data-crit="${esc(c)}"><div class="criterion-head"><strong>${esc(c)}</strong><span class="crit-chip">${rec.excluded ? `<span class="chip chip-muted">Excluded</span>` : hasScore_(rec.teacherScore) ? `<span class="chip chip-done">${rec.teacherScore}/${CRITERION_MAX}</span>` : `<span class="chip chip-warn">Needs a score</span>`}</span></div>
+      <div class="band-row score-bands">${btns}</div>${selfNote}
+      <label class="exclude-toggle"><input type="checkbox" class="critExcludeToggle" data-email="${esc(r.email)}" data-crit="${esc(c)}" ${rec.excluded ? "checked" : ""}> Exclude for this student</label>
+      <label class="sr-only" for="cc-${esc(r.email)}-${esc(c).replace(/[^A-Za-z]/g, "")}">${esc(c)} comment</label><textarea id="cc-${esc(r.email)}-${esc(c).replace(/[^A-Za-z]/g, "")}" class="critComment" data-email="${esc(r.email)}" data-crit="${esc(c)}" placeholder="${esc(c)} comment (optional)">${esc(rec.comment || "")}</textarea></section>`;
+  }
+  function finalBadges_(r) {
+    let t = r.finalTotal || {};
+    if (!r.text) return `<span class="chip chip-muted">Not started</span>`;
+    let sub = t.submitted ? `<span class="chip">Turned in${t.submittedAt ? " " + esc(shortDate_(t.submittedAt)) : ""}</span>` : t.teacherGradedDraft ? `<span class="chip chip-done">Graded draft</span>` : `<span class="chip chip-muted">Draft — not turned in</span>`;
+    let active = MEMOIR_CRITERIA.filter((c) => !r.criteria[c].excluded);
+    let scored = active.filter((c) => hasScore_(r.criteria[c].teacherScore)).length;
+    let redo = t.editedAfterGrading && t.submitted ? `<span class="chip chip-redo">↻ Resubmitted — needs a look</span>` : "";
+    return `${sub}<span class="chip ${scored === active.length && active.length ? "chip-done" : "chip-needs"}">${t.earned}/${t.possible} · ${scored}/${active.length} scored</span>${redo}`;
+  }
+  function finalRowHtml_(r) {
+    let sections = (r.sections || []).map((s) => `<div class="final-section" style="--acc:${pieceColor(s.key)}"><div class="resp-label">${esc(s.label)}</div>${s.text ? `<p>${workTextHtml_({}, s.text, s.process)}</p>` : `<p class="ref-empty">Not written.</p>`}</div>`).join("");
+    return `<article class="grade-row is-final" data-email="${esc(r.email)}" data-rank="${finalRank_(r)}" data-name="${esc(r.name || "")}">
+      <h3 class="row-name"><span>${esc(r.name)}</span><span class="row-badges">${finalBadges_(r)}</span></h3>
+      <div class="row-work"><div class="response-box final-text">${sections || "<em>Nothing written yet.</em>"}</div>${processStatsHtml_(r.text, r.process, { words: r.words, cadence: r.cadence })}</div>
+      <div class="criteria-grid">${MEMOIR_CRITERIA.map((c) => finalCriterionHtml_(r, c)).join("")}</div></article>`;
+  }
+  function recomputeFinal_(r) {
+    let earned = 0, possible = 0;
+    MEMOIR_CRITERIA.forEach((c) => { let x = r.criteria[c]; if (x.excluded) return; possible += CRITERION_MAX; if (hasScore_(x.teacherScore)) earned += Number(x.teacherScore); });
+    r.finalTotal.earned = earned; r.finalTotal.possible = possible;
+    r.finalTotal.editedAfterGrading = false;
+  }
+  function updateFinalRow_(email) {
+    let r = gradeRow_(email);
+    let row = document.querySelector(`.grade-row[data-email="${CSS.escape(email)}"]`);
+    if (!r || !row) return;
+    row.querySelector(".row-badges").innerHTML = finalBadges_(r);
+    MEMOIR_CRITERIA.forEach((c) => {
+      let rec = r.criteria[c];
+      let sec = row.querySelector(`.criterion[data-crit="${CSS.escape(c)}"]`);
+      if (!sec) return;
+      sec.querySelectorAll(".critScoreBtn").forEach((b) => {
+        let on = hasScore_(rec.teacherScore) && Number(b.dataset.score) === Number(rec.teacherScore);
+        b.classList.toggle("selected", on);
+        if (hasScore_(rec.teacherScore)) b.classList.remove("is-suggested");
+      });
+      sec.querySelector(".crit-chip").innerHTML = rec.excluded ? `<span class="chip chip-muted">Excluded</span>` : hasScore_(rec.teacherScore) ? `<span class="chip chip-done">${rec.teacherScore}/${CRITERION_MAX}</span>` : `<span class="chip chip-warn">Needs a score</span>`;
+    });
+    moveRow_(row, finalRank_(r), r.name);
+  }
+
+  // ---- Loading and saving ---------------------------------------------------------------------------
+  function normalizeGradeRows_(rows, key) {
+    return (rows || []).map((r) => {
+      let o = Object.assign({}, r);
+      o.text = String(o.text || "");
+      o.words = Number(o.words || 0);
+      o.process = o.process || {};
+      o.comment = String(o.comment || "");
+      if (key === MEMOIR_FINAL_KEY) {
+        o.criteria = o.criteria || {};
+        MEMOIR_CRITERIA.forEach((c) => {
+          let x = o.criteria[c] || {};
+          x.teacherScore = normScore_(x.teacherScore); x.score = normScore_(x.score);
+          x.excluded = x.excluded === true; x.comment = String(x.comment || "");
+          x.selfEvalIdx = x.selfEvalIdx === undefined || x.selfEvalIdx === null ? "" : x.selfEvalIdx;
+          o.criteria[c] = x;
+        });
+        o.finalTotal = o.finalTotal || { earned: 0, possible: 0 };
+        ["submitted", "editedAfterGrading", "teacherGradedDraft", "hasAnyResult"].forEach((f) => (o.finalTotal[f] = o.finalTotal[f] === true));
+      } else {
+        o.score = normScore_(o.score); o.teacherScore = normScore_(o.teacherScore);
+        ["auto", "excluded", "submitted", "editedAfterGrading", "markedBlank", "teacherGradedDraft"].forEach((f) => (o[f] = o[f] === true));
+      }
+      return o;
+    });
+  }
+  async function loadGradeRows_(key, force) {
+    backend.gradeKey = key;
+    let classId = backend.activeClassId, ck = gradeCacheKey_(classId, key);
+    let cached = backend.gradeCache[ck];
+    if (state.view === "grade") refreshGradeView_();
+    if ((cached && !force) || backend.gradePending[ck]) return;
+    backend.gradePending[ck] = true;
+    try {
+      let fresh = await rpc("getMemoirResponses", { classId, stepKey: key });
+      backend.gradeCache[ck] = normalizeGradeRows_(fresh.responses, key);
+      if (backend.activeClassId === classId && backend.gradeKey === key && state.view === "grade") refreshGradeView_();
+    } catch (e) {
+      console.error(e);
+      let list = document.getElementById("gradeList");
+      if (list && !cached) list.innerHTML = `<p class="muted-note">Couldn't load the class's work: ${esc(e.message || String(e))}</p>`;
+    } finally { delete backend.gradePending[ck]; }
+  }
+  async function savePiece_(email, patch) {
+    let r = gradeRow_(email);
+    if (!r) return;
+    invalidateDashboardCache_();
+    try {
+      let p = rpc("setGradeItem", { classId: backend.activeClassId, studentEmail: email, itemType: "memoir", itemKey: gradeKey_(),
+        score: patch.score !== undefined ? patch.score : r.teacherScore, excluded: patch.excluded !== undefined ? !!patch.excluded : r.excluded,
+        comment: patch.comment !== undefined ? patch.comment : r.comment });
+      trackTeacherSave_(p);
+      acceptGradeSummary_(email, await p);
+    } catch (e) { alert("That grade didn't save — try again. (" + e.message + ")"); }
+  }
+  function applyPiece_(email, patch) {
+    let r = gradeRow_(email);
+    if (!r) return;
+    if (patch.score !== undefined) {
+      r.teacherScore = patch.score; r.score = r.excluded ? null : patch.score; r.auto = false;
+      r.teacherGradedDraft = hasScore_(patch.score) && !r.submitted;
+    }
+    if (patch.excluded !== undefined) { r.excluded = patch.excluded; r.score = patch.excluded ? null : r.teacherScore; }
+    if (patch.comment !== undefined) r.comment = patch.comment;
+    // Any mark re-snapshots the work on the server, so the redo flag is answered.
+    r.editedAfterGrading = false; r.markedBlank = false;
+  }
+  async function saveCrit_(email, crit, patch) {
+    let r = gradeRow_(email);
+    if (!r) return;
+    let rec = r.criteria[crit];
+    invalidateDashboardCache_();
+    try {
+      let p = rpc("setGradeItem", { classId: backend.activeClassId, studentEmail: email, itemType: "memoirRubric", itemKey: crit,
+        score: patch.score !== undefined ? patch.score : rec.teacherScore, excluded: patch.excluded !== undefined ? !!patch.excluded : rec.excluded,
+        comment: patch.comment !== undefined ? patch.comment : rec.comment });
+      trackTeacherSave_(p);
+      acceptGradeSummary_(email, await p);
+    } catch (e) { alert("That score didn't save — try again. (" + e.message + ")"); }
+  }
+  async function toggleExcludeForClass_() {
+    let rows = gradeRows_() || [];
+    if (!rows.length) return;
+    let key = gradeKey_(), isFinal = key === MEMOIR_FINAL_KEY;
+    let rowExcluded = (r) => (isFinal ? MEMOIR_CRITERIA.every((c) => r.criteria[c].excluded) : r.excluded);
+    let next = !rows.every(rowExcluded);
+    if (next && !confirm(`Leave ${MEMOIR_GRADE_LABELS[key]} out of every student's grade in this class? Scores you've entered are kept, and "Count it again" brings them all back.`)) return;
+    let btn = document.getElementById("excludeAllBtn");
+    if (btn) { btn.disabled = true; btn.textContent = next ? "Excluding…" : "Restoring…"; }
+    try {
+      await rpc("setGradeItemForClass", isFinal ? { classId: backend.activeClassId, memoirFinal: true, excluded: next } : { classId: backend.activeClassId, itemType: "memoir", itemKey: key, excluded: next });
+      delete backend.gradeCache[gradeCacheKey_(backend.activeClassId, key)];
+      invalidateDashboardCache_();
+      await loadGradeRows_(key, true);
+    } catch (e) { alert("Couldn't update the whole class: " + e.message); if (btn) btn.disabled = false; }
+  }
+
+  // ---- The screen ---------------------------------------------------------------------------------------
+  function gradePanelHtml_() {
+    let key = gradeKey_(), rows = gradeRows_();
+    let isStage = STAGE_KEYS.indexOf(key) !== -1;
+    let legend = key === MEMOIR_FINAL_KEY
+      ? `<details class="rubric-legend" open><summary>Final Memoir rubric — the full descriptors</summary>${MEMOIR_CRITERIA.map((c) => `<div class="legend-row"><span class="legend-level">${esc(c)}</span><span>${MEMOIR_RUBRIC[c].map((d, i) => `<strong>${esc(BAND_LABELS[i])} (${CRITERION_POINTS[i]})</strong> ${esc(d)}`).join("<br>")}</span></div>`).join("")}<small class="muted-note">Students rate themselves on this same rubric. Their choice shows dashed under each criterion until you decide.</small></details>`
+      : isPassFail_() ? "" : rubricLegendHtml_(PIECE_RUBRICS[key]);
+    let allEx = !!(rows && rows.length && rows.every((r) => (key === MEMOIR_FINAL_KEY ? MEMOIR_CRITERIA.every((c) => r.criteria[c].excluded) : r.excluded)));
+    let viewToggle = isStage
+      ? `<div class="seg seg-inline" role="group" aria-label="What to highlight"><button type="button" class="seg-btn ${backend.markView !== "cadence" ? "active" : ""}" id="markPaste">Paste record</button><button type="button" class="seg-btn ${backend.markView === "cadence" ? "active" : ""}" id="markCadence">Their internal / external highlights</button></div>`
+      : "";
+    return `<p class="grade-prompt">${esc(STEP_GRADE_NOTES[key] || "")}</p>${legend}
+      <div class="grade-tools">${viewToggle}<label class="exclude-toggle"><input type="checkbox" id="hideUnsubmitted" ${backend.hideUnsubmitted ? "checked" : ""}> Hide students who haven't turned it in</label></div>
+      ${isStage || key === MEMOIR_FINAL_KEY ? processLegendHtml_(key === MEMOIR_FINAL_KEY) : ""}
+      ${rows && rows.length ? `<div class="exclude-all-row ${allEx ? "is-excluded" : ""}"><button type="button" class="btn ${allEx ? "btn-primary" : "btn-danger-ghost"}" id="excludeAllBtn">${allEx ? "↺ Count it again for everyone" : "Don't grade this for anyone"}</button><span class="muted-note">${allEx ? "Left out for the whole class — it counts for nobody, and it has nothing to send to Canvas." : "For work you aren't assessing this time. It comes out of every student's total instead of counting as zero; scores you've entered are kept."}</span></div>` : ""}`;
+  }
+  function gradeListHtml_() {
+    let key = gradeKey_(), rows = gradeRows_();
+    if (!rows) { if (!backend.gradePending[gradeCacheKey_(backend.activeClassId, key)]) setTimeout(() => loadGradeRows_(key), 0); return `<div class="hub-loading"><span class="spinner" aria-hidden="true"></span>Loading the class's work…</div>`; }
+    if (!rows.length) return `<p class="muted-note">No students have joined this class yet.</p>`;
+    let rankFn = key === MEMOIR_FINAL_KEY ? finalRank_ : pieceRank_;
+    let shown = backend.hideUnsubmitted ? rows.filter((r) => rankFn(r) !== 1) : rows;
+    let hidden = rows.length - shown.length;
+    return groupedListHtml_(shown, key === MEMOIR_FINAL_KEY ? finalRowHtml_ : pieceRowHtml_, rankFn) + (hidden ? `<p class="muted-note">${hidden} student(s) who haven't turned it in are hidden.</p>` : "");
+  }
+  function refreshGradeView_() {
+    let panel = document.getElementById("gradePanel"), list = document.getElementById("gradeList");
+    if (!panel || !list) { if (state.view === "grade") render(); return; }
+    panel.innerHTML = gradePanelHtml_();
+    list.innerHTML = gradeListHtml_();
+    bindBackend();
+    loadPosterThumbs_();
+    focusGradeStudent_();
+  }
+  function focusGradeStudent_() {
+    let email = backend.gradeFocusEmail;
+    if (!email) return;
+    let row = document.querySelector(`.grade-row[data-email="${CSS.escape(email)}"]`);
+    if (!row) return;
+    backend.gradeFocusEmail = "";
+    row.classList.add("is-focus");
+    row.scrollIntoView({ block: "start", behavior: "smooth" });
+    setTimeout(() => row.classList.remove("is-focus"), 2600);
+  }
+  // A stored image only ever reaches the page as plain base64 of a real image type.
+  function safeB64_(s) { s = String(s || ""); return /^[A-Za-z0-9+/]+={0,2}$/.test(s) ? s : ""; }
+  function safeImgType_(t) { return /^image\/(jpeg|png|webp)$/.test(String(t || "")) ? t : "image/jpeg"; }
+  async function loadPosterThumbs_() {
+    if (gradeKey_() !== MEMOIR_POSTER_KEY) return;
+    let thumbs = Array.from(document.querySelectorAll(".poster-thumb"));
+    for (let el of thumbs) {
+      let email = el.dataset.email;
+      let cached = backend.posterImages[backend.activeClassId + "::" + email];
+      try {
+        let p = cached || (await rpc("getPosterImage", { classId: backend.activeClassId, studentEmail: email })).poster;
+        if (!p) { el.innerHTML = `<span class="muted-note">No image stored.</span>`; continue; }
+        backend.posterImages[backend.activeClassId + "::" + email] = p;
+        let live = document.getElementById(el.id);
+        if (live) live.innerHTML = `<img src="data:${esc(safeImgType_(p.mimeType))};base64,${safeB64_(p.image)}" alt="${esc(p.title || "Memoir poster")} by ${esc(p.author || "the student")}">`;
+      } catch (e) { let live = document.getElementById(el.id); if (live) live.innerHTML = `<span class="muted-note">Couldn't load: ${esc(e.message)}</span>`; }
+    }
+  }
+  gradeScreen = function () {
+    if (!backend.enabled || !backend.ready) return original.gradeScreen();
+    if (!backend.activeClassId) return `<div class="page-head"><h1 class="page-title">Grade the Memoir</h1><p class="page-sub">Choose or create a class on the dashboard first.</p></div>`;
+    if (!backend.gradeKey) backend.gradeKey = "lead";
+    let opts = MEMOIR_GRADE_KEYS.map((k, i) => `<option value="${k}" ${k === backend.gradeKey ? "selected" : ""}>${i + 1}. ${esc(MEMOIR_GRADE_LABELS[k])} — ${esc(worthLabel_(k))}</option>`).join("");
+    let k = currentClass();
+    return `<div class="page-head grade-head" style="--acc:${pieceColor(backend.gradeKey)}"><div><div class="eyebrow">${esc(classLabel_(k))}</div><h1 class="page-title">Grade the Memoir</h1></div>
+        <div class="head-actions"><button type="button" class="btn" id="backToDashboard">${icon("left")} Back to Dashboard</button><button type="button" class="btn" id="refreshGrade">${icon("refresh")} Refresh</button></div></div>
+      <section class="card grade-card"><div class="field grade-select"><label for="gradeSelect">Piece</label><select id="gradeSelect">${opts}</select></div><div id="gradePanel">${gradePanelHtml_()}</div></section>
+      <div id="gradeList">${gradeListHtml_()}</div>`;
+  };
+
+  // ===========================================================================
+  // Canvas
+  // ===========================================================================
+  function canvasSettings_() {
+    let d = backend.dashboard && backend.dashboard.settings && backend.dashboard.settings.canvas;
+    if (d) return d;
+    let k = currentClass();
+    return (k && parseSettings(k.settingsJson, null).canvas) || { courseId: "", assignments: {} };
+  }
+  function canvasLinked_() { return !!(backend.canvas && backend.canvas.connected && backend.canvas.valid !== false && canvasSettings_().courseId); }
+  function canvasSchedule_() {
+    let d = backend.dashboard && backend.dashboard.settings && backend.dashboard.settings.assignmentSchedule;
+    if (d) return d;
+    let k = currentClass();
+    return (k && parseSettings(k.settingsJson, null).assignmentSchedule) || {};
+  }
+  function canvasChip_() {
+    let conn = backend.canvas || {}, cs = canvasSettings_();
+    let label, cls;
+    if (!conn.checked) { label = "Canvas…"; cls = ""; }
+    else if (!conn.connected) { label = "Set up Canvas"; cls = ""; }
+    else if (conn.valid === false) { label = "Canvas needs attention"; cls = "is-bad"; }
+    else if (!cs.courseId) { label = "Link a Canvas course"; cls = "is-warn"; }
+    else { label = "Canvas · " + (cs.courseName || cs.courseId); cls = "is-ok"; }
+    return `<button type="button" class="canvas-chip ${cls}" id="openCanvasSetup" title="Connect Canvas and choose the course this class pushes grades to"><span class="dot" aria-hidden="true"></span>${esc(label)}</button>`;
+  }
+  async function loadCanvasStatus(force) {
+    if (backend.canvas && backend.canvas.checked && !force) return;
+    try {
+      let st = await rpc("getCanvasConnectionStatus");
+      backend.canvas = Object.assign({ checked: true }, st);
+      if (st.connected && st.valid !== false) {
+        try {
+          backend.canvas.courses = (await rpc("listCanvasCourses")).courses || [];
+          let cs = canvasSettings_();
+          if (cs.courseId) backend.canvas.groups = (await rpc("listCanvasAssignmentGroups", { courseId: cs.courseId })).groups || [];
+        } catch (e) { backend.canvas.message = e.message; }
+      }
+    } catch (e) { backend.canvas = { checked: true, connected: false, message: e.message }; }
+    if (state.view === "manage") renderKeepScroll_();
+    if (document.getElementById("canvasSetupBody")) document.getElementById("canvasSetupBody").innerHTML = canvasSetupBody_();
+    bindBackend();
+  }
+  function canvasSetupBody_() {
+    let cs = canvasSettings_(), conn = backend.canvas || {};
+    if (!conn.checked) return `<p class="muted-note">Checking your Canvas connection…</p>`;
+    if (!conn.connected) return `<p class="muted-note">Push scores and your comments from here into the Canvas gradebook. You need an access token from Canvas: <strong>Account → Settings → New Access Token</strong>. It's stored privately against your Google account — never in the class spreadsheet, never shown to students.</p>
+      <div class="field"><label for="canvasBaseUrl">Canvas address</label><input id="canvasBaseUrl" placeholder="https://yourschool.instructure.com" value="${esc(conn.baseUrl || "")}"></div>
+      <div class="field"><label for="canvasToken">Access token</label><input id="canvasToken" type="password" autocomplete="off" placeholder="Paste the token from Canvas"></div>
+      <button type="button" class="btn btn-primary" id="canvasConnectBtn">Connect Canvas</button>`;
+    if (conn.valid === false) return `<p class="muted-note warn-note"><strong>Canvas rejected the saved token.</strong> ${esc(conn.message || "")} Reconnect with a fresh one.</p><button type="button" class="btn" id="canvasDisconnectBtn">Disconnect and start again</button>`;
+    let who = conn.profile && conn.profile.name ? conn.profile.name : "your Canvas account";
+    return `${cs.courseId ? `<p class="muted-note">This class pushes to <strong>${esc(cs.courseName || cs.courseId)}</strong>${cs.assignmentGroupName ? ` · assignments go into <strong>${esc(cs.assignmentGroupName)}</strong>` : ""}. <button type="button" class="link-btn" id="canvasUnlinkBtn">Unlink</button></p>` : `<p class="muted-note">Connected as <strong>${esc(who)}</strong>. Now choose the Canvas course this class pushes to.</p>`}
+      <div class="name-fields"><div class="field"><label for="canvasCourseSelect">Canvas course</label><select id="canvasCourseSelect"><option value="">${conn.courses ? "Choose a course…" : "Loading your courses…"}</option>${(conn.courses || []).map((c) => `<option value="${esc(c.id)}" ${c.id === cs.courseId ? "selected" : ""}>${esc(c.name)}${c.term ? " · " + esc(c.term) : ""}</option>`).join("")}</select></div>
+      <div class="field"><label for="canvasGroupSelect">Assignment group <small>optional</small></label><select id="canvasGroupSelect"><option value="">Course default</option>${(conn.groups || []).map((g) => `<option value="${esc(g.id)}" ${g.id === cs.assignmentGroupId ? "selected" : ""}>${esc(g.name)}</option>`).join("")}</select></div></div>
+      <div class="modal-actions start"><button type="button" class="btn btn-primary" id="canvasLinkBtn">${cs.courseId ? "Update link" : "Link this class"}</button><button type="button" class="btn btn-sm" id="canvasDisconnectBtn">Disconnect Canvas</button></div>
+      ${cs.courseId ? `<p class="muted-note">Use <strong>Push</strong> on any grading tile to send scores and comments. Each assignment is created the first time and reused after that.</p>` : ""}`;
+  }
+  function canvasMsg_(text, bad) { let el = document.getElementById("canvasMsg"); if (el) { el.textContent = text; el.classList.toggle("warn-note", !!bad); } }
+  function openCanvasSetupModal() {
+    let root = document.getElementById("modalRoot");
+    root.innerHTML = `<div class="modal"><div class="modalbox wide" role="dialog" aria-modal="true" aria-labelledby="cvTitle"><h3 id="cvTitle">Canvas</h3><div id="canvasSetupBody">${canvasSetupBody_()}</div><p id="canvasMsg" class="muted-note" role="status"></p><div class="modal-actions"><button type="button" class="btn modal-dismiss" id="closeCanvasSetup">Close</button></div></div></div>`;
+    document.getElementById("closeCanvasSetup").onclick = () => (root.innerHTML = "");
+    bindBackend();
+    if (!backend.canvas) loadCanvasStatus();
+  }
+  function localInputFromIso_(iso) {
+    if (!iso) return "";
+    let d = new Date(iso);
+    return Number.isNaN(d.getTime()) ? "" : new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+  function isoFromLocal_(v) { if (!v) return ""; let d = new Date(v); return Number.isNaN(d.getTime()) ? "" : d.toISOString(); }
+  backend.__isoFromLocal = isoFromLocal_; backend.__localFromIso = localInputFromIso_;
+  // A date and a time side by side: picking a day fills the time in (11:59 PM
+  // for due and lock dates, 12:00 AM for "available from"), so a date is never
+  // silently dropped for want of a time.
+  function dateFieldHtml_(id, label, iso, defTime, optional) {
+    let local = localInputFromIso_(iso);
+    return `<div class="field"><label for="${id}Date">${esc(label)}${optional ? " <small>optional</small>" : ""}</label><div class="dt-row"><input type="date" id="${id}Date" value="${esc(local.slice(0, 10))}"><input type="time" id="${id}Time" value="${esc(local ? local.slice(11, 16) : defTime)}" step="60" aria-label="${esc(label)} time"></div></div>`;
+  }
+  function dateFieldValue_(id, defTime) {
+    let d = (document.getElementById(id + "Date") || {}).value || "";
+    return d ? isoFromLocal_(d + "T" + ((document.getElementById(id + "Time") || {}).value || defTime)) : "";
+  }
+  function asgPayload_(asg) { return { key: String(asg).replace("memoir:", "") }; }
+  function asgLabel_(asg) { return MEMOIR_GRADE_LABELS[asgPayload_(asg).key] || asg; }
+  function setAsgMsg_(asg, text) { let el = document.getElementById("asgMsg-" + asgPayload_(asg).key); if (el) el.textContent = text; }
+  function setAsgBusy_(asg, busy) {
+    if (busy) backend.asgBusy[asg] = true; else delete backend.asgBusy[asg];
+    document.querySelectorAll(`.pushAsgBtn[data-asg="${asg}"],.exportAsgBtn[data-asg="${asg}"]`).forEach((b) => (b.disabled = !!busy));
+  }
+  async function openCanvasAsgModal(asg) {
+    let name = asgLabel_(asg), root = document.getElementById("modalRoot");
+    root.innerHTML = `<div class="modal"><div class="modalbox wide"><h3>${esc(name)} in Canvas</h3><p class="muted-note">Loading…</p></div></div>`;
+    let setup;
+    try { setup = await rpc("getCanvasAsgSetup", Object.assign({ classId: backend.activeClassId }, asgPayload_(asg))); }
+    catch (e) {
+      root.innerHTML = `<div class="modal"><div class="modalbox"><h3>${esc(name)} in Canvas</h3><p class="warn-note">${esc(e.message)}</p><div class="modal-actions"><button type="button" class="btn modal-dismiss" id="closeAsg">Close</button></div></div></div>`;
+      document.getElementById("closeAsg").onclick = () => (root.innerHTML = "");
+      return;
+    }
+    let link = setup.link || {}, sch = setup.schedule || {};
+    let shared = (setup.sharedWith || []).length;
+    // Assignment group for THIS assignment, preselected with where it is in Canvas now; sent only when changed.
+    let groupNow = String(setup.currentGroupId || "");
+    let groupOptions = (groupNow ? "" : `<option value="">Course default</option>`) + (setup.groups || []).map((g) => `<option value="${esc(g.id)}" ${String(g.id) === groupNow ? "selected" : ""}>${esc(g.name)}</option>`).join("");
+    let modules = `<option value="">Not in a module</option>` + (setup.modules || []).map((m) => `<option value="${esc(m.id)}" ${m.id === String(link.moduleId || "") ? "selected" : ""}>${esc(m.name)}${m.published ? "" : " · unpublished"}</option>`).join("");
+    root.innerHTML = `<div class="modal"><div class="modalbox wide" role="dialog" aria-modal="true" aria-labelledby="asgTitle">
+      <h3 id="asgTitle">${esc(setup.label)} in Canvas</h3>
+      <div class="chip-row"><span class="chip">${esc(setup.canvas.courseName || setup.canvas.courseId || "No course linked")}</span>${setup.canvas.assignmentGroupName ? `<span class="chip">${esc(setup.canvas.assignmentGroupName)}</span>` : ""}<span class="chip">${setup.gradingType === "pass_fail" ? "Complete / incomplete" : setup.pointsPossible + " points"}</span>${link.assignmentId ? `<span class="chip chip-done">Linked</span>` : `<span class="chip">Not created yet</span>`}${setup.published ? "" : `<span class="chip">Hidden in the app — stays unpublished until you open it</span>`}${shared ? `<span class="chip chip-warn">Shared with ${esc(setup.sharedWith.join(", "))}</span>` : ""}</div>
+      ${shared ? `<p class="muted-note callout">This is <strong>one Canvas assignment</strong> serving both classes. The due date, module and points are shared. Pushing from either class only fills in that class's own students, so neither can blank the other's.${setup.canvasPointsPossible !== null && Number(setup.canvasPointsPossible) !== Number(setup.pointsPossible) ? ` Canvas has it out of ${setup.canvasPointsPossible} points but this class works out to ${setup.pointsPossible} — that happens when a criterion is excluded for one class only.` : ""}</p>` : ""}
+      ${setup.rowsError ? `<p class="warn-note">${esc(setup.rowsError)}</p>` : ""}
+      <p class="muted-note">The Memoir app controls this assignment's name, points, due date, module and grades. Students do the work in the app, not in Canvas.</p>
+      <div class="date-grid">${dateFieldHtml_("cvDue", "Due date", sch.dueAt || link.dueAt || "", "23:59", false)}${dateFieldHtml_("cvUnlock", "Available from", sch.unlockAt || "", "00:00", true)}${dateFieldHtml_("cvLock", "Lock after", sch.lockAt || "", "23:59", true)}</div>
+      ${setup.appUrl ? `<p class="muted-note url-note">Students get a link to <code>${esc(setup.appUrl)}</code>.${/\/dev($|\?)/.test(setup.appUrl) ? " <strong>That's the test URL, not the one students can open.</strong> Deploy a new version, then press Update in Canvas." : " It's read fresh each time you update or push."}</p>` : ""}
+      <div class="field"><label for="cvGroupPick">Assignment group</label><select id="cvGroupPick">${groupOptions}</select><small class="muted-note">${setup.groupsError ? "Assignment groups couldn't be loaded: " + esc(setup.groupsError) : link.assignmentId ? "Pick a group and press Update in Canvas to move it there. Pushing grades never changes the group, so you can also move it in Canvas." : "The group it goes into when you create it. You can change it here or in Canvas later — pushing grades never moves it back."}</small></div>
+      <div class="field"><label for="cvModule">Canvas module <small>optional</small></label><select id="cvModule">${modules}</select><small class="muted-note">${setup.modulesError ? "Modules couldn't be loaded: " + esc(setup.modulesError) : "Clearing it removes only the module item — the assignment and its grades stay."}</small></div>
+      <div class="modal-actions start"><button type="button" class="btn btn-primary" id="syncAsgBtn">${link.assignmentId ? "Update in Canvas" : "Create in Canvas"}</button><button type="button" class="btn" id="pushFromModalBtn" ${link.assignmentId ? "" : "disabled"}>${icon("push")} Push grades now</button>${link.htmlUrl ? `<a class="btn" target="_blank" rel="noopener" href="${esc(link.htmlUrl)}">Open in Canvas</a>` : ""}<span class="grow"></span><button type="button" class="btn modal-dismiss" id="closeAsg">Close</button></div>
+      <p id="asgModalMsg" class="muted-note" role="status">${link.lastGradeSyncAt ? "Last push: " + esc(new Date(link.lastGradeSyncAt).toLocaleString()) : ""}</p></div></div>`;
+    document.getElementById("closeAsg").onclick = () => (root.innerHTML = "");
+    let msg = document.getElementById("asgModalMsg");
+    document.getElementById("syncAsgBtn").onclick = async () => {
+      let btn = document.getElementById("syncAsgBtn"), sel = document.getElementById("cvModule");
+      let opt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+      let gsel = document.getElementById("cvGroupPick"), groupChoice = gsel && gsel.value && gsel.value !== groupNow ? gsel.value : "";
+      btn.disabled = true; msg.textContent = "Sending the assignment to Canvas…";
+      try {
+        let r = await rpc("syncCanvasAssignment", Object.assign({ classId: backend.activeClassId, assignmentGroupId: groupChoice, dueAt: dateFieldValue_("cvDue", "23:59"), unlockAt: dateFieldValue_("cvUnlock", "00:00"),
+          lockAt: dateFieldValue_("cvLock", "23:59"), moduleId: sel ? sel.value : "", moduleName: opt ? opt.textContent.replace(/ · unpublished$/, "") : "" }, asgPayload_(asg)));
+        invalidateDashboardCache_();
+        await loadDashboard(backend.activeClassId, false);
+        await openCanvasAsgModal(asg);
+        render();
+        if (r && r.adopted) { let m2 = document.getElementById("asgModalMsg"); if (m2) m2.textContent = "Joined the Canvas assignment that already existed" + ((r.sharedWith || []).length ? " for " + r.sharedWith.join(", ") : "") + " instead of making a second one."; }
+      } catch (e) { msg.textContent = e.message; msg.classList.add("warn-note"); btn.disabled = false; }
+    };
+    let pushBtn = document.getElementById("pushFromModalBtn");
+    if (pushBtn) pushBtn.onclick = async () => {
+      pushBtn.disabled = true; msg.classList.remove("warn-note"); msg.textContent = "Saving your latest grades and comments…";
+      try {
+        await waitForTeacherSaves_();
+        msg.textContent = "Pushing " + name + "…";
+        msg.textContent = canvasPushSummary_(await rpc("pushCanvasGrades", Object.assign({ classId: backend.activeClassId }, asgPayload_(asg))));
+        invalidateDashboardCache_();
+      } catch (e) { msg.textContent = e.message; msg.classList.add("warn-note"); } finally { pushBtn.disabled = false; }
+    };
+  }
+  function canvasPushSummary_(res) {
+    let parts = [`Sent ${res.sent} score(s) to “${res.assignment.name}”, out of ${res.pointsPossible}.`];
+    if (res.feedbackPosted) parts.push(`Posted ${res.feedbackPosted} new or revised comment${res.feedbackPosted === 1 ? "" : "s"}.`);
+    if (res.feedbackSkipped) parts.push(`${res.feedbackSkipped} unchanged comment${res.feedbackSkipped === 1 ? " was" : "s were"} already there.`);
+    if (res.feedbackFailed && res.feedbackFailed.length) parts.push(`Comments couldn't be posted for: ${res.feedbackFailed.join(", ")}.`);
+    if (res.skipped && res.skipped.length) parts.push(`Left blank (nothing graded yet): ${res.skipped.join(", ")}.`);
+    if (res.unmatched && res.unmatched.length) parts.push(`No matching Canvas student for: ${res.unmatched.join(", ")} — check their Canvas login email.`);
+    if (res.unmarked && res.unmarked.length) parts.push(`Turned in but not graded yet (left blank): ${res.unmarked.join(", ")}.`);
+    if (res.adjusted && res.adjusted.length) parts.push(`Scaled to keep the same percentage: ${res.adjusted.join("; ")}.`);
+    if (res.pointsConflict) parts.push(res.pointsConflict);
+    return parts.join(" ");
+  }
+  async function pushAsg_(asg) {
+    if (backend.asgBusy[asg]) return;
+    setAsgBusy_(asg, true);
+    setAsgMsg_(asg, "Saving your latest grades and comments…");
+    try {
+      await waitForTeacherSaves_();
+      setAsgMsg_(asg, "Sending " + asgLabel_(asg) + " to Canvas…");
+      setAsgMsg_(asg, canvasPushSummary_(await rpc("pushCanvasGrades", Object.assign({ classId: backend.activeClassId }, asgPayload_(asg)))));
+      invalidateDashboardCache_();
+      loadDashboard(backend.activeClassId, false);
+    } catch (e) { setAsgMsg_(asg, "Canvas: " + (e.message || String(e))); }
+    finally { setAsgBusy_(asg, false); }
+  }
+  async function exportAsg_(asg) {
+    if (backend.asgBusy[asg]) return;
+    setAsgBusy_(asg, true);
+    setAsgMsg_(asg, "Preparing the CSV…");
+    try {
+      await waitForTeacherSaves_();
+      let res = await rpc("exportGradesCsv", Object.assign({ classId: backend.activeClassId }, asgPayload_(asg)));
+      downloadBlob_(new Blob([res.content], { type: "text/csv;charset=utf-8" }), res.filename);
+      let parts = [`Downloaded ${res.filename} (${res.sent} graded), out of ${res.pointsPossible}.`];
+      if (res.unmarked && res.unmarked.length) parts.push(`Turned in but not graded (left blank): ${res.unmarked.join(", ")}.`);
+      if (res.adjusted && res.adjusted.length) parts.push(`Scaled: ${res.adjusted.join("; ")}.`);
+      setAsgMsg_(asg, parts.join(" "));
+    } catch (e) { setAsgMsg_(asg, e.message); }
+    finally { setAsgBusy_(asg, false); }
+  }
+
+  // ===========================================================================
+  // Admin, View Work, bringing in old drafts
+  // ===========================================================================
+  admin = function () {
+    if (!backend.enabled || !backend.ready) return original.admin();
+    let rows = (backend.access || []).map((u) => `<div class="access-row"><div><strong>${esc(u.name || u.email)}</strong><small>${esc(u.email)} · ${esc(u.role)}</small></div><div class="${u.status === "active" ? "ok-text" : "bad-text"}">${esc(u.status)}</div><div>${u.role === "teacher" ? `<button type="button" class="btn btn-sm accessToggle" data-email="${esc(u.email)}" data-status="${u.status === "active" ? "revoked" : "active"}">${u.status === "active" ? "Revoke" : "Restore"}</button>` : ""}</div></div>`).join("");
+    return `<div class="page-head"><h1 class="page-title">Admin</h1><p class="page-sub">Only active teachers can create classes and see student work. Students enter with a teacher's class code.</p></div>
+      <section class="card"><h2 class="card-title">Authorize a teacher</h2><div class="name-fields"><div class="field"><label for="teacherEmail">Teacher email</label><input id="teacherEmail" type="email" placeholder="teacher@yourschool.org"></div><div class="field"><label for="teacherName">Name</label><input id="teacherName"></div></div><button type="button" class="btn btn-primary" id="addTeacherBtn">Grant access</button><p id="teacherAccessMsg" class="muted-note" role="status"></p></section>
+      <section class="card"><h2 class="card-title">Authorized accounts</h2>${rows || '<p class="muted-note">No teachers added yet.</p>'}</section>`;
+  };
+  async function openStudentWork(email) {
+    let root = document.getElementById("modalRoot");
+    root.innerHTML = `<div class="modal"><div class="modalbox wide"><h3>Loading…</h3></div></div>`;
+    try {
+      let r = await rpc("getStudentWork", { classId: backend.activeClassId, studentEmail: email });
+      normalizeGradeSummary_(r.gradeSummary);
+      let m = r.gradeSummary && r.gradeSummary.memoir;
+      let secs = (r.sections || []).map((s) => {
+        let rec = m && m.steps[s.key];
+        let score = rec ? (rec.excluded ? "Excluded" : hasScore_(rec.score) ? (rec.passFail ? (Number(rec.score) > 0 ? "Complete" : "Not complete") : rec.score + "/" + rec.possible) : rec.submitted ? "Turned in · not graded" : rec.draft ? "Draft" : "Not started") : "";
+        return `<section class="view-section" style="--acc:${pieceColor(s.key)}"><div class="view-head"><strong>${esc(s.label)}</strong><span class="chip">${esc(score)}</span><button type="button" class="link-btn gbJump" data-email="${esc(email)}" data-key="${s.key}">Grade this</button></div><div class="response-box">${s.text ? markedTextHtml_(s.text, ((s.process || {}).spans || []).filter((x) => x[2] === "p" || x[2] === "q").map((x) => [x[0], x[1], x[2] === "p" ? "paste-outside" : "paste-own", ""])) : "<em>Not written yet.</em>"}</div>${processStatsHtml_(s.text, s.process, { cadence: s.cadence, leadPaste: s.key === "lead" })}</section>`;
+      }).join("");
+      let posts = (r.posts || []).map((p) => `<div class="response-box"><div class="resp-label">${p.kind === "post" ? "Lead Share post" : "Reply to " + esc(p.to || "a classmate")} · ${esc(shortDate_(p.date))}</div><p>${esc(p.text)}</p></div>`).join("") || '<p class="muted-note">Nothing on the Lead Share board yet.</p>';
+      let fin = m ? m.finalTotal : null;
+      root.innerHTML = `<div class="modal"><div class="modalbox wide" role="dialog" aria-modal="true" aria-labelledby="vwTitle"><div class="view-top"><div><div class="eyebrow">View work</div><h3 id="vwTitle">${esc(r.student.name)}</h3><small class="muted-note">${esc(r.student.email)}${r.updatedAt ? " · last saved " + esc(new Date(r.updatedAt).toLocaleString()) : ""}</small></div><button type="button" class="btn modal-dismiss" id="closeView">Close</button></div>
+        ${secs}<h4 class="sub-title">Lead Share board</h4>${posts}
+        <h4 class="sub-title">Final Memoir &amp; Poster</h4><p class="muted-note">Final: ${fin ? (fin.hasAnyResult ? fin.earned + "/" + fin.possible : fin.submitted ? "turned in, not graded yet" : "not turned in") : "—"} · Poster: ${r.poster ? "turned in — “" + esc(r.poster.title || "Untitled") + "”" : "not turned in"}</p></div></div>`;
+      document.getElementById("closeView").onclick = () => (root.innerHTML = "");
+      root.querySelectorAll(".gbJump").forEach((b) => (b.onclick = () => { root.innerHTML = ""; openGradeAt_(b.dataset.key, b.dataset.email); }));
+    } catch (e) {
+      root.innerHTML = `<div class="modal"><div class="modalbox"><h3>Couldn't load that student's work</h3><p class="warn-note">${esc(e.message)}</p><div class="modal-actions"><button type="button" class="btn modal-dismiss" id="closeView">Close</button></div></div></div>`;
+      document.getElementById("closeView").onclick = () => (root.innerHTML = "");
+    }
+  }
+  function openLegacyImport_() {
+    let root = document.getElementById("modalRoot");
+    root.innerHTML = `<div class="modal"><div class="modalbox wide" role="dialog" aria-modal="true" aria-labelledby="lgTitle"><h3 id="lgTitle">Bring in drafts from the old Memoir tool</h3>
+      <p class="muted-note">Paste the link to the old tool's spreadsheet (“Memoir Data”). For each student enrolled in this class, their old Lead, Beginning, Rising Action, Callback, Climax and So What?, their highlights and checklist, and their poster title come across — but <strong>only for students who haven't written anything in this app yet</strong>. Nothing already here is ever overwritten.</p>
+      <div class="field"><label for="legacySource">Old spreadsheet link</label><input id="legacySource" placeholder="https://docs.google.com/spreadsheets/d/…"></div>
+      <p id="legacyMsg" class="muted-note" role="status"></p>
+      <div class="modal-actions"><button type="button" class="btn modal-dismiss" id="closeLegacy">Close</button><button type="button" class="btn btn-primary" id="runLegacy">Bring drafts in</button></div></div></div>`;
+    document.getElementById("closeLegacy").onclick = () => (root.innerHTML = "");
+    document.getElementById("runLegacy").onclick = async () => {
+      let btn = document.getElementById("runLegacy"), msg = document.getElementById("legacyMsg");
+      btn.disabled = true; msg.textContent = "Reading the old spreadsheet…";
+      try {
+        let r = await rpc("importLegacyMemoirDrafts", { classId: backend.activeClassId, source: document.getElementById("legacySource").value });
+        msg.innerHTML = `Brought in ${r.imported.length} draft${r.imported.length === 1 ? "" : "s"}${r.imported.length ? ": " + esc(r.imported.join(", ")) : ""}.` +
+          (r.hasWork.length ? `<br>Left alone because they've already started here: ${esc(r.hasWork.join(", "))}.` : "") +
+          (r.notFound.length ? `<br>Not in the old sheet: ${esc(r.notFound.join(", "))}.` : "");
+        invalidateDashboardCache_();
+        loadDashboard(backend.activeClassId, false);
+      } catch (e) { msg.textContent = e.message; btn.disabled = false; }
+    };
+  }
+  function openGradeAt_(key, email) {
+    backend.gradeKey = key;
+    backend.gradeFocusEmail = email || "";
+    state.view = "grade";
+    save();
+    render();
+    window.scrollTo(0, 0);
+    loadGradeRows_(key);
+  }
+
+  // ===========================================================================
+  // Student-side calls: coach, Lead Share, poster, refresh
+  // ===========================================================================
+  async function askCoach_(btn) {
+    let key = btn.dataset.stage;
+    let text = stageText_(key).trim();
+    if (!text) return showToast("Write something first, then ask the coach.");
+    btn.disabled = true;
+    let body = document.getElementById("coachBody");
+    let before = body ? body.innerHTML : "";
+    if (body) body.innerHTML = `<p class="coach-empty"><span class="spinner" aria-hidden="true"></span> Reading your ${esc(STAGE_BY_KEY[key].label)}…</p>`;
+    try {
+      let res = await rpc("getCoachFeedback", { classId: backend.activeClassId, stageKey: key, text });
+      if (!res || !res.ok) throw new Error((res && res.error) || "The coach couldn't answer right now.");
+      state.memoir.coach[key] = (state.memoir.coach[key] || []).concat([{ at: res.at || new Date().toISOString(), text: res.feedback }]).slice(-5);
+      save();
+      let card = document.getElementById("coachCard");
+      if (card) { card.outerHTML = coachCardHtml_(key); bindBackend(); }
+      if (typeof res.left === "number" && res.left <= 3) showToast(res.left + " coach request" + (res.left === 1 ? "" : "s") + " left today.");
+    } catch (e) {
+      if (body) body.innerHTML = before + `<p class="coach-error">${esc(e.message)}</p>`;
+    } finally { let b = document.getElementById("coachBtn"); if (b) b.disabled = false; }
+  }
+  function setDiscussion_(list) { backend.discussion = list || []; }
+  async function refreshShare_() {
+    try { setDiscussion_((await rpc("getLeadShare", { classId: backend.activeClassId })).discussion); renderKeepScroll_(); }
+    catch (e) { showToast(e.message, "warn"); }
+  }
+  async function loadSavedPoster_() {
+    let wrap = document.getElementById("posterPreview");
+    if (!wrap || !backend.poster || !backend.poster.savedAt || posterDrawn_) return;
+    try {
+      let p = backend.posterImage;
+      if (!p || p.savedAt !== backend.poster.savedAt) { p = (await rpc("getMyPoster", { classId: backend.activeClassId })).poster; backend.posterImage = p; }
+      let live = document.getElementById("posterPreview");
+      if (!live || posterDrawn_) return;
+      if (!p) { live.innerHTML = `<div class="poster-empty"><p>Your poster appears here.</p></div>`; return; }
+      live.innerHTML = `<figure class="saved-poster"><img src="data:${esc(safeImgType_(p.mimeType))};base64,${safeB64_(p.image)}" alt="Your memoir poster, ${esc(p.title || "untitled")}"><figcaption class="muted-note">The poster you turned in. Make a new version any time with the buttons on the left, then turn it in again.</figcaption></figure>`;
+      let dl = document.getElementById("downloadPosterBtn");
+      if (dl) { dl.disabled = false; dl.onclick = () => { fetch("data:" + safeImgType_(p.mimeType) + ";base64," + safeB64_(p.image)).then((r) => r.blob()).then((b) => downloadBlob_(b, "memoir-poster.jpg")); }; }
+    } catch (e) { console.warn(e); }
+  }
+
+  function b64ToBlob_(b64, type) {
+    let bin = atob(b64), len = bin.length, bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i++) bytes[i] = bin.charCodeAt(i);
+    return new Blob([bytes], { type: type || "application/octet-stream" });
+  }
+  function studentConnected_() { return backend.enabled && backend.ready && backend.user && backend.user.role === "student" && !!backend.activeClassId; }
+
+  // A turn-in is shown as turned in only after the account confirms it. If the
+  // save can't be confirmed, the local "turned in" mark is taken back.
+  const originalBindTurnIn = bindTurnIn_;
+  bindTurnIn_ = function () {
+    if (!studentConnected_()) return originalBindTurnIn();
+    let t = document.getElementById("turnInBtn");
+    if (!t) return;
+    t.onclick = async () => {
+      let key = t.dataset.stage;
+      if (!submissionOf_(key).text) return showToast("Write something first, then turn it in.");
+      let prior = state.memoir.submissions[key] ? JSON.parse(JSON.stringify(state.memoir.submissions[key])) : null;
+      markSubmitted_(key);
+      t.disabled = true; t.textContent = "Turning in…";
+      try {
+        await forceStudentSaveNow_();
+        renderKeepScroll_();
+        showToast(STAGE_BY_KEY[key].label + " turned in. You can keep revising — turn it in again if you change it.");
+      } catch (e) {
+        if (prior) state.memoir.submissions[key] = prior; else delete state.memoir.submissions[key];
+        safeLSSet(localKey(), JSON.stringify(state));
+        renderKeepScroll_();
+        alert(e.message || String(e));
+      }
+    };
+  };
+
+  function bindStudentBackend_() {
+    if (!studentConnected_() && !(backend.ready && backend.user && backend.user.role !== "student")) return;
+    let coach = document.getElementById("coachBtn");
+    if (coach && backend.activeClassId) coach.onclick = () => askCoach_(coach);
+    if (!studentConnected_()) return;
+    bindTurnIn_();
+    let tf = document.getElementById("turnInFinalBtn");
+    if (tf) tf.onclick = async () => {
+      if (!assembledText_()) return showToast("Write your memoir first.");
+      let prior = state.memoir.submissions.final ? JSON.parse(JSON.stringify(state.memoir.submissions.final)) : null;
+      markSubmitted_(MEMOIR_FINAL_KEY);
+      tf.disabled = true; tf.textContent = "Turning in…";
+      try { await forceStudentSaveNow_(); renderKeepScroll_(); showToast("Final Memoir turned in."); }
+      catch (e) {
+        if (prior) state.memoir.submissions.final = prior; else delete state.memoir.submissions.final;
+        safeLSSet(localKey(), JSON.stringify(state));
+        renderKeepScroll_();
+        alert(e.message || String(e));
+      }
+    };
+    let post = document.getElementById("postLeadBtn");
+    if (post) post.onclick = async () => {
+      let text = stageText_("lead").trim();
+      if (!text) return;
+      post.disabled = true; post.textContent = "Posting…";
+      try { setDiscussion_((await rpc("postLeadShare", { classId: backend.activeClassId, text })).discussion); renderKeepScroll_(); showToast("Your Lead is on the board."); }
+      catch (e) { alert(e.message); post.disabled = false; post.textContent = "Post my Lead to the board"; }
+    };
+    document.querySelectorAll(".replySubmit").forEach((b) => (b.onclick = async () => {
+      let ta = b.closest(".reply-compose").querySelector("textarea");
+      let text = ta ? ta.value.trim() : "";
+      if (!text) { if (ta) ta.focus(); return; }
+      b.disabled = true; b.textContent = "Posting…";
+      try { setDiscussion_((await rpc("postLeadShareReply", { classId: backend.activeClassId, postId: b.dataset.postid, text })).discussion); renderKeepScroll_(); }
+      catch (e) { alert(e.message); b.disabled = false; b.textContent = "Post reply"; }
+    }));
+    let rf = document.getElementById("refreshShareBtn");
+    if (rf) rf.onclick = refreshShare_;
+    let rm = document.getElementById("refreshMyWork");
+    if (rm) rm.onclick = async () => {
+      rm.disabled = true;
+      try {
+        await forceStudentSaveNow_();
+        let r = await rpc("getStudentStateRefresh", { classId: backend.activeClassId });
+        let view = state.view;
+        state = normalizeAppState_(r.state || {});
+        state.role = "student"; state.view = view;
+        applyClassSettings_(r.classSettings || {});
+        let k = currentClass(); if (k) state.className = k.className;
+        backend.serverUpdatedAt = r.stateUpdatedAt || backend.serverUpdatedAt;
+        setDiscussion_(r.discussion);
+        backend.gradeSummary = normalizeGradeSummary_(r.gradeSummary);
+        backend.poster = r.poster || null;
+        safeLSSet(localKey(), JSON.stringify(state));
+        render();
+        showToast("Up to date.");
+      } catch (e) { alert("Couldn't refresh: " + (e.message || String(e))); rm.disabled = false; }
+    };
+    // ---- Poster ----
+    let st = document.getElementById("suggestTitleBtn");
+    if (st) st.onclick = async () => {
+      let text = assembledText_();
+      if (!text) return setPosterStatus_("Write some of your memoir first, then ask for a title idea.", "bad");
+      st.disabled = true;
+      setPosterStatus_("Thinking of a title…");
+      try {
+        let res = await rpc("getPosterTitle", { classId: backend.activeClassId, text });
+        if (!res || !res.ok) throw new Error((res && res.error) || "No title came back — try again.");
+        state.memoir.poster.title = res.title;
+        let inp = document.getElementById("posterTitle"); if (inp) inp.value = res.title;
+        save();
+        setPosterStatus_("Suggested: “" + res.title + "”. Keep it, edit it, or type your own.", "ok");
+        if (posterDrawn_) drawPoster_(posterBg_);
+      } catch (e) { setPosterStatus_(e.message, "bad"); }
+      finally { let b = document.getElementById("suggestTitleBtn"); if (b) b.disabled = false; }
+    };
+    let paint = document.getElementById("paintBtn");
+    if (paint) paint.onclick = async () => {
+      if (backend.paintCooldownUntil && Date.now() < backend.paintCooldownUntil) return setPosterStatus_("The free art service needs about 15 seconds between pictures.", "bad");
+      paint.disabled = true;
+      setPosterStatus_("Painting your background… this can take up to 30 seconds.");
+      try {
+        let res = await rpc("getPosterBackground", { classId: backend.activeClassId, hint: state.memoir.poster.hint || "" });
+        if (!res || !res.ok) throw new Error((res && res.error) || "The art service didn't answer — try again, or use a plain background.");
+        await new Promise((resolve, reject) => {
+          let img = new Image();
+          img.onload = () => { posterBg_ = img; resolve(); };
+          img.onerror = () => reject(new Error("A picture came back but couldn't be opened — try again."));
+          img.src = "data:" + (res.mimeType || "image/jpeg") + ";base64," + res.imageBase64;
+        });
+        await drawPoster_(posterBg_);
+        setPosterStatus_("Here's your poster. Change the title or name and it updates.", "ok");
+      } catch (e) { setPosterStatus_(e.message, "bad"); }
+      finally {
+        backend.paintCooldownUntil = Date.now() + 15000;
+        let b = document.getElementById("paintBtn");
+        if (b) { b.disabled = true; setTimeout(() => { let bb = document.getElementById("paintBtn"); if (bb) bb.disabled = false; }, 15000); }
+      }
+    };
+    let tp = document.getElementById("turnInPosterBtn");
+    if (tp) tp.onclick = async () => {
+      if (!posterDrawn_) return setPosterStatus_("Make your poster first.", "bad");
+      let jpg = posterJpeg_();
+      if (!jpg) return setPosterStatus_("That poster is too big to store. Try shortening the title or removing extra blank lines.", "bad");
+      tp.disabled = true;
+      setPosterStatus_("Turning in your poster…");
+      try {
+        let res = await rpc("saveMyPoster", Object.assign({ classId: backend.activeClassId, title: state.memoir.poster.title || "", author: state.memoir.poster.author || "" }, jpg));
+        backend.poster = { title: state.memoir.poster.title || "", author: state.memoir.poster.author || "", savedAt: res.savedAt };
+        backend.posterImage = Object.assign({}, jpg, backend.poster);
+        state.memoir.poster.savedAt = res.savedAt;
+        save();
+        let area = document.querySelector(".poster-turnin");
+        if (area) area.innerHTML = statusChip_(pieceStatus_(MEMOIR_POSTER_KEY)) + `<span class="muted-note">Turned in just now</span>`;
+        sidebar();
+        setPosterStatus_("Poster turned in. Your teacher can see it, and it'll be here next time you open this page.", "ok");
+      } catch (e) { setPosterStatus_(e.message, "bad"); }
+      finally { let b = document.getElementById("turnInPosterBtn"); if (b) b.disabled = false; }
+    };
+  }
+
+  // ===========================================================================
+  // render / bind
+  // ===========================================================================
+  render = function () {
+    if (backend.enabled && backend.ready && backend.user && backend.user.role === "student" && !backend.activeClassId) {
+      document.getElementById("sidebar").innerHTML = "";
+      document.getElementById("app").innerHTML = studentJoinView();
+      document.body.dataset.view = "join";
+      setAccountHeader(); bindBackend();
+      return;
+    }
+    if (backend.enabled && backend.ready && backend.user && backend.user.role === "student" && backend.needsName) {
+      document.getElementById("sidebar").innerHTML = "";
+      document.getElementById("app").innerHTML = confirmNameView();
+      document.body.dataset.view = "join";
+      setAccountHeader(); bindBackend();
+      return;
+    }
+    // A Push or CSV result in a tile survives a redraw of the SAME class's
+    // dashboard; it never follows the teacher into a different class.
+    let notes = {}, oldMount = document.getElementById("gradingHubTiles");
+    let notesClass = oldMount ? oldMount.dataset.class : "";
+    if (oldMount && state.view === "manage") oldMount.querySelectorAll(".tile-msg").forEach((m) => { if (m.textContent.trim()) notes[m.id] = m.textContent; });
+    if (backend.enabled && backend.ready && backend.user) state.role = backend.user.role;
+    original.render();
+    if (state.view === "manage" && notesClass && notesClass === backend.activeClassId)
+      Object.keys(notes).forEach((id) => { let m = document.getElementById(id); if (m) m.textContent = notes[id]; });
+    if (!(backend.enabled && backend.ready && backend.user)) return;
+    setAccountHeader();
+    paintSaveState_();
+    if (backend.user.role !== "student" && backend.activeClassId) {
+      // However the teacher gets back to the dashboard -- the button, the
+      // browser's Back, or the sidebar -- counts that grading made stale are
+      // refetched, after any score still crossing to the server has landed.
+      if (state.view === "manage") {
+        let id = backend.activeClassId;
+        let hubStale = !backend.gradingHubCache[id];
+        let dashStale = !!backend.dashboard && !backend.dashboardCache[id];
+        if (hubStale || dashStale) waitForTeacherSaves_().then(() => { if (hubStale) loadGradingHub(id, true); if (dashStale) refreshDashboardQuietly_(id); });
+      }
+      if (state.view === "share" && backend.shareLoadedFor !== backend.activeClassId) {
+        backend.shareLoadedFor = backend.activeClassId;
+        refreshShare_();
+      }
+      if (state.view === "grade") { loadPosterThumbs_(); setTimeout(focusGradeStudent_, 60); }
+    }
+    if (studentConnected_() && state.view === "poster") loadSavedPoster_();
+    // Your Grades always shows the latest: fetched each time the page is opened.
+    if (studentConnected_() && state.view === "grades" && backend.lastRenderedView !== "grades") refreshMyGrades_();
+    backend.lastRenderedView = state.view;
+  };
+  async function refreshMyGrades_() {
+    try {
+      let r = await rpc("getMyGrades", { classId: backend.activeClassId });
+      backend.gradeSummary = normalizeGradeSummary_(r.gradeSummary);
+      if (state.view === "grades") renderKeepScroll_();
+      else sidebar();
+    } catch (e) { console.warn("Couldn't refresh grades", e); }
+  }
+  bind = function () {
+    original.bind();
+    if (!backend.enabled || !backend.ready) return;
+    bindStudentBackend_();
+    bindBackend();
+  };
+  let commentTimers = {};
+  function bindBackend() {
+    let q = (sel) => Array.from(document.querySelectorAll(sel));
+    let byId = (id) => document.getElementById(id);
+    if (byId("joinClassBtn")) byId("joinClassBtn").onclick = joinCurrent;
+    if (byId("joinCode")) byId("joinCode").onkeydown = (e) => { if (e.key === "Enter") joinCurrent(); };
+    if (byId("confirmNameBtn")) byId("confirmNameBtn").onclick = confirmNameCurrent;
+    if (byId("createClassBtn")) byId("createClassBtn").onclick = createNewClass;
+    if (byId("toggleNewClass")) byId("toggleNewClass").onclick = () => byId("newClassPanel").classList.toggle("hide");
+    q(".class-pill").forEach((b) => (b.onclick = () => { backend.gradeCache = {}; backend.shareLoadedFor = ""; loadDashboard(b.dataset.classid); }));
+    q(".classEditBtn").forEach((b) => (b.onclick = () => openEditClass(b.dataset.classid)));
+    if (byId("openCanvasSetup")) byId("openCanvasSetup").onclick = openCanvasSetupModal;
+    // ---- Canvas setup ----
+    if (byId("canvasConnectBtn")) byId("canvasConnectBtn").onclick = async () => {
+      canvasMsg_("Checking the token with Canvas…");
+      try { await rpc("saveCanvasConnection", { baseUrl: byId("canvasBaseUrl").value, token: byId("canvasToken").value }); canvasMsg_("Connected."); await loadCanvasStatus(true); }
+      catch (e) { canvasMsg_(e.message, true); }
+    };
+    if (byId("canvasDisconnectBtn")) byId("canvasDisconnectBtn").onclick = async () => {
+      if (!confirm("Disconnect Canvas for your account? Assignments already in Canvas and their grades stay there.")) return;
+      try { await rpc("clearCanvasConnection"); backend.canvas = null; await loadCanvasStatus(true); } catch (e) { canvasMsg_(e.message, true); }
+    };
+    if (byId("canvasCourseSelect")) byId("canvasCourseSelect").onchange = async (e) => {
+      let courseId = e.target.value;
+      backend.canvas.groups = [];
+      if (courseId) { try { backend.canvas.groups = (await rpc("listCanvasAssignmentGroups", { courseId })).groups || []; } catch (err) { canvasMsg_(err.message, true); } }
+      let g = byId("canvasGroupSelect");
+      if (g) g.innerHTML = `<option value="">Course default</option>` + backend.canvas.groups.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");
+    };
+    if (byId("canvasLinkBtn")) byId("canvasLinkBtn").onclick = async () => {
+      let courseId = byId("canvasCourseSelect").value;
+      if (!courseId) return canvasMsg_("Choose a course first.", true);
+      canvasMsg_("Linking…");
+      try {
+        let r = await rpc("linkCanvasCourse", { classId: backend.activeClassId, courseId, assignmentGroupId: byId("canvasGroupSelect").value });
+        if (backend.dashboard) backend.dashboard.settings.canvas = r.canvas;
+        invalidateDashboardCache_();
+        await loadDashboard(backend.activeClassId, true);
+        let body = byId("canvasSetupBody"); if (body) body.innerHTML = canvasSetupBody_();
+        canvasMsg_("Linked. Push from any grading tile.");
+        bindBackend();
+      } catch (e) { canvasMsg_(e.message, true); }
+    };
+    if (byId("canvasUnlinkBtn")) byId("canvasUnlinkBtn").onclick = async () => {
+      if (!confirm("Unlink this class from its Canvas course? Nothing in Canvas is deleted.")) return;
+      try { let r = await rpc("unlinkCanvasCourse", { classId: backend.activeClassId }); if (backend.dashboard) backend.dashboard.settings.canvas = r.canvas; invalidateDashboardCache_(); await loadDashboard(backend.activeClassId, true); let body = byId("canvasSetupBody"); if (body) body.innerHTML = canvasSetupBody_(); bindBackend(); }
+      catch (e) { canvasMsg_(e.message, true); }
+    };
+    // ---- Tiles ----
+    if (byId("refreshHub")) byId("refreshHub").onclick = async () => { await waitForTeacherSaves_(); loadGradingHub(backend.activeClassId, true); refreshDashboardQuietly_(backend.activeClassId); };
+    q("[data-hubopen]").forEach((b) => (b.onclick = () => openGradeAt_(b.dataset.hubopen)));
+    q(".pushAsgBtn").forEach((b) => (b.onclick = () => pushAsg_(b.dataset.asg)));
+    q(".hubCanvasBtn").forEach((b) => (b.onclick = () => { let d = b.closest("details"); if (d) d.open = false; canvasLinked_() ? openCanvasAsgModal(b.dataset.asg) : openCanvasSetupModal(); }));
+    q(".exportAsgBtn").forEach((b) => (b.onclick = () => { let d = b.closest("details"); if (d) d.open = false; exportAsg_(b.dataset.asg); }));
+    q(".pieceNoGradeBtn").forEach((b) => (b.onclick = async () => {
+      let key = b.dataset.key, label = MEMOIR_GRADE_LABELS[key];
+      let excluding = !b.classList.contains("is-excluded");
+      if (excluding && !confirm(`Leave ${label} out of every student's grade in this class? Scores you've entered are kept, and "Count it again" brings them all back.`)) return;
+      let d = b.closest("details"); if (d) d.open = false;
+      setAsgMsg_(asgKey_(key), excluding ? "Leaving it out for everyone…" : "Counting it again…");
+      try {
+        await rpc("setGradeItemForClass", key === MEMOIR_FINAL_KEY ? { classId: backend.activeClassId, memoirFinal: true, excluded: excluding } : { classId: backend.activeClassId, itemType: "memoir", itemKey: key, excluded: excluding });
+        delete backend.gradeCache[gradeCacheKey_(backend.activeClassId, key)];
+        invalidateDashboardCache_();
+        await loadGradingHub(backend.activeClassId, true);
+        refreshDashboardQuietly_(backend.activeClassId);
+      } catch (e) { setAsgMsg_(asgKey_(key), e.message); }
+    }));
+    q(".gbJump").forEach((b) => (b.onclick = () => openGradeAt_(b.dataset.key, b.dataset.email)));
+    let roster = byId("rosterCard");
+    if (roster) roster.ontoggle = () => (backend.rosterOpen = roster.open);
+    q(".viewStudent").forEach((b) => (b.onclick = () => openStudentWork(b.dataset.email)));
+    if (byId("importLegacyBtn")) byId("importLegacyBtn").onclick = openLegacyImport_;
+    if (byId("refreshRoster")) byId("refreshRoster").onclick = () => { invalidateDashboardCache_(); loadDashboard(backend.activeClassId); };
+    // ---- Grade the Memoir ----
+    if (byId("backToDashboard")) byId("backToDashboard").onclick = async () => { await waitForTeacherSaves_(); delete backend.gradingHubCache[backend.activeClassId]; go_("manage"); };
+    if (byId("refreshGrade")) byId("refreshGrade").onclick = async () => { await waitForTeacherSaves_(); loadGradeRows_(gradeKey_(), true); };
+    if (byId("gradeSelect")) byId("gradeSelect").onchange = (e) => { backend.gradeKey = e.target.value; render(); loadGradeRows_(e.target.value); };
+    if (byId("hideUnsubmitted")) byId("hideUnsubmitted").onchange = (e) => { backend.hideUnsubmitted = e.target.checked; refreshGradeView_(); };
+    if (byId("excludeAllBtn")) byId("excludeAllBtn").onclick = toggleExcludeForClass_;
+    if (byId("markPaste")) byId("markPaste").onclick = () => { backend.markView = "paste"; refreshGradeView_(); };
+    if (byId("markCadence")) byId("markCadence").onclick = () => { backend.markView = "cadence"; refreshGradeView_(); };
+    q(".pieceScoreBtn,.pieceCompleteBtn").forEach((b) => (b.onclick = () => {
+      let email = b.dataset.email, score = Number(b.dataset.score);
+      applyPiece_(email, { score }); updatePieceRow_(email); savePiece_(email, { score });
+    }));
+    q(".pieceManualScore").forEach((inp) => (inp.onchange = () => {
+      let email = inp.dataset.email, v = readScoreInput_(inp, pieceMax_());
+      if (v === undefined) return;
+      applyPiece_(email, { score: v }); updatePieceRow_(email); savePiece_(email, { score: v });
+    }));
+    q(".pieceExcludeToggle").forEach((c) => (c.onchange = () => { let email = c.dataset.email; applyPiece_(email, { excluded: c.checked }); updatePieceRow_(email); savePiece_(email, { excluded: c.checked }); }));
+    q(".pieceKeepBtn").forEach((b) => (b.onclick = () => { let email = b.dataset.email, r = gradeRow_(email); if (!r) return; applyPiece_(email, { score: r.teacherScore }); updatePieceRow_(email); savePiece_(email, { score: r.teacherScore }); }));
+    q(".pieceComment").forEach((t) => {
+      let flush = () => { clearTimeout(commentTimers[t.id]); let r = gradeRow_(t.dataset.email); if (!r || r.comment === t.value) return; applyPiece_(t.dataset.email, { comment: t.value }); savePiece_(t.dataset.email, { comment: t.value }); };
+      t.oninput = () => { clearTimeout(commentTimers[t.id]); commentTimers[t.id] = setTimeout(flush, 1400); };
+      t.onchange = flush;
+    });
+    q(".critScoreBtn").forEach((b) => (b.onclick = () => {
+      let email = b.dataset.email, crit = b.dataset.crit, score = Number(b.dataset.score), r = gradeRow_(email);
+      if (!r) return;
+      Object.assign(r.criteria[crit], { teacherScore: score, score, pending: false });
+      recomputeFinal_(r); updateFinalRow_(email); saveCrit_(email, crit, { score });
+    }));
+    q(".critExcludeToggle").forEach((c) => (c.onchange = () => {
+      let email = c.dataset.email, crit = c.dataset.crit, r = gradeRow_(email);
+      if (!r) return;
+      r.criteria[crit].excluded = c.checked;
+      recomputeFinal_(r); updateFinalRow_(email); saveCrit_(email, crit, { excluded: c.checked });
+    }));
+    q(".critComment").forEach((t) => {
+      let flush = () => { clearTimeout(commentTimers[t.id]); let r = gradeRow_(t.dataset.email); if (!r) return; let rec = r.criteria[t.dataset.crit]; if (rec.comment === t.value) return; rec.comment = t.value; saveCrit_(t.dataset.email, t.dataset.crit, { comment: t.value }); };
+      t.oninput = () => { clearTimeout(commentTimers[t.id]); commentTimers[t.id] = setTimeout(flush, 1400); };
+      t.onchange = flush;
+    });
+    // ---- Admin ----
+    if (byId("addTeacherBtn")) byId("addTeacherBtn").onclick = async () => {
+      let msg = byId("teacherAccessMsg"); msg.textContent = "Saving…";
+      try { backend.access = (await rpc("adminAddTeacher", { email: byId("teacherEmail").value, name: byId("teacherName").value })).access || []; render(); }
+      catch (e) { msg.textContent = e.message; }
+    };
+    q(".accessToggle").forEach((b) => (b.onclick = async () => {
+      b.disabled = true;
+      try { backend.access = (await rpc("adminSetAccess", { email: b.dataset.email, status: b.dataset.status })).access || []; render(); }
+      catch (e) { alert(e.message); b.disabled = false; }
+    }));
+    // ---- Lead Share moderation ----
+    q(".removeShareItem").forEach((b) => (b.onclick = async () => {
+      if (!confirm(b.dataset.kind === "post" ? "Remove this post and every reply under it? This can't be undone." : "Remove this reply? This can't be undone.")) return;
+      try { setDiscussion_((await rpc("removeLeadShareItem", { classId: backend.activeClassId, kind: b.dataset.kind, id: b.dataset.id })).discussion); renderKeepScroll_(); }
+      catch (e) { alert(e.message); }
+    }));
+  }
+  // Close an open ⋯ menu when the teacher clicks anywhere else.
+  document.addEventListener("click", (e) => {
+    document.querySelectorAll(".tile-more[open]").forEach((d) => { if (!d.contains(e.target)) d.open = false; });
+  });
+
+  __MB.BackendClient = 'ok';
+  if (backend.enabled) bootstrap();
+  else render();
+})();
+</script>

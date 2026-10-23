@@ -1,0 +1,3093 @@
+<script>
+window.__MB = window.__MB || {}; __MB.BackendClient = 'started';
+window.addEventListener("error", function (event) {
+  try {
+    const app = document.getElementById("app");
+    if (app && !window.GATSBY_BACKEND?.ready) {
+      app.innerHTML =
+        '<div class="card"><h2>The Great Gatsby could not finish loading</h2><p>' +
+        String(event.message || "A browser error occurred.") +
+        '</p><p class="toolbar-note">Open the Apps Script deployment in a new tab and make sure you are signed into the Google account allowed by the deployment.</p></div>';
+    }
+  } catch (e) {}
+});
+(function () {
+  if (typeof save !== "function" || typeof render !== "function" || typeof bind !== "function") {
+    const appRoot = document.getElementById("app");
+    if (appRoot)
+      appRoot.innerHTML =
+        '<div class="card"><h2>The Great Gatsby could not start</h2><p>AppLogic.html did not load. Check the Apps Script includes in Index.html.</p></div>';
+    return;
+  }
+  const backend = {
+    enabled: typeof google !== "undefined" && google.script && google.script.run,
+    ready: false,
+    user: null,
+    classes: [],
+    activeClassId: "",
+    dashboard: null,
+    access: [],
+    discussion: [],
+    saveTimer: null,
+    saveRetryTimer: null,
+    saveInFlight: false,
+    saveDirty: false,
+    saveFails: 0,
+    serverUpdatedAt: "",
+    saving: false,
+    lastSaved: "",
+    studentDetail: null,
+    dashboardCache: {},
+    sceneResponseCache: {},
+    sceneResponsePending: {},
+    batchSceneKey: "",
+    batchHideUnsubmitted: false,
+    essayResponseCache: {},
+    essayResponsePending: {},
+    essayStepKey: "",
+    gradingHub: null,
+    gradingHubCache: {},
+    gradingHubPending: {},
+    rosterOpen: false,
+    needsName: false,
+    canvas: null,
+  };
+  window.GATSBY_BACKEND = backend;
+  // Test hook: lets the Act-total arithmetic here be compared against the
+  // server's on the same data, which is how the two are kept from drifting.
+  backend.__recompute = function (gs) { return recomputeActTotals(gs); };
+  backend.__isoFromLocal = function (v) { return isoFromLocalInput_(v); };
+  backend.__localFromIso = function (v) { return localInputFromIso_(v); };
+  const original = { save, render, bind, manage, admin, discussion, batchGrade, essayGrade };
+
+  const backendCss = document.createElement("style");
+  backendCss.textContent = `
+  .account-pill{display:flex;align-items:center;gap:10px;background:#ffffff14;border:1px solid #ffffff26;border-radius:999px;padding:6px 10px;font-size:13px}.account-role{font-weight:850;text-transform:capitalize}.sync-dot{width:8px;height:8px;border-radius:50%;background:#90e0c5}.sync-dot.saving{background:#ffe27a}.sync-dot.error{background:#e07a7a;box-shadow:0 0 0 3px #e07a7a33}.save-toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:80;max-width:min(560px,calc(100vw - 32px));display:flex;flex-direction:column;gap:3px;background:#fff;border:1px solid #c9ded3;border-left:5px solid #4f765d;border-radius:12px;padding:12px 16px;box-shadow:0 10px 30px rgba(20,32,47,.18);font-size:13.5px}.save-toast strong{font-size:14px}.save-toast span{color:var(--muted);line-height:1.45}.save-toast .btn{align-self:flex-start;margin-top:7px;font-size:12px;padding:5px 11px}.save-toast.warn{border-color:#ead8a9;border-left-color:#c98a00;background:#fff8e8}.save-toast.warn span{color:#6b4d16}.backend-banner{display:flex;justify-content:space-between;gap:14px;align-items:center;background:#f0f7f4;border:1px solid #c9ded3;border-radius:12px;padding:12px 14px;margin:0 0 16px}.backend-banner.warn{background:#fff8e8;border-color:#ead8a9}.class-list{display:grid;gap:8px}.class-choice{border:1px solid var(--line);background:#fff;border-radius:10px;padding:12px;text-align:left;cursor:pointer}.class-choice.active{border:2px solid var(--wine);background:#fff7f8}.class-switch-row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 16px;padding-bottom:14px;border-bottom:1px solid var(--line)}.class-pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:9px 16px;cursor:pointer;font-weight:750}.class-pill.active{background:var(--wine);color:#fff;border-color:var(--wine)}.class-pill-wrap{display:inline-flex;align-items:center;gap:3px}.pill-icon-btn{border:1px solid var(--line);background:#fff;width:30px;height:30px;border-radius:8px;cursor:pointer;font-size:13px;padding:0;line-height:1}.pill-icon-btn:hover{border-color:var(--wine)}.classDeleteBtn.confirm-armed{background:#fdeceb;border-color:#b3261e;color:#8c1d17;font-weight:800;width:auto;padding:0 10px}#newClassPanel{margin-bottom:16px;max-width:420px}.student-nav{display:flex;gap:8px;align-items:center}.student-nav .btn[disabled]{opacity:.4;cursor:not-allowed}.join-card{max-width:620px;margin:50px auto}.name-fields{display:grid;grid-template-columns:1fr 1fr;gap:12px}@media(max-width:520px){.name-fields{grid-template-columns:1fr}}.field{display:grid;gap:6px;margin:12px 0}.field input,.field select{width:100%;padding:10px 12px;border:1px solid #cfc6b8;border-radius:9px;background:#fff}.roster-table{width:100%;border-collapse:collapse}.roster-table th,.roster-table td{padding:10px;border-bottom:1px solid #eee;text-align:left;vertical-align:middle}.roster-table th{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}.progress-chips{display:flex;gap:5px;flex-wrap:wrap}.mini-chip{font-size:11px;border:1px solid #ddd4c7;border-radius:999px;padding:4px 7px;background:#faf8f4}.access-row{display:grid;grid-template-columns:1fr 130px 120px;gap:12px;align-items:center;padding:11px 0;border-bottom:1px solid #eee}.status-active{color:#176b4d;font-weight:800}.status-revoked{color:#9b2c2c;font-weight:800}.student-detail-tabs{display:flex;gap:7px;flex-wrap:wrap;margin:12px 0}.detail-section{border-top:1px solid #eee;padding-top:14px;margin-top:14px}.response-box{background:#fff;border:1px solid #ddd5c8;border-radius:10px;padding:14px 16px;margin:9px 0;white-space:pre-wrap;color:#111827;font-size:15.5px;line-height:1.6}.remote-discussion-note{font-size:12px;color:var(--muted)}
+  .rubric-legend{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin:8px 0 14px}.rubric-chip{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;border-radius:50%;background:#5d1726;color:#fff;font-weight:800;font-size:12px;cursor:help}.rubric-legend-note{color:var(--muted);margin-left:4px}
+  .grade-act-block{border:1px solid var(--line);border-radius:12px;padding:14px;margin:12px 0;background:#fff;transition:box-shadow .3s}.act-pending{font-size:11.5px;font-weight:700;color:#8a5a00;background:#fff4e5;border:1px solid #ead8a9;border-radius:999px;padding:3px 9px;cursor:help}.cell-pending{color:#c98a00;font-weight:900;margin-left:3px;cursor:help}.grade-act-block h4{margin:0 0 10px;display:flex;align-items:center;gap:10px}.item-grade-block{border-top:1px solid #eee;padding:12px 0;margin-top:2px}.item-grade-block h5{margin:0 0 6px;font-size:13px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}.grade-row-mc{display:flex;justify-content:space-between;gap:14px;align-items:flex-start;margin-bottom:8px}.mc-summary{font-size:13.5px}.dok-prompt{font-size:13.5px;font-style:italic;color:#4b4030;margin:2px 0 8px;padding-left:9px;border-left:3px solid var(--gold)}.exclude-toggle{font-size:12px;color:var(--muted);white-space:nowrap;display:flex;align-items:center;gap:5px;cursor:pointer}.grade-row-dok{margin-top:8px}.score-btn-row{display:flex;gap:6px;margin-bottom:8px}.score-btn{width:32px;height:32px;border-radius:8px;border:1px solid #cfc6b8;background:#fff;cursor:pointer;font-weight:750}.score-btn:hover{border-color:var(--wine)}.score-btn.selected{background:var(--wine);color:#fff;border-color:var(--wine)}.dokComment{width:100%;min-height:50px;padding:8px;border:1px solid #cfc6b8;border-radius:8px;font-family:inherit;resize:vertical;margin-top:8px}
+  .gradebook-table{width:100%;border-collapse:collapse;margin-top:8px}.gradebook-table th,.gradebook-table td{padding:8px 10px;border-bottom:1px solid #eee;text-align:center}.gradebook-table th:first-child,.gradebook-table td:first-child{text-align:left}.gradebook-cell{font-weight:800;border:1px solid transparent;background:transparent;border-radius:8px;padding:6px 10px;cursor:pointer;font:inherit}.gradebook-cell:hover{border-color:var(--gold);background:#fff9ea}.gradebook-cell.ungraded{color:var(--muted);font-weight:400}.export-act-btn{font-size:12px;padding:5px 8px;margin-top:4px}.export-status{font-size:12px;margin-top:4px;color:var(--muted)}.act-subhead{margin:14px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--wine);border-bottom:1px solid var(--line);padding-bottom:4px}.grade-act-block.jump-highlight{box-shadow:0 0 0 3px var(--gold)}.paste-outside{background:#ffe0e0;border-bottom:2px solid #d4676a;color:#111827;padding:0 1px;border-radius:2px}.paste-quote{background:#fdf3d6;border-bottom:2px solid #d9b755;color:#111827;padding:0 1px;border-radius:2px}.paste-note{font-size:12px;color:var(--muted);margin:-4px 0 8px}.paste-note.warn{color:#8c1d17;font-weight:700}.batch-paste-badge{background:#fdeceb;border-color:#e0a9a6;color:#8c1d17;font-weight:800}.paste-legend{font-size:12px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin:8px 0 2px}.paste-legend .swatch{display:inline-block;width:12px;height:12px;border-radius:3px;vertical-align:-1px;margin-right:5px}.batch-edited-badge{background:#eef2ff;border-color:#a9b6e0;color:#2c3b7a;font-weight:800}.edited-note{font-size:12.5px;color:#2c3b7a;background:#eef2ff;border:1px solid #d5ddf3;border-radius:8px;padding:8px 11px;margin:2px 0 8px}.edited-note .btn{font-size:12px;padding:4px 9px;margin-left:6px}.all-excluded-note{background:#fff8e8;border:1px solid #ead8a9;border-radius:10px;padding:12px 14px;margin:6px 0 16px;color:#8a5a00}.batch-row{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(310px,.9fr);column-gap:20px;row-gap:10px;align-items:start;background:#fff;border:1px solid #e6dfd3;border-radius:14px;padding:16px 18px;margin:12px 0}.batch-row > h5{grid-column:1/-1;margin:0}.batch-work{grid-column:1;grid-row:2;min-width:0}.batch-row .response-box{margin:0 0 6px}.batch-row .grade-row-dok{grid-column:2;grid-row:2;margin:0;position:sticky;top:12px;background:#fffaf0;border:1px solid #e6dcc6;border-radius:12px;padding:12px}.batch-row .grade-row-dok .teacher-score-entry{margin-top:9px}.batch-row .batchComment{display:block;width:100%;box-sizing:border-box;min-height:62px;margin-top:8px;padding:8px 9px;border:1px solid #cfc6b8;border-radius:8px;font-family:inherit;font-size:13.5px;resize:vertical}.batch-row .exclude-toggle{margin-top:9px}@media(max-width:900px){.batch-row{grid-template-columns:1fr}.batch-work,.batch-row .grade-row-dok{grid-column:1;grid-row:auto;position:static}}.batch-grade-groups{display:flex;flex-direction:column;gap:18px;margin-top:14px}.batch-grade-group{border:1px solid var(--line);border-radius:12px;background:#fffdf8;overflow:hidden}.batch-grade-group-head{display:flex;align-items:center;justify-content:space-between;gap:18px;padding:11px 15px;border-bottom:1px solid var(--line);background:#f4ecdc;border-left:5px solid var(--gold)}.batch-grade-group-head strong{display:block;font-size:14.5px}.batch-grade-group-head span{font-size:12.5px;color:var(--muted)}.batch-grade-group[data-grade-group="0"] .batch-grade-group-head{background:#eef4eb;border-left-color:#4f765d}.batch-grade-group[data-grade-group="-1"] .batch-grade-group-head{background:#eef2ff;border-left-color:#5566a8}.batch-grade-group[data-grade-group="2"] .batch-grade-group-head{background:#edf0f4;border-left-color:#64758c}.batch-grade-group[data-grade-group="3"] .batch-grade-group-head{background:#f5f2ea;border-left-color:#b6ab95}.batch-grade-group-count{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:26px;padding:0 9px;border-radius:999px;background:#fff;border:1px solid var(--line);font-weight:850}.batch-grade-group.is-empty{opacity:.62}.batch-grade-group.is-empty .batch-group-list{display:none}.batch-group-list{padding:0 12px 4px}.rubric-level-row{display:flex;flex-wrap:wrap;gap:6px}.rubric-level-btn{display:flex;flex-direction:column;align-items:center;gap:1px;min-width:78px;height:auto;width:auto;padding:6px 9px;border-radius:9px;border:1px solid #cfc6b8;background:#fff;cursor:pointer;font:inherit;line-height:1.15}.rubric-level-btn:hover{border-color:var(--wine)}.rubric-level-name{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);text-align:center}.rubric-level-pts{font-size:15px;font-weight:850}.rubric-level-btn.selected{background:var(--wine);border-color:var(--wine);color:#fff}.rubric-level-btn.selected .rubric-level-name{color:#fff}.teacher-score-entry{margin:10px 0 6px;padding:10px 11px;border:1px solid #ded4c2;border-radius:8px;background:#fff}.teacher-score-entry label{display:flex;justify-content:space-between;gap:8px;font-size:11px;font-weight:850;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:6px}.teacher-score-entry label span:last-child{font-weight:650;text-transform:none;letter-spacing:0}.teacher-score-entry input{width:100%;max-width:120px;padding:8px 9px;border:1px solid #cfc5b2;border-radius:6px;font:inherit;font-weight:800}.rubric-legend{margin:10px 0;border:1px solid var(--line);border-radius:10px;background:#faf7f0;padding:9px 12px}.rubric-legend summary{cursor:pointer;font-weight:800;font-size:13.5px}.rubric-legend-row{display:grid;grid-template-columns:150px 1fr;gap:12px;padding:7px 0;border-top:1px solid #eee;font-size:13px}.rubric-legend-level{font-weight:800}.rubric-legend-note{display:block;margin-top:8px;color:var(--muted)}@media(max-width:700px){.rubric-legend-row{grid-template-columns:1fr;gap:2px}}.batch-row h5{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:14px}.batch-badge-needs{background:#fff4e5;color:#8a5a00;border-color:#ead8a9}.batch-badge-graded{background:#eafff2;color:#0d6b3d;border-color:#bfe8cf}.batch-badge-excluded{background:#f5f2ea;color:var(--muted)}.batch-group{margin:22px 0 2px;font-size:13px;text-transform:uppercase;letter-spacing:.06em;color:var(--wine);display:flex;align-items:center;gap:8px;border-bottom:2px solid var(--gold);padding-bottom:5px}.batch-group:first-child{margin-top:6px}.exclude-all-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}.exclude-all-row .toolbar-note{flex:1;min-width:220px}.exclude-all-row.is-excluded{background:#fff8e8;margin:12px -6px -6px;padding:12px 6px;border-radius:8px}.essay-score-strip{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}.hub-card-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap}.hub-card-head h3{margin:0}.hub-headline{font-size:12px}.hub-card-head .btn{margin-left:auto;font-size:12px;padding:5px 10px}.hub-subhead{margin:18px 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--wine);border-bottom:1px solid var(--line);padding-bottom:5px}.hub-tile-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(215px,1fr));gap:12px;margin:10px 0 4px}.hub-tile{position:relative;display:flex;flex-direction:column;min-height:214px;border:1px solid #ddd5c8;border-radius:12px;background:#fffdf8;padding:14px 15px;cursor:pointer;box-shadow:0 3px 10px rgba(20,32,47,.04);transition:transform .14s ease,box-shadow .14s ease,border-color .14s ease}.hub-tile:hover,.hub-tile:focus-visible{transform:translateY(-2px);box-shadow:0 10px 24px rgba(20,32,47,.10);border-color:var(--gold);outline:none}.hub-tile.is-released{box-shadow:inset 0 4px 0 var(--gold),0 3px 10px rgba(20,32,47,.05)}.hub-tile.is-unreleased{opacity:.72}.hub-tile.has-needs{border-color:#d9a9a6}.hub-tile-top{display:flex;justify-content:space-between;align-items:flex-start;min-height:18px}.hub-tile-eyebrow{font-size:10px;font-weight:850;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}.hub-needs-badge{position:absolute;top:10px;right:11px;min-width:26px;height:26px;padding:0 7px;border-radius:999px;background:#a73d3d;color:#fff;display:grid;place-items:center;font-size:12.5px;font-weight:900;box-shadow:0 2px 8px rgba(112,25,25,.24)}.hub-caught-badge{position:absolute;top:10px;right:11px;width:24px;height:24px;border-radius:999px;background:#eafff2;color:#0d6b3d;display:grid;place-items:center;font-size:13px;font-weight:900;border:1px solid #bfe8cf}.hub-tile-main h4{margin:4px 30px 2px 0;font-family:'Playfair Display',Georgia,serif;font-size:21px;line-height:1.12;color:var(--wine)}.hub-tile-essay .hub-tile-main h4{font-size:17px}.hub-tile-main p{margin:0;color:var(--muted);font-size:12px;line-height:1.35}.hub-tile-points{display:block;margin-top:7px;font-size:10.5px;font-weight:800;text-transform:uppercase;letter-spacing:.045em;color:#8a7040}.hub-tile-rows{display:grid;gap:5px;margin:12px 0 11px;padding:9px 0;border-top:1px solid #ece5d8;border-bottom:1px solid #ece5d8}.hub-tile-rows>div{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:11.5px}.hub-tile-rows span{color:var(--muted)}.hub-tile-rows strong{font-size:11.5px;color:#35624b}.hub-tile-rows strong.needs{color:#a13d3d}.hub-tile-rows strong.is-excluded{color:var(--muted);font-weight:650}.hub-tile-controls{margin-top:auto;display:flex;align-items:center;gap:5px;flex-wrap:wrap;cursor:default}.hub-tile-controls label{display:flex;align-items:center;gap:4px;font-size:11px;font-weight:750;cursor:pointer}.hub-tile-controls .btn{padding:4px 8px;font-size:11px;min-height:0}.hub-mini-btn{border-radius:7px}.actNoGradeBtn.is-excluded{background:#fff8e8;border-color:#ead8a9;color:#8a5a00;font-weight:800}.hub-tile.is-nograde{opacity:.62;filter:saturate(.55)}.hub-tile.is-nograde .hub-tile-controls{opacity:1;filter:none}.hub-tile-canvas{margin-top:7px;font-size:10.5px;line-height:1.3;color:var(--muted);cursor:default;word-break:break-word}.hub-tile-canvas.is-dim{opacity:.6}.gradebook-scroll{overflow:auto;max-width:100%}.gradebook-wide th,.gradebook-wide td{padding:7px 6px;font-size:13px}.gradebook-wide th{font-size:11px;text-transform:uppercase;letter-spacing:.03em;color:var(--muted);font-weight:850;white-space:nowrap}.gradebook-wide .gb-name{text-align:left;position:sticky;left:0;background:#fff;z-index:2;min-width:150px;box-shadow:1px 0 0 #eee}.gradebook-wide thead .gb-name{background:#fff}.gradebook-wide .gb-essay{background:#fbfaf6}.gradebook-wide th.gb-act+th.gb-essay,.gradebook-wide td.gb-act+td.gb-essay{border-left:2px solid #e6dfd3}.gradebook-wide .gb-total{border-left:2px solid #e6dfd3;font-weight:850;white-space:nowrap}.gradebook-wide .gb-total small{display:block;font-size:10.5px;font-weight:650;color:var(--muted)}.gradebook-wide .gb-total .ungraded{color:var(--muted);font-weight:400}.gradebook-wide .gradebook-cell{padding:4px 7px}.roster-card{padding:0}.roster-summary{list-style:none;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 20px;font-size:15px}.roster-summary::-webkit-details-marker{display:none}.roster-summary:hover{background:#faf7f0}.roster-summary::before{content:'\\25b8';color:var(--gold);font-size:13px;margin-right:8px;transition:transform .15s ease;display:inline-block}.roster-card[open] .roster-summary::before{transform:rotate(90deg)}.roster-summary-right{font-size:12.5px;color:var(--muted);font-weight:400}.roster-body{padding:0 20px 18px;border-top:1px solid var(--line)}.roster-actions{display:flex;justify-content:flex-end;padding:10px 0 4px}@media(max-width:700px){.hub-tile-grid{grid-template-columns:1fr}.roster-summary{flex-direction:column;align-items:flex-start;gap:4px}}.essay-para{border-left:4px solid #d9d3c7}.essay-para strong{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:5px}.essay-para.essay-rebuttal{border-left-color:#5566a8;background:#f7f8ff}.essay-thesis-line{font-size:13px;background:#f4ecdc;border-radius:8px;padding:8px 11px;margin:0 0 9px}.essay-post-date{display:block;color:var(--muted);font-size:11.5px;margin-bottom:5px}.essay-complete-row{gap:8px}.final-essay-text{max-height:420px;overflow:auto;white-space:pre-wrap}.final-criteria-grid{grid-column:1/-1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:6px}@media(max-width:900px){.final-criteria-grid{grid-template-columns:1fr}}.final-criterion{border:1px solid #e6dcc6;border-radius:12px;background:#fffaf0;padding:12px 13px}.final-criterion-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}.final-criterion .rubric-level-btn{min-width:66px}.final-criterion .critComment{display:block;width:100%;box-sizing:border-box;min-height:52px;margin-top:8px;padding:8px 9px;border:1px solid #cfc6b8;border-radius:8px;font-family:inherit;font-size:13px;resize:vertical}.rubric-level-btn.pending-suggested{background:#fff8e0;border:2px dashed #c99a2e;color:#6d5613}.rubric-level-btn.pending-suggested .rubric-level-name{color:#8a6d1a}.batch-row .essayComment{display:block;width:100%;box-sizing:border-box;min-height:62px;margin-top:8px;padding:8px 9px;border:1px solid #cfc6b8;border-radius:8px;font-family:inherit;font-size:13.5px;resize:vertical}
+  .integration-row{display:grid;gap:6px;margin:10px 0}.canvas-act-box,.canvas-setup-box{max-width:720px}.canvas-act-meta{display:flex;gap:7px;flex-wrap:wrap;margin:4px 0 12px}.canvas-date-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px 16px;margin:10px 0 14px}.canvas-date-grid .field{margin:0;min-width:0}.canvas-date-grid label{font-size:13px;font-weight:800;margin-bottom:2px}.canvas-date-grid label small{font-weight:600;color:var(--muted)}.canvas-date-grid input{width:100%;box-sizing:border-box;min-width:0;font:inherit;font-size:14px;padding:9px 10px}.canvas-switch-btn{margin-left:auto}.canvas-url-note{background:#f4f7fb;border:1px solid #d5ddf3;border-radius:9px;padding:8px 11px;margin:2px 0 10px;color:#2c3b7a;word-break:break-all}.canvas-url-note code{font-size:12px}.canvas-shared-note{background:#fff8e8;border:1px solid #ead8a9;border-radius:9px;padding:9px 12px;margin:0 0 10px;color:#6b4d16}.canvas-chip-good{border-color:#bfe8cf;background:#eafff2;color:#0d6b3d;font-weight:800}.canvas-chip-warn{border-color:#ead8a9;background:#fff8e8;color:#8a5a00;font-weight:800}.canvas-chip-bad{border-color:#e0a9a6;background:#fdeceb;color:#8c1d17;font-weight:800}.canvas-setup-box .field{max-width:100%}.canvas-setup-btn{font-size:12px;padding:5px 8px;margin-top:4px}.push-act-btn{font-size:12px;padding:5px 8px;margin-top:4px}
+  @media(max-width:900px){.access-row{grid-template-columns:1fr}.roster-table{display:block;overflow:auto}.grade-row{grid-template-columns:1fr}.grade-row select,.grade-row textarea,.grade-row button,.gradeSavedNote{grid-column:1}}
+  `;
+  document.head.appendChild(backendCss);
+
+  function rpc(name, arg) {
+    return new Promise((resolve, reject) => {
+      if (!backend.enabled)
+        return reject(
+          new Error("Backend is not available outside the deployed Apps Script web app."),
+        );
+      const runner = google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler((e) => reject(new Error(e && e.message ? e.message : String(e))));
+      try {
+        if (arg === undefined) runner[name]();
+        else runner[name](arg);
+      } catch (e) {
+        reject(e);
+      }
+    });
+  }
+  const MC_POINTS = 4;
+  const DOK_POINTS = 7;
+
+  // Recomputes one scene's mc/dok contribution to its Act total after a
+  // teacher grading action, using only data already in hand (mirrors
+  // gradeSummaryForStudent_ in Code.gs) so the modal can redraw instantly
+  // without waiting on a round-trip. The real setGradeItem call still goes
+  // to the server in the background.
+  function hasScore_(v) {
+    return v !== null && v !== undefined && v !== "";
+  }
+  // Apps Script does not hand `null` back to the browser reliably -- an
+  // ungraded score arrives as UNDEFINED. Every `score !== null` test then reads
+  // an ungraded response as graded, which is how a class nobody had marked
+  // showed up under "Already graded" as "Graded undefined/7", leaving "Needs
+  // grading" empty. Normalise the moment data crosses into the browser so no
+  // comparison downstream has to know about it.
+  function normalizeScore_(v) {
+    return hasScore_(v) ? Number(v) : null;
+  }
+  function normalizeResponses_(list) {
+    (list || []).forEach((r) => {
+      r.score = normalizeScore_(r.score);
+      r.excluded = !!r.excluded;
+      r.editedAfterGrading = !!r.editedAfterGrading;
+      r.dokText = r.dokText || "";
+    });
+    return list;
+  }
+  function normalizeGradeSummary_(gs) {
+    if (!gs || !gs.scenes) return gs;
+    Object.keys(gs.scenes).forEach((k) => {
+      let sc = gs.scenes[k];
+      if (!sc) return;
+      if (sc.mc) { sc.mc.score = normalizeScore_(sc.mc.score); sc.mc.excluded = !!sc.mc.excluded; }
+      if (sc.dok) { sc.dok.score = normalizeScore_(sc.dok.score); sc.dok.excluded = !!sc.dok.excluded;
+                    sc.dok.editedAfterGrading = !!sc.dok.editedAfterGrading; }
+    });
+    return gs;
+  }
+  // Rebuilds every Act (chapter) total from the scene data in hand. This is a
+  // full recompute rather than an incremental adjustment: the totals are the
+  // same arithmetic the server does, so patching them by hand is how the two
+  // drift apart. 9 chapters is nothing to recount.
+  function recomputeActTotals(gs) {
+    let actIds = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+    actIds.forEach((a) => {
+      if (!gs.acts[a]) gs.acts[a] = {};
+      Object.assign(gs.acts[a], {
+        earned: 0, possible: 0, mcEarned: 0, mcPossible: 0, dokEarned: 0, dokPossible: 0,
+        complete: true, mcUnanswered: 0, dokUnmarked: 0, dokMissing: 0, pendingPoints: 0, touched: false,
+      });
+    });
+    Object.keys(gs.scenes || {}).forEach((key) => {
+      let sc = gs.scenes[key];
+      let meta = CHAPTERS[key];
+      if (!sc || !meta) return;
+      let act = gs.acts[meta.act];
+      if (!act) return;
+      let mcScore = hasScore_(sc.mc && sc.mc.score) ? sc.mc.score : null;
+      let dokScore = hasScore_(sc.dok && sc.dok.score) ? Number(sc.dok.score) : null;
+      let submitted = sc.dok && sc.dok.submitted !== undefined ? !!sc.dok.submitted : dokScore !== null;
+      if (mcScore !== null || submitted || dokScore !== null) act.touched = true;
+      // The Act is worth its full value; anything not done scores zero. Only an
+      // exclusion takes points out of the denominator.
+      if (!(sc.mc && sc.mc.excluded)) {
+        act.mcPossible += MC_POINTS;
+        act.mcEarned += mcScore === 1 ? MC_POINTS : mcScore === 0.5 ? MC_POINTS / 2 : 0;
+        if (mcScore === null) { act.mcUnanswered++; act.complete = false; }
+      }
+      if (!(sc.dok && sc.dok.excluded)) {
+        act.dokPossible += DOK_POINTS;
+        act.dokEarned += dokScore === null ? 0 : dokScore;
+        if (dokScore === null) {
+          act.complete = false;
+          if (submitted) { act.dokUnmarked++; act.pendingPoints += DOK_POINTS; }
+          else act.dokMissing++;
+        }
+      }
+    });
+    actIds.forEach((a) => {
+      let act = gs.acts[a];
+      act.earned = act.mcEarned + act.dokEarned;
+      act.possible = act.mcPossible + act.dokPossible;
+    });
+  }
+  // The Act total is always out of the full Act. That means a response you
+  // haven't marked yet is sitting in there as a zero, which is correct but
+  // easy to misread mid-marking -- so say so rather than let the number lie by
+  // omission. Work the student never submitted is a real zero and isn't listed.
+  function actPendingNoteHtml_(a) {
+    if (!a || !a.dokUnmarked) return "";
+    return `<span class="act-pending" title="These are counted as 0 in the total above until you grade them. Responses the student never submitted are not included in this count.">${a.dokUnmarked} written response${a.dokUnmarked === 1 ? "" : "s"} not marked yet (${a.pendingPoints} pts)</span>`;
+  }
+  function applyLocalGradeItemUpdate(gs, key, itemType, patch) {
+    let scene = gs.scenes[key];
+    if (!scene || !CHAPTERS[key]) return;
+    if (itemType === "mc") {
+      scene.mc.excluded = !!patch.excluded;
+    } else {
+      scene.dok.excluded = !!patch.excluded;
+      if (patch.score !== undefined) scene.dok.score = scene.dok.excluded ? null : patch.score;
+      if (patch.comment !== undefined) scene.dok.comment = patch.comment;
+    }
+    recomputeActTotals(gs);
+  }
+
+  function blankStudentState() {
+    return {
+      role: "student",
+      view: "home",
+      releasedActs: [1],
+      releasedScenes: {},
+      releasedEssayThrough: "self",
+      supportOpen: false,
+      answers: {},
+      dok: {},
+      dokMeta: {},
+      evidence: [],
+      teacherResources: true,
+      className: "English - The Great Gatsby",
+      activityResponses: {},
+      essay: {
+        step: "thesis",
+        theme: "",
+        thesis: "",
+        discussion: [],
+        bodies: ["", "", ""],
+        intro: "",
+        conclusion: "",
+        selfEval: {},
+        selfComments: {},
+      },
+    };
+  }
+  function normalizeState(remote, settings) {
+    let b = blankStudentState();
+    let r = remote && typeof remote === "object" ? remote : {};
+    b = Object.assign(b, r);
+    b.answers = b.answers || {};
+    b.dok = b.dok || {};
+    b.dokMeta = b.dokMeta || {};
+    b.evidence = Array.isArray(b.evidence) ? b.evidence : [];
+    b.activityResponses = b.activityResponses || {};
+    b.essay = Object.assign(blankStudentState().essay, b.essay || {});
+    b.essay.bodies = Array.isArray(b.essay.bodies) ? b.essay.bodies : ["", "", ""];
+    while (b.essay.bodies.length < 3) b.essay.bodies.push("");
+    b.essay.selfEval = b.essay.selfEval || {};
+    b.essay.selfComments = b.essay.selfComments || {};
+    b.essay.discussion = Array.isArray(b.essay.discussion) ? b.essay.discussion : [];
+    if (settings) {
+      b.releasedActs = settings.releasedActs || [1];
+      b.releasedScenes = settings.releasedScenes || {};
+      b.releasedEssayThrough = settings.releasedEssayThrough || "self";
+      b.teacherResources = settings.teacherResources !== false;
+    }
+    b.role = "student";
+    return b;
+  }
+  function localKey() {
+    return backend.user && backend.activeClassId
+      ? `macbethState:${backend.user.email}:${backend.activeClassId}`
+      : "macbethState";
+  }
+  function safeLSGet(k) {
+    try {
+      return localStorage.getItem(k);
+    } catch (e) {
+      return null;
+    }
+  }
+  function safeLSSet(k, v) {
+    try {
+      localStorage.setItem(k, v);
+      return true;
+    } catch (e) {
+      console.warn("Local storage save skipped:", e);
+      return false;
+    }
+  }
+  function setAccountHeader() {
+    const roleSwitch = document.querySelector(".role-switch");
+    if (!backend.enabled) {
+      if (roleSwitch) roleSwitch.style.display = "flex";
+      return;
+    }
+    if (roleSwitch) roleSwitch.style.display = "none";
+    let old = document.getElementById("accountPill");
+    if (old) old.remove();
+    if (!backend.user) return;
+    const el = document.createElement("div");
+    el.id = "accountPill";
+    el.className = "account-pill";
+    el.innerHTML = `<span id="syncDot" class="sync-dot"></span><span><strong>${esc(backend.user.name || backend.user.email)}</strong> · <span class="account-role">${esc(backend.user.role)}</span></span>`;
+    document.querySelector(".topbar").appendChild(el);
+  }
+  // A save that fails used to colour a dot that has no failure colour and write
+  // a tooltip nobody hovers over, so "it didn't save" looked exactly like
+  // "it saved". Everything that can tell a student otherwise is painted here,
+  // from one place, off the backend's own counters.
+  function saveBusy_() {
+    return !!(backend.saveInFlight || backend.saveDirty || backend.saveTimer);
+  }
+  function paintSaveState_() {
+    const failing = backend.saveFails > 0;
+    const busy = saveBusy_();
+    const d = document.getElementById("syncDot");
+    if (d) {
+      d.classList.toggle("saving", busy && !failing);
+      d.classList.toggle("error", failing);
+      d.title = failing
+        ? "Not reaching your account right now. Your work is safe in this browser and will be sent as soon as the connection is back."
+        : busy
+          ? "Saving..."
+          : "Saved";
+    }
+    const st = document.getElementById("saveStatus");
+    if (st) {
+      st.textContent = failing
+        ? "Trying to reconnect — your work is safe in this browser"
+        : busy
+          ? "Saving..."
+          : "Autosave on";
+      const banner = st.parentElement;
+      if (banner && banner.classList.contains("backend-banner"))
+        banner.classList.toggle("warn", failing);
+    }
+    // Two failures in a row is no longer a blip. Say so where it cannot be
+    // missed, and say the thing that actually matters: the work is not lost.
+    let toast = document.getElementById("saveTrouble");
+    if (failing && backend.saveFails >= 2) {
+      if (!toast) {
+        toast = document.createElement("div");
+        toast.id = "saveTrouble";
+        toast.className = "save-toast warn";
+        toast.innerHTML =
+          "<strong>Still trying to save to your account.</strong><span>Your work is safe in this browser. Leave this tab open and it will send itself as soon as the connection comes back.</span>";
+        document.body.appendChild(toast);
+      }
+    } else if (toast) toast.remove();
+  }
+  function noteSaveMerge_(kept) {
+    let n = document.getElementById("saveMerged");
+    if (!n) {
+      n = document.createElement("div");
+      n.id = "saveMerged";
+      n.className = "save-toast";
+      document.body.appendChild(n);
+    }
+    n.innerHTML =
+      "<strong>Another window had newer work.</strong><span>Both copies were kept and nothing was overwritten. Reload this page to see the merged version.</span>";
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "btn";
+    b.textContent = "Got it";
+    b.onclick = () => n.remove();
+    n.appendChild(b);
+    console.warn("Merged on save; kept from the other copy:", kept);
+  }
+  function currentClass() {
+    return backend.classes.find((c) => c.classId === backend.activeClassId) || null;
+  }
+
+  async function bootstrap() {
+    if (!backend.enabled) {
+      return;
+    }
+    document.getElementById("app").innerHTML =
+      '<div class="card"><h2>Connecting to your class...</h2><p>Checking your Google Workspace account and loading saved work.</p></div>';
+    try {
+      const data = await rpc("getBootstrap");
+      if (!data || !data.ok)
+        throw new Error(data && data.message ? data.message : "Could not load account.");
+      backend.ready = true;
+      backend.user = {
+        email: data.email,
+        name: data.name,
+        role: data.role,
+        status: data.accessStatus,
+      };
+      backend.classes = data.classes || [];
+      backend.activeClassId =
+        data.activeClassId ||
+        safeLSGet("macbethActiveClass") ||
+        (backend.classes[0] || {}).classId ||
+        "";
+      backend.needsName = data.role === "student" && !!data.needsName;
+      backend.access = data.access || [];
+      backend.discussion = data.discussion || [];
+      backend.grades = data.grades || {};
+      backend.gradeSummary = normalizeGradeSummary_(data.gradeSummary) || null;
+      // The stamp on the copy we were just handed. Every save quotes it back so
+      // the server can tell whether anything else has written since.
+      backend.serverUpdatedAt = data.stateUpdatedAt || "";
+      state.role = data.role;
+      if (data.role === "student") {
+        if (backend.activeClassId) {
+          const klass = currentClass() || backend.classes[0];
+          backend.activeClassId = klass.classId;
+          safeLSSet("macbethActiveClass", backend.activeClassId);
+          const settings = parseSettings(klass.settingsJson, data.classSettings);
+          const cached = JSON.parse(safeLSGet(localKey()) || "null");
+          state = normalizeState(
+            Object.keys(data.state || {}).length ? data.state : cached,
+            settings,
+          );
+          state.className = klass.className;
+          safeLSSet(localKey(), JSON.stringify(state));
+        } else state = normalizeState({}, null);
+      } else {
+        state.role = data.role;
+        state.view = "manage";
+        if (backend.activeClassId) await loadDashboard(backend.activeClassId, false);
+      }
+      setAccountHeader();
+      render();
+    } catch (e) {
+      backend.ready = true;
+      setAccountHeader();
+      document.getElementById("sidebar").innerHTML = "";
+      document.getElementById("app").innerHTML =
+        `<div class="card"><h2>Backend setup needed</h2><p>${esc(e.message)}</p><p class="toolbar-note">If this is the first deployment, run <strong>setupGatsbyBackend()</strong> once in Apps Script, then redeploy the web app so users sign in with their school Google account.</p></div>`;
+    }
+  }
+  function parseSettings(json, fallback) {
+    try {
+      return fallback || JSON.parse(json || "{}");
+    } catch (e) {
+      return (
+        fallback || {
+          releasedActs: [1],
+          releasedScenes: {},
+          releasedEssayThrough: "self",
+          teacherResources: true,
+        }
+      );
+    }
+  }
+
+  save = function () {
+    safeLSSet(localKey(), JSON.stringify(state));
+    if (!backend.enabled || !backend.ready || !backend.activeClassId) return;
+    backend.saveDirty = true;
+    clearTimeout(backend.saveTimer);
+    backend.saveTimer = setTimeout(() => {
+      backend.saveTimer = null;
+      flushSave_();
+    }, 650);
+    paintSaveState_();
+  };
+
+  // Everything a save can do wrong, it used to do:
+  //   - an edit made inside the 650ms debounce was simply never sent if the
+  //     tab closed first;
+  //   - a save that failed was caught, logged, and FORGOTTEN -- the text only
+  //     went up again if the student happened to keep typing;
+  //   - two saves could be in the air at once, so the older one could land last.
+  // One sender, nothing dropped: a failure puts the work straight back on the
+  // dirty pile and comes back for it, and anything typed while a save is in the
+  // air is sent the moment that one lands.
+  async function flushSave_() {
+    clearTimeout(backend.saveTimer);
+    backend.saveTimer = null;
+    clearTimeout(backend.saveRetryTimer);
+    backend.saveRetryTimer = null;
+    if (!backend.enabled || !backend.ready || !backend.activeClassId || !backend.user) return;
+    if (!backend.saveDirty || backend.saveInFlight) return;
+    backend.saveInFlight = true;
+    backend.saveDirty = false;
+    paintSaveState_();
+    try {
+      if (backend.user.role === "student") {
+        const res = await rpc("saveStudentState", {
+          classId: backend.activeClassId,
+          state: state,
+          baseUpdatedAt: backend.serverUpdatedAt || "",
+        });
+        if (res && res.updatedAt) backend.serverUpdatedAt = res.updatedAt;
+        if (res && res.merged) noteSaveMerge_(res.kept || []);
+      } else if (backend.dashboard) {
+        await rpc("saveClassSettings", {
+          classId: backend.activeClassId,
+          settings: {
+            releasedActs: state.releasedActs || [1],
+            releasedScenes: state.releasedScenes || {},
+            releasedEssayThrough: state.releasedEssayThrough || "self",
+            teacherResources: state.teacherResources !== false,
+            modernSupport: true,
+          },
+        });
+      }
+      backend.saveFails = 0;
+      backend.lastSaved = new Date().toISOString();
+      backend.saveInFlight = false;
+      paintSaveState_();
+      if (backend.saveDirty) flushSave_(); // they carried on typing while it sent
+    } catch (e) {
+      backend.saveInFlight = false;
+      backend.saveDirty = true; // still owed to the server
+      backend.saveFails = (backend.saveFails || 0) + 1;
+      console.error(e);
+      paintSaveState_();
+      const wait = Math.min(30000, 800 * Math.pow(2, Math.min(backend.saveFails, 6)));
+      backend.saveRetryTimer = setTimeout(() => flushSave_(), wait);
+    }
+  }
+  backend.__flushSave = flushSave_;
+
+  // The gap between the last keystroke and the save going out is 650ms. Close
+  // the tab, switch app, or lock the phone inside it and the old code lost that
+  // edit. These send the pending save the moment the page stops being looked
+  // at, which is while there is still time for it to land.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") flushSave_();
+  });
+  window.addEventListener("pagehide", () => flushSave_());
+  window.addEventListener("blur", () => flushSave_());
+  window.addEventListener("beforeunload", (e) => {
+    if (!backend.enabled || !backend.ready || !backend.activeClassId) return;
+    flushSave_();
+    // Only hold them up when we already know saving is failing -- otherwise
+    // this is a confirm dialog on every single tab close, for nothing.
+    if (backend.saveFails > 0) {
+      e.preventDefault();
+      e.returnValue = "";
+      return "";
+    }
+  });
+
+  // The name a student types here is what the teacher sees in the marking
+  // list, so first and last are separate required fields.
+  function splitStoredName_(name) {
+    let parts = String(name || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .split(" ");
+    if (parts.length < 2 || /\d/.test(String(name || ""))) return { first: "", last: "" };
+    return { first: parts.shift(), last: parts.join(" ") };
+  }
+  function nameFieldsHtml_(name) {
+    let n = splitStoredName_(name);
+    return `<div class="name-fields"><div class="field"><label>First name</label><input id="joinFirst" value="${esc(n.first)}" placeholder="Alex" autocomplete="given-name"></div><div class="field"><label>Last name</label><input id="joinLast" value="${esc(n.last)}" placeholder="Rivera" autocomplete="family-name"></div></div>`;
+  }
+  function readNameFields_() {
+    let f = (document.getElementById("joinFirst") || {}).value || "";
+    let l = (document.getElementById("joinLast") || {}).value || "";
+    return { firstName: f.trim(), lastName: l.trim() };
+  }
+  function studentJoinView() {
+    return `<div class="join-card card"><div class="pill">Student Access</div><h2>Join your Great Gatsby class</h2><p>Use your real first and last name — this is how your teacher will find your work when marking.</p>${nameFieldsHtml_(backend.user.name)}<div class="field"><label>Class code</label><input id="joinCode" maxlength="8" style="text-transform:uppercase" placeholder="ABC123"></div><button class="btn primary" id="joinClassBtn">Join Class</button><p id="joinMsg" class="toolbar-note"></p></div>`;
+  }
+  async function joinCurrent() {
+    let b = document.getElementById("joinClassBtn");
+    let msg = document.getElementById("joinMsg");
+    let name = readNameFields_();
+    if (!name.firstName || !name.lastName) {
+      msg.textContent = "Please enter both your first name and your last name.";
+      (name.firstName ? document.getElementById("joinLast") : document.getElementById("joinFirst")).focus();
+      return;
+    }
+    b.disabled = true;
+    msg.textContent = "Joining...";
+    try {
+      await rpc("joinClass", {
+        code: document.getElementById("joinCode").value,
+        firstName: name.firstName,
+        lastName: name.lastName,
+      });
+      backend.user.name = name.firstName + " " + name.lastName;
+      backend.needsName = false;
+      let d = await rpc("getBootstrap");
+      backend.classes = d.classes || [];
+      backend.activeClassId = d.activeClassId || (backend.classes[0] || {}).classId || "";
+      backend.discussion = d.discussion || [];
+      let k = currentClass();
+      state = normalizeState(d.state || {}, parseSettings(k.settingsJson, d.classSettings));
+      state.className = k.className;
+      safeLSSet("macbethActiveClass", backend.activeClassId);
+      save();
+      render();
+    } catch (e) {
+      msg.textContent = e.message;
+      b.disabled = false;
+    }
+  }
+
+  // Students who joined before names were required are carrying a name pulled
+  // from their email address ("Jsmith1234"). Ask them once, on their next
+  // sign-in, and rewrite it everywhere their work is stored.
+  function confirmNameView() {
+    return `<div class="join-card card"><div class="pill">One quick thing</div><h2>What is your name?</h2><p>Your teacher marks by name, so please enter your real first and last name. You only have to do this once.</p>${nameFieldsHtml_(backend.user.name)}<button class="btn primary" id="confirmNameBtn">Save My Name</button><p id="confirmNameMsg" class="toolbar-note"></p></div>`;
+  }
+  async function confirmNameCurrent() {
+    let b = document.getElementById("confirmNameBtn");
+    let msg = document.getElementById("confirmNameMsg");
+    let name = readNameFields_();
+    if (!name.firstName || !name.lastName) {
+      msg.textContent = "Please enter both your first name and your last name.";
+      (name.firstName ? document.getElementById("joinLast") : document.getElementById("joinFirst")).focus();
+      return;
+    }
+    b.disabled = true;
+    msg.textContent = "Saving...";
+    try {
+      let r = await rpc("updateMyName", name);
+      backend.user.name = (r && r.name) || name.firstName + " " + name.lastName;
+      backend.needsName = false;
+      render();
+    } catch (e) {
+      msg.textContent = e.message;
+      b.disabled = false;
+    }
+  }
+
+  manage = function () {
+    if (!backend.enabled) return original.manage();
+    if (!backend.classes.length)
+      return `<div class="sectionhead"><h2>Teacher Dashboard</h2></div><div class="backend-banner"><div><strong>${esc(backend.user.name)}</strong><br><small>Your teacher access is active. Create your first class to begin.</small></div></div>${createClassCard()}`;
+    let dash = backend.dashboard;
+    let klass = currentClass();
+    let classSwitcher = `<div class="class-switch-row">${backend.classes
+      .map(
+        (c) =>
+          `<span class="class-pill-wrap"><button class="class-pill ${c.classId === backend.activeClassId ? "active" : ""}" data-classid="${c.classId}" title="${esc(c.period || "")} · Code ${esc(c.joinCode)}">${esc(c.className)}</button><button class="pill-icon-btn classEditBtn" data-classid="${c.classId}" title="Edit ${esc(c.className)}">✎</button><button class="pill-icon-btn classDeleteBtn" data-classid="${c.classId}" title="Delete ${esc(c.className)}">🗑</button></span>`,
+      )
+      .join("")}<button class="btn" id="toggleNewClass">+ New Class</button>${canvasSwitcherButton_()}</div><div id="newClassPanel" class="hide">${createClassCard()}</div>`;
+    if (!dash && backend.activeClassId)
+      return `<div class="sectionhead"><h2>Teacher Dashboard</h2></div>${classSwitcher}<p class="toolbar-note">Loading this class…</p>`;
+    // Release Controls lost its Act checkboxes -- those live on the Chapter
+    // tiles now, beside the counts that tell you whether releasing worked.
+    // With one scene per chapter, a separate scene-level release would just
+    // duplicate the chapter toggle, so this card is left with resources only.
+    let controls = "";
+    if (dash) {
+      controls = `<div class="card"><h3>Release &amp; Resources</h3><p class="toolbar-note">Chapter release is on the Chapter tiles above.</p><label style="display:block;margin:10px 0"><input id="resourceToggle" type="checkbox" ${state.teacherResources ? "checked" : ""}> Show enrichment resources to students</label></div>`;
+    }
+
+    // The roster moved below the gradebook and folded shut. It is a reference --
+    // who is in the class, what their email is, how far along they are -- not
+    // the thing you came to the dashboard to do.
+    let roster = dash
+      ? `<details class="card roster-card" id="rosterCard" ${backend.rosterOpen ? "open" : ""}><summary class="roster-summary"><span><strong>Students</strong> <span class="mini-chip">${dash.students.length} enrolled</span></span><span class="roster-summary-right">class code <strong>${esc(dash.classInfo.joinCode)}</strong></span></summary><div class="roster-body"><div class="roster-actions"><button class="btn" id="refreshRoster">\u21bb Refresh</button></div>${
+          dash.students.length
+            ? `<table class="roster-table"><thead><tr><th>Student</th><th>Reading</th><th>Evidence</th><th>Essay</th><th></th></tr></thead><tbody>${dash.students
+                .map(
+                  (s) =>
+                    `<tr><td><strong>${esc(s.name)}</strong><br><small>${esc(s.email)}</small></td><td><div class="progress-chips"><span class="mini-chip">MC ${s.mcAnswered}/9</span><span class="mini-chip">DOK ${s.dokAnswered}/9</span></div></td><td>${s.evidenceCount}</td><td>${s.essaySections}/5 sections${s.essayExtras ? ` <span class="mini-chip">+${s.essayExtras}</span>` : ""}<br><small>Self ${s.selfAssessment}/4</small></td><td><button class="btn viewStudent" data-email="${esc(s.email)}">View Work</button></td></tr>`,
+                )
+                .join("")}</tbody></table>`
+            : "<p>No students have joined yet. Give students the class code above.</p>"
+        }</div></details>`
+      : "";
+    let hub = dash ? gradingHubCard() : "";
+    let gradebook = dash && dash.students.length ? gradebookCard(dash) : "";
+
+    return `<div class="sectionhead"><h2>Teacher Dashboard</h2></div><div class="backend-banner"><div><strong>${esc(klass ? klass.className : "Classes")}</strong><br><small>Student work is saved to their Google account and visible here.</small></div><div>Class code: <strong>${esc(klass ? klass.joinCode : "")}</strong></div></div>${classSwitcher}${hub}${gradebook}${roster}${controls}`;
+  };
+
+  // ---- Batch grading: grade one written-response question across the whole class ----
+  // Keyed by classId+sceneKey (not just sceneKey) so switching classes never shows a
+  // stale class's responses under the same scene. Loaded once per scene, then cached
+  // and re-sorted only on load -- a grading click patches that one row in place rather
+  // than re-rendering the whole list, so the page never jumps while you work down it.
+  function sceneCacheKey_(classId, sceneKey) {
+    return classId + "::" + sceneKey;
+  }
+  function getBatchResponses_() {
+    return backend.sceneResponseCache[sceneCacheKey_(backend.activeClassId, backend.batchSceneKey)];
+  }
+  function getBatchResponse_(email) {
+    let list = getBatchResponses_();
+    return list ? list.find((r) => r.email === email) : null;
+  }
+  function applyBatchLocalUpdate_(email, patch) {
+    let r = getBatchResponse_(email);
+    if (!r) return;
+    if (patch.score !== undefined) r.score = patch.score;
+    if (patch.excluded !== undefined) r.excluded = patch.excluded;
+    if (patch.comment !== undefined) r.comment = patch.comment;
+    // Any grading action re-snapshots the response on the server, so the
+    // "redone since marking" flag is answered. Clear it HERE, before the row
+    // redraws -- clearing it inside the save call happens a beat too late and
+    // the badge survives its own dismissal.
+    r.editedAfterGrading = false;
+  }
+  // Any grade change makes the cached dashboard's Act totals stale, so drop it and
+  // let the Teacher Dashboard refetch next time it's opened.
+  function invalidateDashboardCache_() {
+    delete backend.dashboardCache[backend.activeClassId];
+    // The tiles' "needs grading" counts are the first thing a grade changes, so
+    // they go stale at exactly the same moment the dashboard does.
+    delete backend.gradingHubCache[backend.activeClassId];
+  }
+  async function toggleExcludeWholeClass_() {
+    let responses = getBatchResponses_() || [];
+    if (!responses.length) return;
+    let sceneKey = backend.batchSceneKey;
+    let next = !responses.every((r) => r.excluded);
+    let btn = document.getElementById("excludeAllBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = next ? "Excluding…" : "Restoring…";
+    }
+    try {
+      await rpc("setGradeItemForClass", {
+        classId: backend.activeClassId,
+        itemType: "dok",
+        itemKey: sceneKey,
+        excluded: next,
+      });
+      responses.forEach((r) => (r.excluded = next));
+      invalidateDashboardCache_();
+    } catch (e) {
+      alert("Could not update the whole class: " + e.message);
+    }
+    if (state.view === "batchGrade") refreshBatchView_();
+  }
+  async function saveBatchGradeItem_(email, patch) {
+    invalidateDashboardCache_();
+    // The server re-snapshots the response text on every save, so whatever was
+    // flagged as redone has now been seen by you. Mirror that locally rather
+    // than leaving a stale flag until the next fetch.
+    let cached = getBatchResponse_(email);
+    if (cached) cached.editedAfterGrading = false;
+    try {
+      await rpc("setGradeItem", {
+        classId: backend.activeClassId,
+        studentEmail: email,
+        itemType: "dok",
+        itemKey: backend.batchSceneKey,
+        score: patch.score !== undefined ? patch.score : null,
+        excluded: !!patch.excluded,
+        comment: patch.comment !== undefined ? patch.comment : ((getBatchResponse_(email) || {}).comment || ""),
+      });
+    } catch (e) {
+      alert("Could not save that grade -- try again: " + e.message);
+    }
+  }
+  // Sort priority: ungraded first (the actual to-do list), then incomplete
+  // (nothing submitted yet, so you can see who to chase), then already-graded
+  // last since they need no further attention.
+  // -1 = redone since you marked it (your score is attached to text that has
+  // changed, so it goes to the very top), 0 = waiting on you, 1 = nothing
+  // submitted, 2 = done.
+  // -1 redone since marking, 0 waiting on you, 1 nothing submitted, 2 done,
+  // 3 excluded. Excluded gets its own group at the bottom: it used to share
+  // "Already graded", which is untrue -- an excluded response has no score and
+  // never will, and lumping the two together made a question excluded for the
+  // whole class look like a class that had already been marked.
+  function batchSortRank_(r) {
+    if (r.excluded) return 3;
+    if (r.editedAfterGrading && r.dokText) return -1;
+    // A SCORE WINS OVER EVERYTHING ELSE. This check used to sit below the
+    // no-response check, which meant giving a non-submitter a zero left them
+    // parked in Incomplete for ever -- you could mark the whole group and watch
+    // nothing move. Incomplete now means "still needs a decision from you".
+    if (hasScore_(r.score)) return 2;
+    if (!r.dokText) return 1;
+    return 0;
+  }
+  function batchSortCompare_(a, b) {
+    let ra = batchSortRank_(a),
+      rb = batchSortRank_(b);
+    if (ra !== rb) return ra - rb;
+    return String(a.name || "").localeCompare(String(b.name || ""));
+  }
+  // ---- Rubric presentation, ported from the Short Story app ----
+  // The 1-7 descriptors in DOK_RUBRIC are written as "Name. Sentence...", so
+  // the leading word is the band name. Showing the name on the button (and in
+  // the status chip) is the difference between picking a number and applying a
+  // rubric.
+  // Turns a "Name. Sentence..." descriptor array (index 0 unused, 1-7) into the
+  // shape the marking UI renders. Every 7-point rubric in the app -- the scene
+  // written response and the four essay steps -- is written that way, so they
+  // all get the same buttons, the same legend and the same off-band note.
+  function rubricFrom_(arr, label) {
+    let levels = [];
+    for (let n = arr.length - 1; n >= 1; n--) {
+      let full = String(arr[n] || "");
+      let dot = full.indexOf(". ");
+      levels.push({
+        points: n,
+        label: dot > 0 ? full.slice(0, dot) : "Level " + n,
+        text: dot > 0 ? full.slice(dot + 2) : full,
+      });
+    }
+    return { label: label, levels: levels, max: arr.length - 1 };
+  }
+  const MB_RUBRIC = rubricFrom_(DOK_RUBRIC, "Written Response");
+  // Every rubric in the app can be reached by name, so one marking screen can
+  // switch between them by changing a key rather than a code path.
+  const ESSAY_RUBRICS = {
+    discussion: rubricFrom_(DISCUSSION_RUBRIC, "Thesis Discussion"),
+    body: rubricFrom_(BODY_RUBRIC, "Body Paragraphs"),
+    intro: rubricFrom_(INTRO_RUBRIC, "Introduction"),
+    conclusion: rubricFrom_(CONCLUSION_RUBRIC, "Conclusion"),
+  };
+  function rubricLevelName_(score, rubric) {
+    if (!hasScore_(score)) return "";
+    let l = (rubric || MB_RUBRIC).levels.find((x) => x.points === Number(score));
+    return l ? l.label : "";
+  }
+  function rubricLevelRow_(currentScore, btnClass, dataAttrs, rubric) {
+    return `<div class="score-btn-row rubric-level-row">${(rubric || MB_RUBRIC).levels
+      .map(
+        (l) =>
+          `<button type="button" class="${btnClass} rubric-level-btn ${hasScore_(currentScore) && Number(currentScore) === l.points ? "selected" : ""}" ${dataAttrs} data-score="${l.points}" title="${esc(l.text || l.label)}"><span class="rubric-level-name">${esc(l.label)}</span><span class="rubric-level-pts">${l.points}</span></button>`,
+      )
+      .join("")}</div>`;
+  }
+  // A free numeric box beside the bands, because a response is sometimes a 5.5
+  // and forcing it onto a band loses that.
+  function teacherScoreInputHtml_(inputClass, score, attrs, max) {
+    let m = max === undefined ? DOK_POINTS : max;
+    return `<div class="teacher-score-entry"><label><span>Teacher score</span><span>1\u2013${m} \u00b7 decimals allowed</span></label><input type="number" class="${inputClass}" min="0" max="${m}" step="0.5" value="${hasScore_(score) ? esc(String(score)) : ""}" ${attrs || ""} placeholder="Score"></div>`;
+  }
+  function teacherScoreValue_(input, max) {
+    let m = max === undefined ? DOK_POINTS : max;
+    let raw = String(input.value || "").trim();
+    if (!raw) return null;
+    let n = Number(raw);
+    if (!Number.isFinite(n) || n < 0 || n > m) {
+      alert("Enter a score from 0 to " + m + ".");
+      input.focus();
+      return undefined;
+    }
+    return Math.round(n * 100) / 100;
+  }
+  // The descriptors are the reason for having a rubric, so they are readable
+  // without hovering every button.
+  function rubricLegendHtml_(note, rubric) {
+    let rb = rubric || MB_RUBRIC;
+    return `<details class="rubric-legend"><summary>${esc(rb.label)} rubric &mdash; the full descriptors</summary>${rb.levels
+      .map(
+        (l) =>
+          `<div class="rubric-legend-row"><span class="rubric-legend-level">${esc(l.label)} <strong>${l.points}</strong></span><span class="rubric-legend-text">${esc(l.text || "")}</span></div>`,
+      )
+      .join("")}${note ? `<small class="rubric-legend-note">${note}</small>` : ""}</details>`;
+  }
+  // A score that sits between bands (5.5) still counts, but no button lights
+  // up -- say so rather than letting it read as ungraded.
+  function offRubricNoteHtml_(score, rubric) {
+    if (!hasScore_(score)) return "";
+    if ((rubric || MB_RUBRIC).levels.some((l) => l.points === Number(score))) return "";
+    return `<p class="toolbar-note">Teacher-entered score: <strong>${score}</strong>. It falls between the rubric's bands.</p>`;
+  }
+
+  // Badges follow the same order the buckets do, and a student can carry two of
+  // them: scoring someone who submitted nothing should still say so.
+  function batchStatusBadgeHtml_(r) {
+    if (r.excluded) return `<span class="mini-chip batch-status-badge batch-badge-excluded">Excluded</span>`;
+    let out = "";
+    if (!r.dokText) out += `<span class="mini-chip batch-status-badge">Not submitted</span>`;
+    if (hasScore_(r.score)) {
+      let n = rubricLevelName_(r.score);
+      out += `<span class="mini-chip batch-status-badge batch-badge-graded">${n ? esc(n) + " " : ""}${r.score}/7</span>`;
+    } else if (r.dokText) {
+      out += `<span class="mini-chip batch-status-badge batch-badge-needs">Needs grading</span>`;
+    }
+    return out;
+  }
+  // Shown when the response no longer matches what was on screen at the moment
+  // it was marked. Re-saving the mark refreshes the record and clears this.
+  function batchEditedBadgeHtml_(r) {
+    if (!r.editedAfterGrading || !r.dokText) return "";
+    let when = r.gradedAt ? new Date(r.gradedAt).toLocaleDateString() : "";
+    return `<span class="mini-chip batch-edited-badge" title="This answer has been changed since you marked it${when ? " on " + when : ""}. Your score is still the one you gave the old version. Re-read it and set a score to clear this.">✎ Redone since marking</span>`;
+  }
+  // Only outside pastes get a badge. A quotation lifted from the scene is what
+  // the question asks for, so it is highlighted in the text but not flagged.
+  function batchPasteBadgeHtml_(r) {
+    let p = r.paste;
+    if (!r.dokText || !p || !p.pasted) return "";
+    let pct = Math.round((p.pasted / (p.total || r.dokText.length || 1)) * 100);
+    return `<span class="mini-chip batch-paste-badge" title="Part of this answer was pasted in from outside the app. Worth a conversation, not a verdict.">📋 ${pct}% pasted</span>`;
+  }
+  // Renders a response with any pasted stretches marked. Spans come from the
+  // student's own typing record; text pasted out of the scene is shown as a
+  // quotation rather than as an outside paste, because citing the novel is the
+  // assignment. Every segment is escaped separately, so nothing a student types
+  // can inject markup.
+  function responseHtmlWithPaste_(text, paste) {
+    if (!text) return "<em>No written response submitted yet.</em>";
+    let spans = paste && Array.isArray(paste.spans) ? paste.spans.slice() : [];
+    if (!spans.length) return esc(text);
+    spans.sort((a, b) => a[0] - b[0]);
+    let out = "";
+    let at = 0;
+    spans.forEach((sp) => {
+      let a = Math.max(at, sp[0]);
+      let b = Math.min(text.length, sp[1]);
+      if (b <= a) return;
+      if (a > at) out += esc(text.slice(at, a));
+      let cls = sp[2] === "q" ? "paste-quote" : "paste-outside";
+      let title = sp[2] === "q" ? "Pasted from the scene text (a quotation)" : "Pasted in from somewhere outside the app";
+      out += `<mark class="${cls}" title="${title}">${esc(text.slice(a, b))}</mark>`;
+      at = b;
+    });
+    if (at < text.length) out += esc(text.slice(at));
+    return out;
+  }
+  function pasteSummaryHtml_(r) {
+    let p = r.paste;
+    if (!r.dokText) return "";
+    if (!p || (!p.pasted && !p.quoted)) {
+      return `<p class="paste-note">Typed — nothing pasted in.</p>`;
+    }
+    let total = p.total || r.dokText.length || 1;
+    let pct = Math.round((p.pasted / total) * 100);
+    let bits = [];
+    if (p.pasted) bits.push(`<strong>${p.pasted} of ${total} characters (${pct}%) pasted from outside</strong>`);
+    if (p.quoted) bits.push(`${p.quoted} pasted from the scene text`);
+    return `<p class="paste-note ${p.pasted ? "warn" : ""}">${bits.join(" · ")}</p>`;
+  }
+  // ---- Grading buckets, ported from the Short Story app ----
+  // Every bucket renders even when it holds nobody. That is the whole point: an
+  // empty group that disappears is indistinguishable from a broken sort, which
+  // is exactly how a scene excluded for the entire class came to look like a
+  // class that had already been marked.
+  function batchGroupMeta_(rank) {
+    if (rank === -1) return { label: "Redone since marking", note: "Rewritten after you scored it" };
+    if (rank === 0) return { label: "Ready to Grade", note: "Finished work that still needs a score" };
+    if (rank === 1) return { label: "Incomplete", note: "No response submitted yet" };
+    if (rank === 2) return { label: "Graded", note: "Already scored" };
+    return { label: "Excluded", note: "Not counted for these students" };
+  }
+  const BATCH_RANKS = [-1, 0, 1, 2, 3];
+  // opts lets the essay screens reuse this with their own row renderer, their own
+  // rank function and their own bucket names, rather than growing a second copy
+  // of the grouping logic that would then drift from this one.
+  function batchGroupedListHtml_(sceneKey, rows, opts) {
+    opts = opts || {};
+    let rowHtml = opts.rowHtml || ((r) => batchStudentRowHtml_(sceneKey, r));
+    let rankFn = opts.rankFn || batchSortRank_;
+    let metaFn = opts.metaFn || batchGroupMeta_;
+    let buckets = {};
+    BATCH_RANKS.forEach((k) => (buckets[k] = []));
+    (rows || []).forEach((r) => {
+      let rank = rankFn(r);
+      if (buckets[rank] === undefined) rank = 1;
+      buckets[rank].push(r);
+    });
+    BATCH_RANKS.forEach((k) =>
+      buckets[k].sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))),
+    );
+    return `<div class="batch-grade-groups">${BATCH_RANKS.map((rank) => {
+      let meta = metaFn(rank);
+      let items = buckets[rank];
+      if (!items.length && (rank === -1 || rank === 3)) return ""; // only the core three are shown empty
+      return `<section class="batch-grade-group ${items.length ? "" : "is-empty"}" data-grade-group="${rank}"><div class="batch-grade-group-head"><div><strong>${meta.label}</strong><span>${meta.note}</span></div><span class="batch-grade-group-count">${items.length}</span></div><div class="batch-group-list">${items
+        .map(rowHtml)
+        .join("")}</div></section>`;
+    }).join("")}</div>`;
+  }
+  function refreshBatchGroupCounts_(root) {
+    if (!root) return;
+    root.querySelectorAll(".batch-grade-group").forEach((group) => {
+      let list = group.querySelector(".batch-group-list");
+      let count = list ? list.querySelectorAll(":scope > .batch-row").length : 0;
+      let chip = group.querySelector(".batch-grade-group-count");
+      if (chip) chip.textContent = String(count);
+      group.classList.toggle("is-empty", count === 0);
+    });
+  }
+  // Scoring a response moves its row into Graded straight away, instead of
+  // leaving the list stale until the next load. The row is MOVED, not
+  // re-rendered, so nothing you are typing into is destroyed.
+  function resortBatchRows_(row, rank, studentName) {
+    if (!row) return;
+    if (BATCH_RANKS.indexOf(rank) === -1) rank = 1;
+    row.dataset.gradeRank = String(rank);
+    if (studentName !== undefined) row.dataset.studentName = String(studentName || "");
+    let root = row.closest(".batch-grade-groups");
+    if (!root) return;
+    let target = root.querySelector(`.batch-grade-group[data-grade-group="${rank}"] .batch-group-list`);
+    if (!target) return;
+    target.appendChild(row);
+    let rows = Array.from(target.children).filter((el) => el.classList && el.classList.contains("batch-row"));
+    rows.sort((a, b) => String(a.dataset.studentName || "").localeCompare(String(b.dataset.studentName || "")));
+    rows.forEach((el) => target.appendChild(el));
+    refreshBatchGroupCounts_(root);
+  }
+
+  function batchStudentRowHtml_(sceneKey, r) {
+    return `<div class="item-grade-block batch-row" data-email="${esc(r.email)}" data-grade-rank="${batchSortRank_(r)}" data-student-name="${esc(r.name || "")}">
+      <h5>${esc(r.name)} ${batchStatusBadgeHtml_(r)}${batchEditedBadgeHtml_(r)}${batchPasteBadgeHtml_(r)}</h5>
+      <div class="batch-work">${r.editedAfterGrading && r.dokText ? `<p class="edited-note">You gave this <strong>${hasScore_(r.score) ? r.score + "/7" : "no score"}</strong>${r.gradedAt ? " on " + esc(new Date(r.gradedAt).toLocaleDateString()) : ""}, and the student has rewritten it since. Below is the current version. <button class="btn keepMarkBtn" data-email="${esc(r.email)}" ${hasScore_(r.score) ? "" : "disabled"}>Keep ${r.score}/7</button></p>` : ""}<div class="response-box">${responseHtmlWithPaste_(r.dokText, r.paste)}</div>${pasteSummaryHtml_(r)}</div>
+      <div class="grade-row-dok">${scoreButtonRow(sceneKey, { score: r.score }, r.email)}<label class="exclude-toggle"><input type="checkbox" class="batchExcludeToggle" data-email="${esc(r.email)}" ${r.excluded ? "checked" : ""}> Exclude from grade</label><textarea class="batchComment" data-email="${esc(r.email)}" placeholder="Optional feedback comment for the student">${esc(r.comment || "")}</textarea></div>
+    </div>`;
+  }
+  function updateBatchRowUI_(email) {
+    let r = getBatchResponse_(email);
+    if (!r) return;
+    let row = document.querySelector('.batch-row[data-email="' + email + '"]');
+    if (!row) return;
+    let h5 = row.querySelector("h5");
+    if (h5) h5.innerHTML = `${esc(r.name)} ${batchStatusBadgeHtml_(r)}${batchEditedBadgeHtml_(r)}${batchPasteBadgeHtml_(r)}`;
+    if (!r.editedAfterGrading) {
+      let note = row.querySelector(".edited-note");
+      if (note) note.remove();
+    }
+    let manual = row.querySelector(".dokManualScore");
+    if (manual) manual.value = hasScore_(r.score) ? r.score : "";
+    row.querySelectorAll(".score-btn").forEach((btn) => {
+      btn.classList.toggle("selected", hasScore_(r.score) && Number(btn.dataset.score) === Number(r.score));
+    });
+    let excludeCb = row.querySelector(".batchExcludeToggle");
+    if (excludeCb) excludeCb.checked = r.excluded;
+    resortBatchRows_(row, batchSortRank_(r), r.name);
+  }
+  async function loadSceneResponses(sceneKey, forceRefresh) {
+    backend.batchSceneKey = sceneKey;
+    let classId = backend.activeClassId;
+    let key = sceneCacheKey_(classId, sceneKey);
+    let cached = backend.sceneResponseCache[key];
+    if (state.view === "batchGrade") refreshBatchView_(); // instant from cache, or the "Loading responses…" placeholder
+    if ((cached && !forceRefresh) || backend.sceneResponsePending[key]) return;
+    backend.sceneResponsePending[key] = true;
+    try {
+      let fresh = await rpc("getSceneResponses", { classId: classId, sceneKey: sceneKey });
+      backend.sceneResponseCache[key] = normalizeResponses_(fresh.responses);
+      if (backend.activeClassId === classId && backend.batchSceneKey === sceneKey && state.view === "batchGrade") refreshBatchView_();
+    } catch (e) {
+      console.error(e);
+      let list = document.getElementById("batchResponseList");
+      if (list && !cached)
+        list.innerHTML = `<p class="toolbar-note">Could not load responses: ${esc(e.message || String(e))}</p>`;
+    } finally {
+      delete backend.sceneResponsePending[key];
+    }
+  }
+  // The scene <select> is deliberately rendered ONCE and never rebuilt by a data
+  // refresh. It used to sit inside the same innerHTML as the response list, so a
+  // background fetch finishing while the menu was open destroyed and recreated
+  // the element mid-click -- the dropdown appeared to glitch and the click was
+  // lost, and only the second attempt worked. Everything that changes with the
+  // data now lives in #batchScenePanel and #batchResponseList, which are updated
+  // on their own.
+  function batchListHtml_(sceneKey, responses) {
+    if (!responses) {
+      let key = sceneCacheKey_(backend.activeClassId, sceneKey);
+      if (!backend.sceneResponsePending[key]) setTimeout(() => loadSceneResponses(sceneKey), 0);
+      return `<p class="toolbar-note">Loading responses…</p>`;
+    }
+    if (!responses.length) return `<p>No students enrolled in this class yet.</p>`;
+    if (responses.every((r) => r.excluded)) {
+      let wrote = responses.filter((r) => r.dokText).length;
+      return (
+        `<p class="all-excluded-note"><strong>This question is excluded for the whole class</strong>, so there is nothing to grade here${
+          wrote ? ` — ${wrote} student(s) wrote a response, but it is not being counted` : ""
+        }. Use the button above to count it again.</p>` +
+        batchGroupedListHtml_(sceneKey, responses)
+      );
+    }
+    let shown = backend.batchHideUnsubmitted ? responses.filter((r) => batchSortRank_(r) !== 1) : responses;
+    let hidden = responses.length - shown.length;
+    let anyPaste = responses.some((r) => r.paste && (r.paste.pasted || r.paste.quoted));
+    let legend = anyPaste
+      ? `<p class="paste-legend"><span><span class="swatch" style="background:#ffe0e0;border:1px solid #d4676a"></span>pasted from outside</span><span><span class="swatch" style="background:#fdf3d6;border:1px solid #d9b755"></span>pasted from the scene (a quotation)</span><span>Unmarked text was typed.</span></p>`
+      : "";
+    let note = hidden
+      ? `<p class="toolbar-note">${hidden} student(s) who haven't submitted are hidden.</p>`
+      : "";
+    return legend + batchGroupedListHtml_(sceneKey, shown) + note;
+  }
+
+  function batchPanelHtml_(sceneKey, responses) {
+    let q = QUESTIONS[sceneKey];
+    let allExcluded = !!(responses && responses.length && responses.every((r) => r.excluded));
+    let excludeBtn =
+      responses && responses.length
+        ? `<div class="exclude-all-row ${allExcluded ? "is-excluded" : ""}"><button class="btn ${allExcluded ? "primary" : ""}" id="excludeAllBtn">${
+            allExcluded ? "↺ Count this question again for everyone" : "🚫 Don't grade this question for anyone"
+          }</button><span class="toolbar-note">${
+            allExcluded
+              ? `Excluded for the whole class — Chapter ${CHAPTERS[sceneKey].act} is now worth ${DOK_POINTS} points less for every student, and the Canvas CSV you export will show the lower total.`
+              : `Use this if the question turned out to be flawed or unfair. It comes out of every student's Chapter ${CHAPTERS[sceneKey].act} total (${DOK_POINTS} points) rather than counting as a zero.`
+          }</span></div>`
+        : "";
+    return `<p class="dok-prompt">${esc(q ? q[3] : "")}</p>${rubricLegendHtml_("Keep this open while you score the class. Click a band, or type an exact score in the box beside it.")}<label class="exclude-toggle" style="margin-top:6px"><input type="checkbox" id="hideUnsubmitted" ${backend.batchHideUnsubmitted ? "checked" : ""}> Hide students who haven't submitted</label>${excludeBtn}`;
+  }
+
+  // Updates just the two data-driven panels, leaving the dropdown alone.
+  // Falls back to a full render if the batch screen isn't on show.
+  function refreshBatchView_() {
+    let panel = document.getElementById("batchScenePanel");
+    let list = document.getElementById("batchResponseList");
+    if (!panel || !list) {
+      if (state.view === "batchGrade") render();
+      return;
+    }
+    let sceneKey = backend.batchSceneKey;
+    let responses = getBatchResponses_();
+    panel.innerHTML = batchPanelHtml_(sceneKey, responses);
+    list.innerHTML = batchListHtml_(sceneKey, responses);
+    bindBackend();
+  }
+
+  batchGrade = function () {
+    if (!backend.enabled) return original.batchGrade();
+    if (!backend.activeClassId)
+      return `<div class="sectionhead"><h2>Grade Written Responses</h2></div><p class="toolbar-note">Choose a class from the Teacher Dashboard first.</p>`;
+    if (!backend.batchSceneKey) backend.batchSceneKey = Object.keys(CHAPTERS).sort(sceneSort)[0];
+    let sceneKey = backend.batchSceneKey;
+    let sceneOptions = Object.keys(CHAPTERS)
+      .sort(sceneSort)
+      .map((k) => `<option value="${k}" ${k === sceneKey ? "selected" : ""}>Chapter ${CHAPTERS[k].act}</option>`)
+      .join("");
+    let responses = getBatchResponses_();
+    return `<div class="sectionhead"><h2>Grade Written Responses</h2><button class="btn" id="backToDashboard">← Back to Dashboard</button></div><div class="card"><div class="field" style="max-width:360px"><label>Chapter</label><select id="batchSceneSelect">${sceneOptions}</select></div><div id="batchScenePanel">${batchPanelHtml_(sceneKey, responses)}</div></div><div id="batchResponseList">${batchListHtml_(sceneKey, responses)}</div>`;
+  };
+  // ---- Grade the essay, one step at a time ----------------------------------
+  // The same screen as Grade Written Responses, keyed by essay step instead of
+  // scene. It deliberately reuses that screen's grouping, sorting and rubric
+  // rendering rather than growing a parallel copy: two marking screens that look
+  // the same but behave differently is worse than either one alone.
+  const ESSAY_GRADE_STEPS = ESSAY_STEP_KEYS.concat(["final"]);
+  const ESSAY_GRADE_LABELS = Object.assign({}, ESSAY_STEP_LABELS, { final: "Final Essay" });
+  // Column headings have to fit eleven of them across one table.
+  const ESSAY_GRADE_SHORT = {
+    thesis: "Thesis", discussion: "Discussion", body: "Body", intro: "Intro", conclusion: "Conclusion", final: "Final Essay",
+  };
+
+  function essayCacheKey_(classId, stepKey) { return classId + "::essay::" + stepKey; }
+  function getEssayRows_() {
+    return backend.essayResponseCache[essayCacheKey_(backend.activeClassId, backend.essayStepKey)];
+  }
+  function getEssayRow_(email) {
+    let list = getEssayRows_();
+    return list ? list.find((r) => r.email === email) : null;
+  }
+  // The thesis is a completion mark the app fills in: a drafted thesis is
+  // complete without the teacher clicking anything. Everywhere else, "graded"
+  // means the teacher put a number on it.
+  function essayIsThesis_() { return backend.essayStepKey === "thesis"; }
+  function essayRubric_() { return ESSAY_RUBRICS[backend.essayStepKey] || MB_RUBRIC; }
+  function essayStepMax_() { return essayIsThesis_() ? 1 : DOK_POINTS; }
+
+  function essayRowRank_(r) {
+    if (r.excluded) return 3;
+    if (r.editedAfterGrading && r.text) return -1;
+    if (hasScore_(r.score)) return 2;
+    if (!r.text) return 1;
+    return 0;
+  }
+  function essayGroupMeta_(rank) {
+    if (!essayIsThesis_()) return batchGroupMeta_(rank);
+    if (rank === -1) return { label: "Redone since marking", note: "Rewritten after you marked it" };
+    if (rank === 0) return { label: "Ready to Grade", note: "Needs a decision from you" };
+    if (rank === 1) return { label: "Not drafted", note: "No thesis written yet" };
+    if (rank === 2) return { label: "Complete", note: "A thesis is drafted" };
+    return { label: "Excluded", note: "Not counted for these students" };
+  }
+  function essayStatusBadgeHtml_(r) {
+    if (r.excluded) return `<span class="mini-chip batch-status-badge batch-badge-excluded">Excluded</span>`;
+    let out = "";
+    if (!r.text) out += `<span class="mini-chip batch-status-badge">Not submitted</span>`;
+    if (essayIsThesis_()) {
+      if (hasScore_(r.score))
+        out += `<span class="mini-chip batch-status-badge batch-badge-graded">${Number(r.score) > 0 ? "Complete" : "Not complete"}${r.auto ? "" : " (yours)"}</span>`;
+      else if (r.text) out += `<span class="mini-chip batch-status-badge batch-badge-needs">Needs a decision</span>`;
+      return out;
+    }
+    if (hasScore_(r.score)) {
+      let n = rubricLevelName_(r.score, essayRubric_());
+      out += `<span class="mini-chip batch-status-badge batch-badge-graded">${n ? esc(n) + " " : ""}${r.score}/${DOK_POINTS}</span>`;
+    } else if (r.text) {
+      out += `<span class="mini-chip batch-status-badge batch-badge-needs">Needs grading</span>`;
+    }
+    return out;
+  }
+  function essayEditedBadgeHtml_(r) {
+    if (!r.editedAfterGrading || !r.text) return "";
+    let when = r.gradedAt ? new Date(r.gradedAt).toLocaleDateString() : "";
+    return `<span class="mini-chip batch-edited-badge" title="This has been changed since you marked it${when ? " on " + when : ""}. Your score is still the one you gave the old version. Re-read it and set a score to clear this.">✎ Redone since marking</span>`;
+  }
+
+  // What the teacher actually reads, which is different for every step: a
+  // thesis is one sentence, the body step is several paragraphs plus an optional
+  // counterargument, the discussion is a list of posts.
+  function essayWorkHtml_(r) {
+    let step = backend.essayStepKey;
+    let thesis = r.thesis ? `<p class="essay-thesis-line"><strong>Their thesis:</strong> ${esc(r.thesis)}</p>` : "";
+    if (step === "discussion") {
+      if (!r.posts || !r.posts.length) return `<div class="response-box"><em>Nothing posted to the discussion yet.</em></div>`;
+      return r.posts
+        .map((p) => `<div class="response-box"><small class="essay-post-date">${esc(new Date(p.date).toLocaleString())}</small><p>${esc(p.text)}</p></div>`)
+        .join("");
+    }
+    if (step === "body") {
+      let bodies = Array.isArray(r.bodies) ? r.bodies : [];
+      let blocks = bodies
+        .map((b, i) => `<div class="response-box essay-para"><strong>Body Paragraph ${i + 1}${i >= 3 ? " (extra)" : ""}</strong><p>${b && b.trim() ? esc(b) : "<em>Not drafted</em>"}</p></div>`)
+        .join("");
+      let reb = String(r.rebuttal || "").trim()
+        ? `<div class="response-box essay-para essay-rebuttal"><strong>Counterargument</strong> <span class="mini-chip body-chip-extra">Optional</span><p>${esc(r.rebuttal)}</p></div>`
+        : `<p class="toolbar-note">No counterargument paragraph — it is optional, so this is not a gap.</p>`;
+      return thesis + (blocks || `<div class="response-box"><em>Nothing drafted yet.</em></div>`) + reb;
+    }
+    return thesis + `<div class="response-box">${r.text ? esc(r.text) : "<em>Nothing drafted yet.</em>"}</div>`;
+  }
+
+  // The thesis row asks a yes/no question, so it gets two buttons rather than a
+  // seven-band rubric. Anything else would be pretending to measure something.
+  function essayScoreRowHtml_(r) {
+    if (essayIsThesis_()) {
+      let val = hasScore_(r.score) ? Number(r.score) : null;
+      return `<div class="score-btn-row essay-complete-row">
+        <button type="button" class="essayCompleteBtn rubric-level-btn ${val === 1 ? "selected" : ""}" data-email="${esc(r.email)}" data-score="1"><span class="rubric-level-name">Complete</span><span class="rubric-level-pts">1</span></button>
+        <button type="button" class="essayCompleteBtn rubric-level-btn ${val === 0 ? "selected" : ""}" data-email="${esc(r.email)}" data-score="0"><span class="rubric-level-name">Not complete</span><span class="rubric-level-pts">0</span></button>
+      </div>${r.auto && val === 1 ? `<p class="toolbar-note">Marked complete automatically because a thesis is drafted. Click either button to decide it yourself.</p>` : ""}`;
+    }
+    let rb = essayRubric_();
+    return (
+      rubricLevelRow_(r.score, "essayScoreBtn", `data-email="${esc(r.email)}"`, rb) +
+      teacherScoreInputHtml_("essayManualScore", r.score, `data-email="${esc(r.email)}"`, DOK_POINTS) +
+      offRubricNoteHtml_(r.score, rb)
+    );
+  }
+  function essayStudentRowHtml_(r) {
+    let keep = r.editedAfterGrading && r.text
+      ? `<p class="edited-note">You gave this <strong>${hasScore_(r.teacherScore) ? r.teacherScore + "/" + essayStepMax_() : "no score"}</strong>${r.gradedAt ? " on " + esc(new Date(r.gradedAt).toLocaleDateString()) : ""}, and the student has rewritten it since. Below is the current version. <button class="btn essayKeepBtn" data-email="${esc(r.email)}" ${hasScore_(r.teacherScore) ? "" : "disabled"}>Keep ${r.teacherScore}/${essayStepMax_()}</button></p>`
+      : "";
+    return `<div class="item-grade-block batch-row" data-email="${esc(r.email)}" data-grade-rank="${essayRowRank_(r)}" data-student-name="${esc(r.name || "")}">
+      <h5>${esc(r.name)} ${essayStatusBadgeHtml_(r)}${essayEditedBadgeHtml_(r)}</h5>
+      <div class="batch-work">${keep}${essayWorkHtml_(r)}</div>
+      <div class="grade-row-dok">${essayScoreRowHtml_(r)}<label class="exclude-toggle"><input type="checkbox" class="essayExcludeToggle" data-email="${esc(r.email)}" ${r.excluded ? "checked" : ""}> Exclude from grade</label><textarea class="essayComment" data-email="${esc(r.email)}" placeholder="Optional feedback comment for the student">${esc(r.comment || "")}</textarea></div>
+    </div>`;
+  }
+  function applyEssayLocalUpdate_(email, patch) {
+    let r = getEssayRow_(email);
+    if (!r) return;
+    if (patch.score !== undefined) {
+      r.score = patch.score;
+      r.teacherScore = patch.score;
+      r.auto = false;
+      r.editedAfterGrading = false; // marking it again is reading the new version
+    }
+    if (patch.excluded !== undefined) r.excluded = patch.excluded;
+    if (patch.comment !== undefined) r.comment = patch.comment;
+  }
+  function updateEssayRowUI_(email) {
+    let r = getEssayRow_(email);
+    if (!r) return;
+    let row = document.querySelector('.batch-row[data-email="' + email + '"]');
+    if (!row) return;
+    let h5 = row.querySelector("h5");
+    if (h5) h5.innerHTML = `${esc(r.name)} ${essayStatusBadgeHtml_(r)}${essayEditedBadgeHtml_(r)}`;
+    if (!r.editedAfterGrading) {
+      let note = row.querySelector(".edited-note");
+      if (note) note.remove();
+    }
+    let manual = row.querySelector(".essayManualScore");
+    if (manual) manual.value = hasScore_(r.score) ? r.score : "";
+    row.querySelectorAll(".essayScoreBtn,.essayCompleteBtn").forEach((btn) => {
+      btn.classList.toggle("selected", hasScore_(r.score) && Number(btn.dataset.score) === Number(r.score));
+    });
+    let cb = row.querySelector(".essayExcludeToggle");
+    if (cb) cb.checked = r.excluded;
+    resortBatchRows_(row, essayRowRank_(r), r.name);
+  }
+  async function toggleExcludeEssayStepForClass_() {
+    let rows = getEssayRows_() || [];
+    if (!rows.length) return;
+    let stepKey = backend.essayStepKey;
+    let next = !rows.every((r) => r.excluded);
+    let btn = document.getElementById("essayExcludeAllBtn");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = next ? "Excluding\u2026" : "Restoring\u2026";
+    }
+    try {
+      await rpc("setGradeItemForClass", {
+        classId: backend.activeClassId,
+        itemType: "essay",
+        itemKey: stepKey,
+        excluded: next,
+      });
+      rows.forEach((r) => (r.excluded = next));
+      invalidateDashboardCache_();
+    } catch (e) {
+      alert("Could not update the whole class: " + e.message);
+    }
+    if (state.view === "essayGrade") refreshEssayView_();
+  }
+  async function saveEssayGradeItem_(email, patch) {
+    invalidateDashboardCache_();
+    try {
+      await rpc("setGradeItem", {
+        classId: backend.activeClassId,
+        studentEmail: email,
+        itemType: "essay",
+        itemKey: backend.essayStepKey,
+        score: patch.score !== undefined ? patch.score : null,
+        excluded: !!patch.excluded,
+        comment: patch.comment !== undefined ? patch.comment : (getEssayRow_(email) || {}).comment || "",
+      });
+    } catch (e) {
+      alert("Could not save that grade — try again: " + e.message);
+    }
+  }
+
+  // ---- The finished essay, all four criteria at once ----
+  // The teacher reads a 900-word essay once, then scores Meaning, Style, Form
+  // and Conventions together. Splitting them across four passes would mean
+  // reading it four times.
+  function finalRowRank_(r) {
+    let active = ESSAY_CRITERIA.filter((c) => !r.criteria[c].excluded);
+    if (!active.length) return 3;
+    if (r.finalTotal && r.finalTotal.editedAfterGrading && r.text) return -1;
+    if (!r.text) return 1;
+    return active.every((c) => hasScore_(r.criteria[c].teacherScore)) ? 2 : 0;
+  }
+  function finalGroupMeta_(rank) {
+    if (rank === -1) return { label: "Redone since marking", note: "Rewritten after you scored it" };
+    if (rank === 0) return { label: "Ready to Grade", note: "Still has a criterion without a score" };
+    if (rank === 1) return { label: "Incomplete", note: "No essay assembled yet" };
+    if (rank === 2) return { label: "Graded", note: "All four criteria scored" };
+    return { label: "Excluded", note: "Not counted for these students" };
+  }
+  function finalSummaryHtml_(r) {
+    if (!r.text) return `<span class="mini-chip batch-status-badge">Not submitted</span>`;
+    let t = r.finalTotal || { earned: 0, possible: 0 };
+    let scored = ESSAY_CRITERIA.filter((c) => !r.criteria[c].excluded && hasScore_(r.criteria[c].teacherScore)).length;
+    let active = ESSAY_CRITERIA.filter((c) => !r.criteria[c].excluded).length;
+    let cls = scored === active && active ? "batch-badge-graded" : "batch-badge-needs";
+    return `<span class="mini-chip batch-status-badge ${cls}">${t.earned}/${t.possible} · ${scored}/${active} criteria</span><span class="mini-chip">${r.words} words</span>`;
+  }
+  function finalCriterionCardHtml_(r, c) {
+    let rec = r.criteria[c] || {};
+    let self = rec.selfEvalIdx !== "" && rec.selfEvalIdx !== undefined ? Number(rec.selfEvalIdx) : null;
+    let btns = RUBRIC[c]
+      .map((desc, i) => {
+        let pts = ESSAY_CRITERION_POINTS[i];
+        let official = hasScore_(rec.teacherScore) && Number(rec.teacherScore) === pts;
+        let suggested = !hasScore_(rec.teacherScore) && self === i;
+        return `<button type="button" class="critScoreBtn rubric-level-btn ${official ? "selected" : suggested ? "pending-suggested" : ""}" data-email="${esc(r.email)}" data-crit="${esc(c)}" data-score="${pts}" title="${esc(desc)}"><span class="rubric-level-name">${esc(ESSAY_BAND_LABELS[i])}</span><span class="rubric-level-pts">${pts}</span></button>`;
+      })
+      .join("");
+    let selfNote =
+      self !== null
+        ? `<p class="toolbar-note">The student rated themselves <strong>${esc(ESSAY_BAND_LABELS[self])} (${ESSAY_CRITERION_POINTS[self]})</strong>${rec.selfComment ? ": “" + esc(rec.selfComment) + "”" : "."}${hasScore_(rec.teacherScore) ? "" : " Shown dashed above until you decide."}</p>`
+        : `<p class="toolbar-note">No self-evaluation for this criterion yet.</p>`;
+    return `<section class="final-criterion">
+      <div class="final-criterion-head"><strong>${esc(c)}</strong>${
+        rec.excluded
+          ? `<span class="mini-chip batch-badge-excluded">Excluded</span>`
+          : hasScore_(rec.teacherScore)
+            ? `<span class="mini-chip batch-badge-graded">${rec.teacherScore}/${ESSAY_CRITERION_MAX}</span>`
+            : `<span class="mini-chip batch-badge-needs">Needs grading</span>`
+      }</div>
+      <div class="score-btn-row rubric-level-row">${btns}</div>
+      ${selfNote}
+      <label class="exclude-toggle"><input type="checkbox" class="critExcludeToggle" data-email="${esc(r.email)}" data-crit="${esc(c)}" ${rec.excluded ? "checked" : ""}> Exclude ${esc(c)} from this student's grade</label>
+      <textarea class="critComment" data-email="${esc(r.email)}" data-crit="${esc(c)}" placeholder="Optional ${esc(c)} comment">${esc(rec.comment || "")}</textarea>
+    </section>`;
+  }
+  function finalStudentRowHtml_(r) {
+    return `<div class="item-grade-block batch-row" data-email="${esc(r.email)}" data-grade-rank="${finalRowRank_(r)}" data-student-name="${esc(r.name || "")}">
+      <h5>${esc(r.name)} ${finalSummaryHtml_(r)}</h5>
+      <div class="batch-work"><div class="response-box final-essay-text">${r.text ? esc(r.text) : "<em>No essay assembled yet.</em>"}</div></div>
+      <div class="final-criteria-grid">${ESSAY_CRITERIA.map((c) => finalCriterionCardHtml_(r, c)).join("")}</div>
+    </div>`;
+  }
+  function applyFinalLocalUpdate_(email, crit, patch) {
+    let r = getEssayRow_(email);
+    if (!r || !r.criteria || !r.criteria[crit]) return;
+    let rec = r.criteria[crit];
+    if (patch.score !== undefined) { rec.teacherScore = patch.score; rec.score = patch.score; rec.pending = false; }
+    if (patch.excluded !== undefined) rec.excluded = patch.excluded;
+    if (patch.comment !== undefined) rec.comment = patch.comment;
+    if (r.finalTotal) {
+      let earned = 0, possible = 0;
+      ESSAY_CRITERIA.forEach((c) => {
+        let x = r.criteria[c];
+        if (x.excluded) return;
+        possible += ESSAY_CRITERION_MAX;
+        if (hasScore_(x.teacherScore)) earned += Number(x.teacherScore);
+      });
+      r.finalTotal.earned = earned;
+      r.finalTotal.possible = possible;
+      r.finalTotal.editedAfterGrading = false;
+    }
+  }
+  function updateFinalRowUI_(email) {
+    let r = getEssayRow_(email);
+    if (!r) return;
+    let row = document.querySelector('.batch-row[data-email="' + email + '"]');
+    if (!row) return;
+    let h5 = row.querySelector("h5");
+    if (h5) h5.innerHTML = `${esc(r.name)} ${finalSummaryHtml_(r)}`;
+    ESSAY_CRITERIA.forEach((c) => {
+      let rec = r.criteria[c];
+      row.querySelectorAll(`.critScoreBtn[data-crit="${c}"]`).forEach((btn) => {
+        btn.classList.toggle("selected", hasScore_(rec.teacherScore) && Number(btn.dataset.score) === Number(rec.teacherScore));
+        if (hasScore_(rec.teacherScore)) btn.classList.remove("pending-suggested");
+      });
+      let head = row.querySelectorAll(".final-criterion-head")[ESSAY_CRITERIA.indexOf(c)];
+      if (head) {
+        let chip = head.querySelector(".mini-chip");
+        if (chip) {
+          chip.className = "mini-chip " + (rec.excluded ? "batch-badge-excluded" : hasScore_(rec.teacherScore) ? "batch-badge-graded" : "batch-badge-needs");
+          chip.textContent = rec.excluded ? "Excluded" : hasScore_(rec.teacherScore) ? rec.teacherScore + "/" + ESSAY_CRITERION_MAX : "Needs grading";
+        }
+      }
+    });
+    resortBatchRows_(row, finalRowRank_(r), r.name);
+  }
+  async function saveFinalGradeItem_(email, crit, patch) {
+    invalidateDashboardCache_();
+    try {
+      let rec = (getEssayRow_(email) || { criteria: {} }).criteria[crit] || {};
+      await rpc("setGradeItem", {
+        classId: backend.activeClassId,
+        studentEmail: email,
+        itemType: "essayRubric",
+        itemKey: crit,
+        score: patch.score !== undefined ? patch.score : null,
+        excluded: !!patch.excluded,
+        comment: patch.comment !== undefined ? patch.comment : rec.comment || "",
+      });
+    } catch (e) {
+      alert("Could not save that grade — try again: " + e.message);
+    }
+  }
+
+  async function loadEssayResponses(stepKey, forceRefresh) {
+    backend.essayStepKey = stepKey;
+    let classId = backend.activeClassId;
+    let key = essayCacheKey_(classId, stepKey);
+    let cached = backend.essayResponseCache[key];
+    if (state.view === "essayGrade") refreshEssayView_();
+    if ((cached && !forceRefresh) || backend.essayResponsePending[key]) return;
+    backend.essayResponsePending[key] = true;
+    try {
+      let fresh = await rpc("getEssayResponses", { classId: classId, stepKey: stepKey });
+      backend.essayResponseCache[key] = normalizeEssayRows_(fresh.responses, stepKey);
+      if (backend.activeClassId === classId && backend.essayStepKey === stepKey && state.view === "essayGrade") refreshEssayView_();
+    } catch (e) {
+      console.error(e);
+      let list = document.getElementById("essayResponseList");
+      if (list && !cached) list.innerHTML = `<p class="toolbar-note">Could not load the essays: ${esc(e.message || String(e))}</p>`;
+    } finally {
+      delete backend.essayResponsePending[key];
+    }
+  }
+  // Apps Script hands the browser `undefined` where the server returned null, so
+  // every score arriving from the server is normalised at the door -- the same
+  // guard the scene responses get, and for the same reason.
+  function normalizeEssayRows_(rows, stepKey) {
+    return (rows || []).map((r) => {
+      let out = Object.assign({}, r);
+      out.text = String(out.text || "");
+      out.excluded = out.excluded === true;
+      out.comment = String(out.comment || "");
+      if (stepKey === "final") {
+        out.criteria = out.criteria || {};
+        ESSAY_CRITERIA.forEach((c) => {
+          let rec = out.criteria[c] || {};
+          rec.teacherScore = normalizeScore_(rec.teacherScore);
+          rec.score = normalizeScore_(rec.score);
+          rec.excluded = rec.excluded === true;
+          rec.comment = String(rec.comment || "");
+          rec.selfEvalIdx = rec.selfEvalIdx === undefined || rec.selfEvalIdx === null ? "" : rec.selfEvalIdx;
+          out.criteria[c] = rec;
+        });
+        out.finalTotal = out.finalTotal || { earned: 0, possible: 0 };
+        out.words = Number(out.words || 0);
+      } else {
+        out.score = normalizeScore_(out.score);
+        out.teacherScore = normalizeScore_(out.teacherScore);
+        out.auto = out.auto === true;
+        out.submitted = out.submitted === true;
+        out.editedAfterGrading = out.editedAfterGrading === true;
+      }
+      return out;
+    });
+  }
+
+  function essayPanelHtml_() {
+    let step = backend.essayStepKey;
+    let rows = getEssayRows_();
+    let intro = ESSAY_GRADE_NOTES[step] || "";
+    let legend =
+      step === "final"
+        ? `<details class="rubric-legend"><summary>Gatsby essay rubric &mdash; the full descriptors</summary>${ESSAY_CRITERIA.map(
+            (c) =>
+              `<div class="rubric-legend-row"><span class="rubric-legend-level">${esc(c)}</span><span class="rubric-legend-text">${RUBRIC[c]
+                .map((d, i) => `<strong>${esc(ESSAY_BAND_LABELS[i])} (${ESSAY_CRITERION_POINTS[i]})</strong> ${esc(d)}`)
+                .join("<br>")}</span></div>`,
+          ).join("")}<small class="rubric-legend-note">This is the same rubric the students self-assess against on Step 7. Their own choice is shown dashed under each criterion until you decide.</small></details>`
+        : step === "thesis"
+          ? ""
+          : rubricLegendHtml_("Keep this open while you score the class. Click a band, or type an exact score in the box beside it.", essayRubric_());
+    let allExcluded = !!(rows && rows.length && rows.every((r) => (step === "final" ? ESSAY_CRITERIA.every((c) => r.criteria[c].excluded) : r.excluded)));
+    let excludeBtn =
+      rows && rows.length && step !== "final"
+        ? `<div class="exclude-all-row ${allExcluded ? "is-excluded" : ""}"><button class="btn ${allExcluded ? "primary" : ""}" id="essayExcludeAllBtn">${
+            allExcluded ? "↺ Count this step again for everyone" : "🚫 Don't grade this step for anyone"
+          }</button><span class="toolbar-note">${
+            allExcluded
+              ? "Excluded for the whole class — it has no Canvas assignment and counts for nobody."
+              : "Use this if you are not marking this step this time round. It comes out of every student's essay total rather than counting as a zero."
+          }</span></div>`
+        : "";
+    return `<p class="dok-prompt">${esc(intro)}</p>${legend}${excludeBtn}`;
+  }
+  function essayListHtml_() {
+    let step = backend.essayStepKey;
+    let rows = getEssayRows_();
+    if (!rows) {
+      let key = essayCacheKey_(backend.activeClassId, step);
+      if (!backend.essayResponsePending[key]) setTimeout(() => loadEssayResponses(step), 0);
+      return `<p class="toolbar-note">Loading the class's work…</p>`;
+    }
+    if (!rows.length) return `<p>No students enrolled in this class yet.</p>`;
+    if (step === "final")
+      return batchGroupedListHtml_("", rows, { rowHtml: finalStudentRowHtml_, rankFn: finalRowRank_, metaFn: finalGroupMeta_ });
+    return batchGroupedListHtml_("", rows, { rowHtml: essayStudentRowHtml_, rankFn: essayRowRank_, metaFn: essayGroupMeta_ });
+  }
+  function refreshEssayView_() {
+    let panel = document.getElementById("essayStepPanel");
+    let list = document.getElementById("essayResponseList");
+    if (!panel || !list) {
+      if (state.view === "essayGrade") render();
+      return;
+    }
+    panel.innerHTML = essayPanelHtml_();
+    list.innerHTML = essayListHtml_();
+    bindBackend();
+  }
+  essayGrade = function () {
+    if (!backend.enabled) return original.essayGrade();
+    if (!backend.activeClassId)
+      return `<div class="sectionhead"><h2>Grade the Essay</h2></div><p class="toolbar-note">Choose a class from the Teacher Dashboard first.</p>`;
+    if (!backend.essayStepKey) backend.essayStepKey = ESSAY_GRADE_STEPS[0];
+    let opts = ESSAY_GRADE_STEPS.map(
+      (k, i) => `<option value="${k}" ${k === backend.essayStepKey ? "selected" : ""}>${i + 1}. ${esc(ESSAY_GRADE_LABELS[k])}</option>`,
+    ).join("");
+    return `<div class="sectionhead"><h2>Grade the Essay</h2><button class="btn" id="backToDashboard">← Back to Dashboard</button></div><div class="card"><div class="field" style="max-width:360px"><label>Essay step</label><select id="essayStepSelect">${opts}</select></div><div id="essayStepPanel">${essayPanelHtml_()}</div></div><div id="essayResponseList">${essayListHtml_()}</div>`;
+  };
+
+  // ---- The Grading Hub -------------------------------------------------------
+  // Eleven tiles: the five Acts and the six pieces of the essay. Each one answers
+  // the only question worth asking at a glance -- how many students are waiting
+  // on me -- and is a button through to the screen where you deal with them.
+  //
+  // Counts come from getGradingHubSummary, fetched separately from the roster so
+  // a grading click refreshes the numbers without refetching every student's
+  // whole grade summary. Ported from the short story unit's Grading Hub.
+  async function loadGradingHub(classId, forceRefresh) {
+    classId = classId || backend.activeClassId;
+    if (!classId) return;
+    let cached = backend.gradingHubCache[classId];
+    if (cached && !forceRefresh) {
+      backend.gradingHub = cached;
+      return;
+    }
+    if (backend.gradingHubPending[classId]) return;
+    backend.gradingHubPending[classId] = true;
+    try {
+      let fresh = await rpc("getGradingHubSummary", { classId: classId });
+      backend.gradingHubCache[classId] = fresh;
+      if (backend.activeClassId !== classId) return; // switched class while this was in flight
+      backend.gradingHub = fresh;
+      // Repaint just the tiles, so a refresh never destroys anything the teacher
+      // is part-way through elsewhere on the dashboard.
+      let mount = document.getElementById("gradingHubTiles");
+      if (mount && state.view === "manage") {
+        mount.innerHTML = hubTilesHtml_();
+        bindBackend();
+      } else if (state.view === "manage") {
+        render();
+      }
+    } catch (e) {
+      console.error(e);
+      let mount = document.getElementById("gradingHubTiles");
+      if (mount && !cached) mount.innerHTML = `<p class="toolbar-note">Could not load the grading counts: ${esc(e.message || String(e))}</p>`;
+    } finally {
+      delete backend.gradingHubPending[classId];
+    }
+  }
+
+  // The one line on a tile that says what it wants from you.
+  function hubStatusLine_(r) {
+    if (r.allExcluded) return { text: "Not graded for this class", cls: "is-excluded" };
+    if (r.needsGrading > 0) return { text: r.needsGrading + " to mark", cls: "needs" };
+    if (r.submitted > 0) return { text: "Caught up", cls: "done" };
+    return { text: "No submissions yet", cls: "" };
+  }
+  // Canvas, in the smallest number of words that are still true.
+  function hubCanvasNote_(asg) {
+    let c = canvasSettings_();
+    if (!c.courseId) return "Canvas not linked";
+    let link = (c.assignments || {})[asg] || {};
+    let sch = canvasSchedule_()[asg] || {};
+    let parts = [link.assignmentId ? "Canvas ✓" : "Not in Canvas yet"];
+    if (link.moduleName) parts.push(link.moduleName);
+    let due = sch.dueAt || link.dueAt;
+    if (due) {
+      let d = new Date(due);
+      if (!Number.isNaN(d.getTime())) parts.push("Due " + d.toLocaleString([], { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }));
+    }
+    return parts.join(" · ");
+  }
+
+  // Push shows as soon as the class is linked to a Canvas course, not once the
+  // assignment exists: the server creates the assignment on demand, so pushing a
+  // brand-new Act is still one button. Hiding it until "Create" had been pressed
+  // would take a step away that already worked.
+  function hubCanvasButtonsHtml_(asg) {
+    let push = canvasLinked_()
+      ? `<button class="btn primary hub-mini-btn push-act-btn" data-asg="${asg}" title="Send these scores to Canvas now. The assignment is created the first time and reused after that.">\u2197 Push</button>`
+      : "";
+    return `${push}<button class="btn hub-mini-btn hubCanvasBtn" data-asg="${asg}" title="Due date, module placement and the Canvas assignment">Canvas</button><button class="btn hub-mini-btn export-act-btn" data-asg="${asg}" title="Download a Canvas CSV">CSV</button>`;
+  }
+
+  function hubActTileHtml_(r) {
+    let st = hubStatusLine_(r);
+    let asg = "act:" + r.act;
+    let marked = r.totalItems ? `${r.graded} of ${r.totalItems}` : "No students yet";
+    // The section heading already says "The Novel", so the eyebrow carries
+    // something the tile does not otherwise show: this chapter's title.
+    let card = ACT_CARDS[r.act - 1];
+    let range = card ? card[1] : "";
+    return `<article class="hub-tile ${r.released ? "is-released" : "is-unreleased"} ${st.cls === "needs" ? "has-needs" : ""} ${r.allExcluded ? "is-nograde" : ""}" data-hubopen="act" data-key="${r.act}" data-scene="${esc(r.firstToMark)}" tabindex="0" role="button" aria-label="Mark Chapter ${r.act} written responses">
+      <div class="hub-tile-top"><span class="hub-tile-eyebrow">${esc(range)}</span>${
+        st.cls === "needs"
+          ? `<span class="hub-needs-badge" title="${r.needsGrading} written response${r.needsGrading === 1 ? "" : "s"} waiting on you">${r.needsGrading}</span>`
+          : r.submitted > 0
+            ? `<span class="hub-caught-badge" title="Nothing waiting on you here">✓</span>`
+            : ""
+      }</div>
+      <div class="hub-tile-main"><h4>Chapter ${r.act}</h4><p>Written responses and multiple choice</p>
+        <span class="hub-tile-points">${r.pointsError ? "Not graded" : r.pointsPossible + " pts"}</span></div>
+      <div class="hub-tile-rows">
+        <div><span>Written</span><strong class="${st.cls}">${esc(st.text)}</strong></div>
+        <div><span>Answered</span><strong>${r.mcPossible ? `${r.mcAnswered} of ${r.mcPossible}` : "—"}</strong></div>
+        <div><span>Marked</span><strong>${esc(marked)}</strong></div>
+      </div>
+      <div class="hub-tile-controls">
+        <label title="Show Chapter ${r.act} to students"><input type="checkbox" class="actRelease" data-act="${r.act}" ${r.released ? "checked" : ""}> Released</label>
+        ${hubCanvasButtonsHtml_(asg)}
+        <button class="btn hub-mini-btn actNoGradeBtn ${r.allExcluded ? "is-excluded" : ""}" data-act="${r.act}" title="${
+          r.allExcluded
+            ? "Count Chapter " + r.act + " again for the whole class"
+            : "Leave Chapter " + r.act + " out of every student's grade. Scores you have already entered are kept."
+        }">${r.allExcluded ? "\u21ba Count it again" : "\uD83D\uDEAB Don't grade"}</button>
+      </div>
+      <div class="hub-tile-canvas ${canvasLinked_() ? "" : "is-dim"}" id="${asgStatusId_(asg)}">${esc(hubCanvasNote_(asg))}</div>
+    </article>`;
+  }
+
+  function hubEssayTileHtml_(r, idx) {
+    let st = hubStatusLine_(r);
+    let asg = "essay:" + r.key;
+    let worth = r.gradingType === "pass_fail" ? "complete / incomplete" : r.pointsPossible + " pts";
+    let marked = r.totalItems ? `${r.graded} of ${r.totalItems}` : "No students yet";
+    // Whether students can reach this stage at all. The teacher always can.
+    let stageOpen = essayGradeKeyReleased_(r.key);
+    return `<article class="hub-tile hub-tile-essay ${stageOpen ? "" : "is-unreleased"} ${st.cls === "needs" ? "has-needs" : ""}" data-hubopen="essay" data-key="${esc(r.key)}" tabindex="0" role="button" aria-label="Mark ${esc(r.label)}">
+      <div class="hub-tile-top"><span class="hub-tile-eyebrow">Essay · Step ${idx + 1}</span>${
+        st.cls === "needs"
+          ? `<span class="hub-needs-badge" title="${r.needsGrading} waiting on you">${r.needsGrading}</span>`
+          : r.submitted > 0
+            ? `<span class="hub-caught-badge" title="Nothing waiting on you here">✓</span>`
+            : ""
+      }</div>
+      <div class="hub-tile-main"><h4>${esc(r.label)}</h4><p>${esc(ESSAY_TILE_BLURB[r.key] || "")}</p>
+        <span class="hub-tile-points">${esc(worth)}</span></div>
+      <div class="hub-tile-rows">
+        <div><span>Status</span><strong class="${st.cls}">${esc(st.text)}</strong></div>
+        <div><span>Submitted</span><strong>${r.submitted} of ${r.totalItems}</strong></div>
+        <div><span>Marked</span><strong>${esc(marked)}</strong></div>
+        <div><span>Students</span><strong class="${stageOpen ? "" : "is-excluded"}">${stageOpen ? "Open" : "Not open yet"}</strong></div>
+      </div>
+      <div class="hub-tile-controls">
+        ${
+          stageOpen
+            ? ""
+            : `<button class="btn hub-mini-btn essayOpenThroughBtn" data-estep="${esc(essayGradeKeyStage_(r.key))}" title="Open the essay through ${esc(r.label)} for this class">\u2192 Open through here</button>`
+        }
+        ${hubCanvasButtonsHtml_(asg)}
+      </div>
+      <div class="hub-tile-canvas ${canvasLinked_() ? "" : "is-dim"}" id="${asgStatusId_(asg)}">${esc(hubCanvasNote_(asg))}</div>
+    </article>`;
+  }
+
+  function hubTilesHtml_() {
+    let hub = backend.gradingHub;
+    if (!hub) return `<p class="toolbar-note">Loading the grading counts…</p>`;
+    return `<h5 class="hub-subhead">The Novel</h5>
+      <div class="hub-tile-grid">${hub.acts.map(hubActTileHtml_).join("")}</div>
+      <h5 class="hub-subhead">The Essay</h5>
+      <div class="hub-tile-grid">${hub.essay.map(hubEssayTileHtml_).join("")}</div>`;
+  }
+
+  function gradingHubCard() {
+    let hub = backend.gradingHub;
+    let headline = !hub
+      ? ""
+      : hub.needsGradingTotal > 0
+        ? `<span class="mini-chip batch-badge-needs hub-headline">${hub.needsGradingTotal} waiting on you</span>`
+        : `<span class="mini-chip batch-badge-graded hub-headline">Nothing waiting on you</span>`;
+    return `<div class="card">
+      <div class="hub-card-head"><h3>Grading</h3>${headline}<button class="btn" id="refreshHub" title="Recount everything">↻ Refresh</button></div>
+      <p class="toolbar-note">A red number means work is sitting there waiting for you. Click a tile to go straight to it.</p>
+      <div id="gradingHubTiles">${hubTilesHtml_()}</div>
+    </div>`;
+  }
+
+  // ---- Canvas: connect once, then push each Act straight into the gradebook ----
+  function canvasSettings_() {
+    // The dashboard's settings are the freshly-fetched copy. backend.classes
+    // still carries whatever bootstrap loaded at sign-in, so reading that
+    // first would leave a class looking unlinked right after you linked it.
+    let fromDash = backend.dashboard && backend.dashboard.settings && backend.dashboard.settings.canvas;
+    if (fromDash) return fromDash;
+    let k = currentClass();
+    return (k && parseSettings(k.settingsJson, null).canvas) || { courseId: "", assignments: {} };
+  }
+  function canvasLinked_() {
+    return !!(backend.canvas && backend.canvas.connected && canvasSettings_().courseId);
+  }
+  // Due dates live beside the Canvas block, not inside it, because they are set
+  // per class whether or not an assignment has been created yet.
+  function canvasSchedule_() {
+    let fromDash = backend.dashboard && backend.dashboard.settings && backend.dashboard.settings.assignmentSchedule;
+    if (fromDash) return fromDash;
+    let k = currentClass();
+    return (k && parseSettings(k.settingsJson, null).assignmentSchedule) || {};
+  }
+  function canvasCard_() {
+    let cs = canvasSettings_();
+    let conn = backend.canvas || {};
+    let body;
+    if (!conn.checked) {
+      body = `<p class="toolbar-note">Checking your Canvas connection…</p>`;
+    } else if (!conn.connected) {
+      body = `<p class="toolbar-note">Push scores from here into your Canvas gradebook. You'll need an access token from Canvas: <strong>Account → Settings → New Access Token</strong>. It is stored privately against your Google account, never in the class spreadsheet, and never shown to students.</p>
+        <div class="field"><label>Canvas address</label><input id="canvasBaseUrl" placeholder="https://yourschool.instructure.com" value="${esc(conn.baseUrl || "")}"></div>
+        <div class="field"><label>Access token</label><input id="canvasToken" type="password" placeholder="Paste the token from Canvas"></div>
+        <button class="btn primary" id="canvasConnectBtn">Connect Canvas</button>`;
+    } else if (conn.valid === false) {
+      body = `<p class="toolbar-note" style="color:#8c1d17"><strong>Canvas rejected the saved token.</strong> ${esc(conn.message || "")} Reconnect with a fresh one.</p>
+        <button class="btn" id="canvasDisconnectBtn">Disconnect and start again</button>`;
+    } else {
+      let who = conn.profile && conn.profile.name ? conn.profile.name : "your Canvas account";
+      let courseLine = cs.courseId
+        ? `<p class="toolbar-note">This class is linked to <strong>${esc(cs.courseName || cs.courseId)}</strong>${cs.assignmentGroupName ? ` · assignments go into <strong>${esc(cs.assignmentGroupName)}</strong>` : ""}. <button class="btn" id="canvasUnlinkBtn" style="font-size:12px;padding:4px 9px">Unlink</button></p>`
+        : `<p class="toolbar-note">Connected as <strong>${esc(who)}</strong>. Now choose which Canvas course this class pushes to.</p>`;
+      let picker = `<div class="integration-row"><div class="field"><label>Canvas course</label><select id="canvasCourseSelect"><option value="">${
+          conn.courses ? "Choose a course…" : "Loading your courses…"
+        }</option>${(conn.courses || []).map((c) => `<option value="${esc(c.id)}" ${c.id === cs.courseId ? "selected" : ""}>${esc(c.name)}${c.term ? " · " + esc(c.term) : ""}</option>`).join("")}</select></div>
+        <div class="field"><label>Assignment group (optional)</label><select id="canvasGroupSelect"><option value="">Course default</option>${(conn.groups || []).map((g) => `<option value="${esc(g.id)}" ${g.id === cs.assignmentGroupId ? "selected" : ""}>${esc(g.name)}</option>`).join("")}</select></div>
+        <div><button class="btn primary" id="canvasLinkBtn">${cs.courseId ? "Update link" : "Link this class"}</button></div></div>`;
+      let links = cs.courseId && cs.assignments && Object.keys(cs.assignments).length
+        ? `<p class="toolbar-note">Canvas assignments created so far: ${Object.keys(cs.assignments)
+            .map((k) => cs.assignments[k])
+            .sort((a, b) => a.act - b.act)
+            .map((a) => `Chapter ${a.act}${a.lastGradeSyncAt ? " ✓" : ""}`)
+            .join(" · ")}</p>`
+        : "";
+      body = courseLine + picker + links +
+        `<p class="toolbar-note">${cs.courseId ? "Use <strong>↗ Push to Canvas</strong> on any Chapter below. The assignment is created the first time and reused after that." : ""}</p>
+         <button class="btn" id="canvasDisconnectBtn" style="font-size:12px;padding:4px 9px">Disconnect Canvas</button>`;
+    }
+    return body;
+  }
+  // A short status chip up with the class pills, so Canvas is reachable without
+  // scrolling past the roster and the gradebook to find it.
+  function canvasSwitcherButton_() {
+    let conn = backend.canvas || {};
+    let cs = canvasSettings_();
+    let label, cls;
+    if (!conn.checked) { label = "Canvas…"; cls = ""; }
+    else if (!conn.connected) { label = "⚙ Set up Canvas"; cls = ""; }
+    else if (conn.valid === false) { label = "⚠ Canvas needs attention"; cls = "canvas-chip-bad"; }
+    else if (!cs.courseId) { label = "⚙ Link a Canvas course"; cls = "canvas-chip-warn"; }
+    else { label = "✓ Canvas: " + (cs.courseName || cs.courseId); cls = "canvas-chip-good"; }
+    return `<button class="btn canvas-switch-btn ${cls}" id="openCanvasSetup" title="Connect Canvas, and choose which course this class pushes grades to">${esc(label)}</button>`;
+  }
+  function openCanvasSetupModal() {
+    let root = document.getElementById("modalRoot");
+    root.innerHTML = `<div class="modal"><div class="modalbox canvas-setup-box"><h3>Canvas</h3>${canvasCard_()}<div class="modal-actions"><button class="btn modal-dismiss" id="closeCanvasSetup">Close</button></div><p id="canvasMsg" class="toolbar-note"></p></div></div>`;
+    document.getElementById("closeCanvasSetup").onclick = () => (root.innerHTML = "");
+    bindBackend();
+  }
+  async function loadCanvasStatus(force) {
+    if (backend.canvas && backend.canvas.checked && !force) return;
+    try {
+      let st = await rpc("getCanvasConnectionStatus");
+      backend.canvas = Object.assign({ checked: true }, st);
+      if (st.connected && st.valid !== false) {
+        try {
+          let list = await rpc("listCanvasCourses");
+          backend.canvas.courses = list.courses || [];
+          let cs = canvasSettings_();
+          if (cs.courseId) {
+            let g = await rpc("listCanvasAssignmentGroups", { courseId: cs.courseId });
+            backend.canvas.groups = g.groups || [];
+          }
+        } catch (e) {
+          backend.canvas.message = e.message;
+        }
+      }
+    } catch (e) {
+      // Not connected, or the scope was never authorised. Either way the card
+      // should offer to connect rather than sit on "checking".
+      backend.canvas = { checked: true, connected: false, message: e.message };
+    }
+    if (state.view === "manage") render();
+  }
+  function canvasMsg_(text, bad) {
+    let el = document.getElementById("canvasMsg");
+    if (el) { el.textContent = text; el.style.color = bad ? "#8c1d17" : ""; }
+  }
+  // datetime-local speaks local wall-clock time with no zone; Canvas speaks
+  // ISO8601 with one. Convert at the boundary in both directions so a due date
+  // set at 3pm here is 3pm to the students.
+  function localInputFromIso_(iso) {
+    if (!iso) return "";
+    let d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  }
+  function isoFromLocalInput_(v) {
+    if (!v) return "";
+    let d = new Date(v);
+    return Number.isNaN(d.getTime()) ? "" : d.toISOString();
+  }
+  // Every Canvas assignment -- the five Acts and the six essay pieces -- is
+  // addressed by one string: "act:2" or "essay:body". One code path, so a fix to
+  // the Act flow cannot forget the essay flow.
+  function asgPayload_(asg) {
+    let str = String(asg);
+    return str.indexOf("essay:") === 0 ? { kind: "essay", key: str.slice(6) } : { act: Number(str.replace("act:", "")) };
+  }
+  function asgLabel_(asg) {
+    let str = String(asg);
+    return str.indexOf("essay:") === 0 ? ESSAY_GRADE_LABELS[str.slice(6)] || str.slice(6) : "Chapter " + str.replace("act:", "");
+  }
+  function asgStatusId_(asg) { return "exportStatus-" + String(asg).replace(":", "-"); }
+
+  async function openCanvasActModal(asg) {
+    let name = asgLabel_(asg);
+    let root = document.getElementById("modalRoot");
+    root.innerHTML = `<div class="modal"><div class="modalbox"><h3>${esc(name)} in Canvas</h3><p class="toolbar-note">Loading…</p></div></div>`;
+    let setup;
+    try {
+      setup = await rpc("getCanvasActSetup", Object.assign({ classId: backend.activeClassId }, asgPayload_(asg)));
+    } catch (e) {
+      root.innerHTML = `<div class="modal"><div class="modalbox"><h3>${esc(name)} in Canvas</h3><p class="toolbar-note" style="color:#8c1d17">${esc(e.message)}</p><div class="modal-actions"><button class="btn modal-dismiss" id="closeCanvasAct">Close</button></div></div></div>`;
+      document.getElementById("closeCanvasAct").onclick = () => (root.innerHTML = "");
+      return;
+    }
+    let link = setup.link || {};
+    let sch = setup.schedule || {};
+    let moduleOptions =
+      `<option value="">Not in a module</option>` +
+      (setup.modules || [])
+        .map((m) => `<option value="${esc(m.id)}" ${m.id === String(link.moduleId || "") ? "selected" : ""}>${esc(m.name)}${m.published ? "" : " · unpublished"}</option>`)
+        .join("");
+    // Assignment group for THIS assignment. Preselected with where it is in Canvas now; it is
+    // sent only when changed, so a move made in Canvas is never undone from here.
+    let groupNow = String(setup.currentGroupId || "");
+    let groupOptions =
+      (groupNow ? "" : `<option value="">Course default</option>`) +
+      (setup.groups || []).map((g) => `<option value="${esc(g.id)}" ${String(g.id) === groupNow ? "selected" : ""}>${esc(g.name)}</option>`).join("");
+    root.innerHTML = `<div class="modal"><div class="modalbox canvas-act-box">
+      <h3>${esc(setup.label)} in Canvas</h3>
+      <div class="canvas-act-meta"><span class="mini-chip">${esc(setup.canvas.courseName || setup.canvas.courseId)}</span>${
+        setup.canvas.assignmentGroupName ? `<span class="mini-chip">${esc(setup.canvas.assignmentGroupName)}</span>` : ""
+      }<span class="mini-chip">${setup.pointsPossible} points</span>${
+        link.assignmentId ? `<span class="mini-chip batch-badge-graded">✓ Linked</span>` : `<span class="mini-chip">Not created yet</span>`
+      }${setup.gradingType === "pass_fail" ? `<span class="mini-chip">Complete / incomplete</span>` : ""}${setup.published ? "" : `<span class="mini-chip">Unpublished — ${esc(name)} isn't released to students yet</span>`}${
+        (setup.sharedWith || []).length ? `<span class="mini-chip canvas-chip-warn">Shared with ${esc(setup.sharedWith.join(", "))}</span>` : ""
+      }</div>
+      ${
+        (setup.sharedWith || []).length
+          ? `<p class="toolbar-note canvas-shared-note">This is <strong>one Canvas assignment</strong> serving both classes. The due date, module and points below are shared — changing them here changes them for ${esc(setup.sharedWith.join(", "))} too. Pushing grades from either class only fills in that class's own students, so neither can blank the other's.${
+              setup.canvasPointsPossible !== null && Number(setup.canvasPointsPossible) !== Number(setup.pointsPossible)
+                ? ` <strong>Note:</strong> Canvas currently has it out of ${setup.canvasPointsPossible} points, but this class works out to ${setup.pointsPossible} — that happens when a question is excluded for one class and not the other.`
+                : ""
+            }</p>`
+          : ""
+      }
+      <p class="toolbar-note">The Great Gatsby app controls this assignment's name, points, due date, module placement and grades. Students do the work here, not in Canvas.</p>
+      <div class="canvas-date-grid">
+        <div class="field"><label>Due date</label><input type="datetime-local" id="canvasDueAt" value="${esc(localInputFromIso_(sch.dueAt || link.dueAt || ""))}"></div>
+        <div class="field"><label>Available from <small>(optional)</small></label><input type="datetime-local" id="canvasUnlockAt" value="${esc(localInputFromIso_(sch.unlockAt || ""))}"></div>
+        <div class="field"><label>Lock after <small>(optional)</small></label><input type="datetime-local" id="canvasLockAt" value="${esc(localInputFromIso_(sch.lockAt || ""))}"></div>
+      </div>
+      ${
+        setup.appUrl
+          ? `<p class="toolbar-note canvas-url-note">Students will get a link to <code>${esc(setup.appUrl)}</code>.${
+              /\/dev($|\?)/.test(setup.appUrl)
+                ? ` <strong>⚠ That is the test URL, not the one students can open.</strong> Deploy a new version, then press Update in Canvas to fix the link.`
+                : ` It is read fresh each time you press Update or push grades, so a redeploy keeps it current.`
+            }</p>`
+          : `<p class="toolbar-note canvas-url-note">⚠ The app could not work out its own web address, so the assignment won't include a link to it. Everything else still works.</p>`
+      }
+      <div class="field"><label>Assignment group</label><select id="canvasGroupPick">${groupOptions}</select>
+        <small class="toolbar-note">${
+          setup.groupsError
+            ? `Assignment groups could not be loaded: ${esc(setup.groupsError)}`
+            : link.assignmentId
+              ? "Pick a group and press Update in Canvas to move it there. Pushing grades never changes the group, so you can also move it in Canvas."
+              : "The group it goes into when you create it. You can change it here or in Canvas later — pushing grades never moves it back."
+        }</small></div>
+      <div class="field"><label>Canvas module <small>(optional)</small></label><select id="canvasModuleSelect">${moduleOptions}</select>
+        <small class="toolbar-note">${
+          setup.modulesError
+            ? `Modules could not be loaded: ${esc(setup.modulesError)}`
+            : "Adds this assignment to an existing module. Clearing it removes the module item only — the assignment and its grades stay."
+        }</small></div>
+      <div class="modal-actions" style="justify-content:flex-start;flex-wrap:wrap">
+        <button class="btn primary" id="syncCanvasActBtn">${link.assignmentId ? "Update in Canvas" : "Create in Canvas"}</button>
+        <button class="btn" id="pushFromModalBtn" ${link.assignmentId ? "" : "disabled"}>↗ Push grades now</button>
+        ${link.htmlUrl ? `<a class="btn" target="_blank" rel="noopener" href="${esc(link.htmlUrl)}">Open in Canvas ↗</a>` : ""}
+        <button class="btn modal-dismiss" id="closeCanvasAct">Close</button>
+      </div>
+      <p id="canvasActMsg" class="toolbar-note">${
+        link.lastGradeSyncAt ? "Last grade push: " + esc(new Date(link.lastGradeSyncAt).toLocaleString()) : ""
+      }</p></div></div>`;
+    document.getElementById("closeCanvasAct").onclick = () => (root.innerHTML = "");
+    let msg = document.getElementById("canvasActMsg");
+    document.getElementById("syncCanvasActBtn").onclick = async () => {
+      let btn = document.getElementById("syncCanvasActBtn");
+      let sel = document.getElementById("canvasModuleSelect");
+      let opt = sel && sel.selectedIndex >= 0 ? sel.options[sel.selectedIndex] : null;
+      let gsel = document.getElementById("canvasGroupPick");
+      let groupChoice = gsel && gsel.value && gsel.value !== groupNow ? gsel.value : "";
+      btn.disabled = true;
+      msg.textContent = "Sending the assignment to Canvas…";
+      try {
+        let r = await rpc("syncCanvasAssignment", Object.assign({
+          classId: backend.activeClassId,
+          assignmentGroupId: groupChoice,
+          dueAt: isoFromLocalInput_(document.getElementById("canvasDueAt").value),
+          unlockAt: isoFromLocalInput_(document.getElementById("canvasUnlockAt").value),
+          lockAt: isoFromLocalInput_(document.getElementById("canvasLockAt").value),
+          moduleId: sel ? sel.value : "",
+          moduleName: opt ? opt.textContent.replace(/ · unpublished$/, "") : "",
+        }, asgPayload_(asg)));
+        invalidateDashboardCache_();
+        await loadDashboard(backend.activeClassId, false);
+        await openCanvasActModal(asg);
+        render();
+        if (r && r.adopted) {
+          let m2 = document.getElementById("canvasActMsg");
+          if (m2)
+            m2.textContent =
+              "Joined the Canvas assignment that already existed" +
+              ((r.sharedWith || []).length ? " for " + r.sharedWith.join(", ") : "") +
+              " instead of creating a second one. Both classes now share it.";
+        }
+      } catch (e) {
+        msg.textContent = e.message;
+        msg.style.color = "#8c1d17";
+        btn.disabled = false;
+      }
+    };
+    let pushBtn = document.getElementById("pushFromModalBtn");
+    if (pushBtn)
+      pushBtn.onclick = async () => {
+        pushBtn.disabled = true;
+        msg.style.color = "";
+        msg.textContent = "Pushing " + name + " grades…";
+        try {
+          let res = await rpc("pushCanvasGrades", Object.assign({ classId: backend.activeClassId }, asgPayload_(asg)));
+          msg.textContent = canvasPushSummary_(res);
+          invalidateDashboardCache_();
+        } catch (e) {
+          msg.textContent = e.message;
+          msg.style.color = "#8c1d17";
+        } finally {
+          pushBtn.disabled = false;
+        }
+      };
+  }
+  function canvasPushSummary_(res) {
+    let parts = [`Sent ${res.sent} score(s) to “${res.assignment.name}”, out of ${res.pointsPossible} points.`];
+    if (res.skipped && res.skipped.length) parts.push(`Left alone (nothing done yet): ${res.skipped.join(", ")}.`);
+    if (res.unmatched && res.unmatched.length)
+      parts.push(`⚠ No matching Canvas student: ${res.unmatched.join(", ")} — check their Canvas login email.`);
+    if (res.unmarked && res.unmarked.length)
+      parts.push(`⚠ Counted as 0 because you haven't marked them yet — ${res.unmarked.join(", ")}.`);
+    if (res.adjusted && res.adjusted.length) parts.push(`Scaled to keep the same percentage: ${res.adjusted.join("; ")}.`);
+    if (res.pointsConflict) parts.push(`⚠ ${res.pointsConflict}`);
+    return parts.join(" ");
+  }
+  async function pushActToCanvas(asg, btn) {
+    let status = document.getElementById(asgStatusId_(asg));
+    if (btn) btn.disabled = true;
+    if (status) status.textContent = "Sending " + asgLabel_(asg) + " to Canvas…";
+    try {
+      let res = await rpc("pushCanvasGrades", Object.assign({ classId: backend.activeClassId }, asgPayload_(asg)));
+      if (status) status.textContent = canvasPushSummary_(res);
+      invalidateDashboardCache_();
+    } catch (e) {
+      if (status) status.textContent = "Canvas error: " + (e.message || String(e));
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  }
+  // ---- One gradebook -------------------------------------------------------
+  // Everything the unit is worth in a single table: the nine Chapters, the six
+  // pieces of the essay, and a unit total. There used to be two tables with
+  // three Canvas buttons stacked in every column heading, which made the
+  // headings taller than the data. Those buttons live on the tiles above now,
+  // where the rest of each assignment's controls already are, so this is just
+  // numbers -- which is what a gradebook is for.
+  function gradebookCard(dash) {
+    let actCols = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+      .map((act) => `<th class="gb-act" title="Chapter ${act}: multiple choice + written responses">Chapter ${act}</th>`)
+      .join("");
+    let essayCols = ESSAY_GRADE_STEPS.map((k) => {
+      let pts = k === "final" ? ESSAY_CRITERIA.length * ESSAY_CRITERION_MAX : k === "thesis" ? 1 : DOK_POINTS;
+      return `<th class="gb-essay" title="${esc(ESSAY_GRADE_LABELS[k])} · ${k === "thesis" ? "complete / incomplete" : pts + " points"}">${esc(ESSAY_GRADE_SHORT[k] || ESSAY_GRADE_LABELS[k])}</th>`;
+    }).join("");
+
+    let rows = dash.students
+      .map((s) => {
+        let gs = s.gradeSummary || { acts: {} };
+        let unitEarned = 0, unitPossible = 0, anyStarted = false;
+        let actCells = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+          .map((act) => {
+            let a = gs.acts[act];
+            // "—" means the student has not touched this Chapter at all (and exports
+            // blank). A number is always out of the full Chapter total; a dot after
+            // it means some of it is still waiting on you.
+            let started = a && a.possible && a.touched;
+            // The Unit column counts what the student has STARTED, not the whole
+            // unit. Including a Chapter nobody has opened yet would read as a
+            // failing grade in week one -- the same misleading-denominator
+            // problem as the Chapter totals, pointing the other way. Inside each
+            // Chapter the rule is unchanged: work they skipped still counts as zero.
+            if (started) { unitPossible += a.possible; unitEarned += a.earned; anyStarted = true; }
+            let pending = started && a.dokUnmarked ? `<span class="cell-pending" title="${a.dokUnmarked} written response(s) not marked yet, counted as 0 so far">•</span>` : "";
+            let tip = started
+              ? `${esc(s.name)} · Chapter ${act}: ${a.earned} of ${a.possible}${a.dokUnmarked ? ` · ${a.dokUnmarked} not marked yet` : ""}${a.dokMissing ? ` · ${a.dokMissing} not submitted` : ""}`
+              : `${esc(s.name)} has not started Chapter ${act}`;
+            return `<td class="gb-act"><button type="button" class="gradebook-cell gradebookJump ${started ? "" : "ungraded"}" data-email="${esc(s.email)}" data-act="${act}" title="${tip}">${started ? a.earned + "/" + a.possible + pending : "—"}</button></td>`;
+          })
+          .join("");
+
+        let e = gs.essay;
+        let essayCells = ESSAY_GRADE_STEPS.map((k) => {
+          if (!e) return `<td class="gb-essay"><button type="button" class="gradebook-cell ungraded" disabled>—</button></td>`;
+          if (k === "final") {
+            let t = e.finalTotal || { earned: 0, possible: 0, hasAnyResult: false };
+            if (ESSAY_CRITERIA.every((c) => ((e.criteria || {})[c] || {}).excluded))
+              return `<td class="gb-essay"><button type="button" class="gradebook-cell ungraded" disabled title="${esc(s.name)} is excused from the final essay">ex</button></td>`;
+            if (t.hasAnyResult || t.submitted) {
+              unitPossible += Number(t.possible || 0);
+              unitEarned += Number(t.earned || 0);
+              anyStarted = true;
+            }
+            let tip = t.hasAnyResult
+              ? `${esc(s.name)} · Final Essay: ${t.earned} of ${t.possible}${t.unmarked ? ` · ${t.unmarked} criteria not scored yet` : ""}`
+              : t.submitted
+                ? `${esc(s.name)} has assembled an essay but none of it is scored yet`
+                : `${esc(s.name)} has not assembled an essay yet`;
+            return `<td class="gb-essay"><button type="button" class="gradebook-cell essayJump ${t.hasAnyResult ? "" : "ungraded"}" data-email="${esc(s.email)}" data-step="final" title="${tip}">${t.hasAnyResult ? t.earned + "/" + t.possible : t.submitted ? "•" : "—"}</button></td>`;
+          }
+          let rec = (e.steps || {})[k] || {};
+          if (!rec.excluded && (hasScore_(rec.score) || rec.submitted)) {
+            unitPossible += Number(rec.possible || 0);
+            if (hasScore_(rec.score)) unitEarned += Number(rec.score);
+            anyStarted = true;
+          }
+          let val = rec.excluded
+            ? "ex"
+            : hasScore_(rec.score)
+              ? k === "thesis"
+                ? Number(rec.score) > 0
+                  ? "✓"
+                  : "✗"
+                : rec.score + "/" + rec.possible
+              : rec.submitted
+                ? "•"
+                : "—";
+          let tip = rec.excluded
+            ? `${esc(s.name)} is excused from ${esc(ESSAY_GRADE_LABELS[k])}`
+            : hasScore_(rec.score)
+              ? `${esc(s.name)} · ${esc(ESSAY_GRADE_LABELS[k])}: ${rec.score} of ${rec.possible}${rec.auto ? " (marked complete automatically)" : ""}`
+              : rec.submitted
+                ? `${esc(s.name)} has done this but it is not marked yet`
+                : `${esc(s.name)} has not done this yet`;
+          return `<td class="gb-essay"><button type="button" class="gradebook-cell essayJump ${hasScore_(rec.score) ? "" : "ungraded"}" data-email="${esc(s.email)}" data-step="${k}" title="${tip}">${val}</button></td>`;
+        }).join("");
+
+        // The unit total counts what has actually been marked so far. It is a
+        // running figure, not a final grade, and says so in its tooltip --
+        // unmarked work sits in it as a zero exactly as it would in Canvas.
+        let pct = unitPossible ? Math.round((unitEarned / unitPossible) * 100) : 0;
+        let totalCell = anyStarted
+          ? `<td class="gb-total"><span title="${esc(s.name)}: ${Math.round(unitEarned * 100) / 100} of ${unitPossible} across the work they have started. Assignments nobody has opened yet are left out; work you have not marked yet counts as 0, the same as it would in Canvas.">${Math.round(unitEarned * 100) / 100}/${unitPossible}<small>${pct}%</small></span></td>`
+          : `<td class="gb-total"><span class="ungraded" title="${esc(s.name)} has not started anything yet">—</span></td>`;
+        return `<tr><td class="gb-name"><strong>${esc(s.name)}</strong></td>${actCells}${essayCells}${totalCell}</tr>`;
+      })
+      .join("");
+
+    return `<div class="card"><h3>Gradebook</h3><p class="toolbar-note">Every assignment in the unit. <strong>✓</strong> complete · <strong>•</strong> done but not marked yet · <strong>—</strong> not done · <strong>ex</strong> excused. Click any cell to go straight to marking it. <strong>Unit</strong> totals the work each student has actually started, so it does not read as a fail in week one. Due dates, Canvas and CSV downloads are on the tiles above.</p><div class="gradebook-scroll"><table class="gradebook-table gradebook-wide"><thead><tr><th class="gb-name">Student</th>${actCols}${essayCols}<th class="gb-total">Unit</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  }
+
+  async function exportAct(asg) {
+    let status = document.getElementById(asgStatusId_(asg));
+    let btn = document.querySelector(`.export-act-btn[data-asg="${asg}"]`);
+    if (btn) btn.disabled = true;
+    if (status) status.textContent = "Preparing CSV...";
+    try {
+      let res = await rpc("exportActGradesCsv", Object.assign({ classId: backend.activeClassId }, asgPayload_(asg)));
+      downloadTextFile_(res.filename, res.content);
+      let parts = [`Downloaded ${res.filename} (${res.sent} graded student(s)), out of ${res.pointsPossible} points.`];
+      if (res.skipped && res.skipped.length)
+        parts.push(`Left blank (nothing done in this Act yet): ${res.skipped.join(", ")}.`);
+      if (res.unmarked && res.unmarked.length)
+        parts.push(
+          `⚠ Counted as 0 because you haven't marked them yet — ${res.unmarked.join(", ")}. Mark those and download again if you don't want the zeros.`,
+        );
+      if (res.adjusted && res.adjusted.length)
+        parts.push(
+          `Scaled to keep the same percentage (these students had a question excluded individually): ${res.adjusted.join("; ")}.`,
+        );
+      if (status) status.textContent = parts.join(" ");
+    } catch (e) {
+      if (status) status.textContent = "Error: " + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+  function downloadTextFile_(filename, content) {
+    let blob = new Blob([content], { type: "text/csv;charset=utf-8" });
+    let url = URL.createObjectURL(blob);
+    let a = document.createElement("a");
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  }
+  function openEditClass(classId) {
+    let c = backend.classes.find((x) => x.classId === classId);
+    if (!c) return;
+    document.getElementById("modalRoot").innerHTML =
+      `<div class="modal"><div class="modalbox"><h3>Edit Class</h3><div class="field"><label>Class name</label><input id="editClassName" value="${esc(c.className)}"></div><div class="field"><label>Period / section</label><input id="editClassPeriod" value="${esc(c.period || "")}"></div><p id="editClassMsg" class="toolbar-note"></p><div class="modal-actions"><button class="btn modal-dismiss" id="cancelEditClass">Cancel</button><button class="btn primary" id="saveEditClass">Save</button></div></div></div>`;
+    document.getElementById("cancelEditClass").onclick = () =>
+      (document.getElementById("modalRoot").innerHTML = "");
+    document.getElementById("saveEditClass").onclick = async () => {
+      let name = document.getElementById("editClassName").value.trim();
+      let period = document.getElementById("editClassPeriod").value.trim();
+      let msg = document.getElementById("editClassMsg");
+      if (!name) {
+        msg.textContent = "Class name is required.";
+        return;
+      }
+      msg.textContent = "Saving...";
+      try {
+        await rpc("updateClass", { classId, className: name, period });
+        c.className = name;
+        c.period = period;
+        if (backend.activeClassId === classId) state.className = name;
+        if (backend.dashboardCache[classId]) {
+          backend.dashboardCache[classId].classInfo.className = name;
+          backend.dashboardCache[classId].classInfo.period = period;
+        }
+        document.getElementById("modalRoot").innerHTML = "";
+        render();
+      } catch (e) {
+        msg.textContent = e.message;
+      }
+    };
+  }
+  function armDeleteButton(b) {
+    b.textContent = "Confirm?";
+    b.dataset.armed = "1";
+    b.classList.add("confirm-armed");
+    clearTimeout(b._armTimer);
+    b._armTimer = setTimeout(() => {
+      b.dataset.armed = "0";
+      b.textContent = "🗑";
+      b.classList.remove("confirm-armed");
+    }, 4000);
+  }
+  async function confirmDeleteClass(b, classId) {
+    let name = (backend.classes.find((c) => c.classId === classId) || {}).className || "this class";
+    b.disabled = true;
+    b.textContent = "…";
+    try {
+      await rpc("archiveClass", { classId });
+      backend.classes = backend.classes.filter((c) => c.classId !== classId);
+      delete backend.dashboardCache[classId];
+      if (backend.activeClassId === classId) {
+        let next = (backend.classes[0] || {}).classId || "";
+        backend.activeClassId = next;
+        safeLSSet("macbethActiveClass", next);
+        backend.dashboard = null;
+        if (next) loadDashboard(next);
+        else render();
+      } else {
+        render();
+      }
+    } catch (e) {
+      alert(`Could not delete ${name}: ${e.message}`);
+      b.disabled = false;
+      b.textContent = "🗑";
+      b.dataset.armed = "0";
+      b.classList.remove("confirm-armed");
+    }
+  }
+  function createClassCard() {
+    return `<div class="card"><h3>Create a Class</h3><div class="field"><label>Class name</label><input id="newClassName" placeholder="English 2 - Period 2"></div><div class="field"><label>Period / section</label><input id="newClassPeriod" placeholder="Period 2"></div><button class="btn primary" id="createClassBtn">Create Class</button><p id="createClassMsg" class="toolbar-note"></p></div>`;
+  }
+  async function createNewClass() {
+    let msg = document.getElementById("createClassMsg");
+    let name = document.getElementById("newClassName").value.trim();
+    if (!name) {
+      msg.textContent = "Enter a class name.";
+      return;
+    }
+    msg.textContent = "Creating...";
+    try {
+      let c = await rpc("createClass", {
+        className: name,
+        period: document.getElementById("newClassPeriod").value,
+      });
+      let d = await rpc("getBootstrap");
+      backend.classes = d.classes || [];
+      backend.activeClassId = c.classId;
+      safeLSSet("macbethActiveClass", c.classId);
+      await loadDashboard(c.classId);
+    } catch (e) {
+      msg.textContent = e.message;
+    }
+  }
+  function applyDashboardState_(d) {
+    state.releasedActs = d.settings.releasedActs || [1];
+    state.releasedScenes = d.settings.releasedScenes || {};
+    state.releasedEssayThrough = d.settings.releasedEssayThrough || "self";
+    state.teacherResources = d.settings.teacherResources !== false;
+    state.className = d.classInfo.className;
+    // Mirror the server's settings back onto the cached class record, so
+    // anything reading settingsJson (the Canvas link, chiefly) is not stale.
+    let k = (backend.classes || []).find((c) => c.classId === backend.activeClassId);
+    if (k && d.settings) k.settingsJson = JSON.stringify(d.settings);
+  }
+  // Switching classes used to always wait on a fresh getClassDashboard round-trip
+  // before anything on screen changed, which reads as "stuck" for however long that
+  // sheet read takes. Now: if we've shown this class before, redraw instantly from
+  // the cached copy, then quietly refresh from the server in the background and
+  // redraw again only if anything actually changed. First-time loads still wait on
+  // the real fetch (there's nothing to show yet), same as before.
+  async function loadDashboard(classId, rerender = true) {
+    backend.activeClassId = classId;
+    safeLSSet("macbethActiveClass", classId);
+    let cached = backend.dashboardCache[classId];
+    backend.gradingHub = backend.gradingHubCache[classId] || null;
+    if (cached) {
+      backend.dashboard = cached;
+      applyDashboardState_(cached);
+      if (rerender) render();
+      loadGradingHub(classId);
+    } else {
+      backend.dashboard = null;
+      if (rerender) render();
+    }
+    try {
+      let fresh = await rpc("getClassDashboard", { classId });
+      (fresh.students || []).forEach((st) => normalizeGradeSummary_(st.gradeSummary));
+      backend.dashboardCache[classId] = fresh;
+      if (backend.activeClassId !== classId) return; // switched again before this resolved
+      backend.dashboard = fresh;
+      applyDashboardState_(fresh);
+      if (rerender) render();
+      loadGradingHub(classId);
+    } catch (e) {
+      console.error(e);
+      if (!cached && rerender) {
+        let app = document.getElementById("app");
+        if (app)
+          app.insertAdjacentHTML(
+            "beforeend",
+            `<p class="toolbar-note">Could not load this class right now: ${esc(e.message || String(e))}</p>`,
+          );
+      }
+    }
+  }
+
+  admin = function () {
+    if (!backend.enabled) return original.admin();
+    let rows = (backend.access || [])
+      .map(
+        (u) =>
+          `<div class="access-row"><div><strong>${esc(u.name || u.email)}</strong><br><small>${esc(u.email)} · ${esc(u.role)}</small></div><div class="status-${u.status === "active" ? "active" : "revoked"}">${esc(u.status)}</div><div>${u.role === "teacher" ? `<button class="btn accessToggle" data-email="${esc(u.email)}" data-status="${u.status === "active" ? "revoked" : "active"}">${u.status === "active" ? "Revoke" : "Restore"}</button>` : ""}</div></div>`,
+      )
+      .join("");
+    return `<div class="sectionhead"><h2>Curriculum Admin</h2></div><div class="backend-banner"><div><strong>Access control is active.</strong><br><small>Only teachers listed as active can create classes and use the teacher curriculum backend. Students enter through an authorized teacher's class code.</small></div></div><div class="admin-grid"><div class="card"><h3>Authorize a Teacher</h3><div class="field"><label>Teacher email</label><input id="teacherEmail" type="email" placeholder="teacher@school.org"></div><div class="field"><label>Name</label><input id="teacherName" placeholder="Teacher name"></div><button class="btn primary" id="addTeacherBtn">Grant Access</button><p id="teacherAccessMsg" class="toolbar-note"></p></div><div class="card"><h3>Access Model</h3><p><strong>Admin</strong> controls teacher access.</p><p><strong>Teacher</strong> creates classes, releases scenes, and reviews student work.</p><p><strong>Student</strong> joins with a class code and can only access released curriculum.</p></div></div><div class="card"><h3>Authorized Accounts</h3>${rows || "<p>No teacher accounts have been added yet.</p>"}</div>`;
+  };
+  async function addTeacher() {
+    let msg = document.getElementById("teacherAccessMsg");
+    msg.textContent = "Saving...";
+    try {
+      let r = await rpc("adminAddTeacher", {
+        email: document.getElementById("teacherEmail").value,
+        name: document.getElementById("teacherName").value,
+      });
+      backend.access = r.access || [];
+      render();
+    } catch (e) {
+      msg.textContent = e.message;
+    }
+  }
+  async function toggleAccess(btn) {
+    btn.disabled = true;
+    try {
+      let r = await rpc("adminSetAccess", { email: btn.dataset.email, status: btn.dataset.status });
+      backend.access = r.access || [];
+      render();
+    } catch (e) {
+      alert(e.message);
+      btn.disabled = false;
+    }
+  }
+
+  discussion = function () {
+    if (!backend.enabled || backend.user.role !== "student" || !backend.activeClassId)
+      return original.discussion();
+    return `<div class="card"><h3>Step 2 · Thesis Discussion</h3><p>Post your thesis for classmates to read. Before revising, ask: Is my claim arguable? Is it specific? Does it explain <em>why</em> this theme is central?</p><div class="thesis-preview">${state.essay.thesis ? esc(state.essay.thesis) : "Complete your thesis first."}</div><button class="btn primary" id="postThesis" ${state.essay.thesis ? "" : "disabled"}>Post Thesis to Class Discussion</button><p class="remote-discussion-note">Posts are shared with students in ${esc(state.className || "your class")} and saved to your school account.</p>${backend.discussion.length ? backend.discussion.map((p) => `<div class="discussion-post"><strong>${esc(p.name || "Student")}</strong><p>${esc(p.text)}</p><small>${esc(new Date(p.date).toLocaleString())}</small></div>`).join("") : "<p>No thesis has been posted yet.</p>"}</div>`;
+  };
+
+  function backendBanner() {
+    if (
+      !backend.enabled ||
+      !backend.user ||
+      backend.user.role !== "student" ||
+      !backend.activeClassId
+    )
+      return "";
+    let k = currentClass();
+    return `<div class="backend-banner"><div><strong>${esc(k ? k.className : state.className)}</strong><br><small>Signed in as ${esc(backend.user.name)} · work autosaves to your account</small></div><div id="saveStatus">Autosave on</div></div>`;
+  }
+
+  render = function () {
+    if (
+      backend.enabled &&
+      backend.ready &&
+      backend.user &&
+      backend.user.role === "student" &&
+      !backend.activeClassId
+    ) {
+      document.getElementById("sidebar").innerHTML = "";
+      document.getElementById("app").innerHTML = studentJoinView();
+      let j = document.getElementById("joinClassBtn");
+      if (j) j.onclick = joinCurrent;
+      setAccountHeader();
+      return;
+    }
+    if (
+      backend.enabled &&
+      backend.ready &&
+      backend.user &&
+      backend.user.role === "student" &&
+      backend.needsName
+    ) {
+      document.getElementById("sidebar").innerHTML = "";
+      document.getElementById("app").innerHTML = confirmNameView();
+      let c = document.getElementById("confirmNameBtn");
+      if (c) c.onclick = confirmNameCurrent;
+      setAccountHeader();
+      return;
+    }
+    original.render();
+    if (backend.enabled && backend.ready) {
+      state.role = backend.user.role;
+      setAccountHeader();
+      if (backend.user.role === "student" && backend.activeClassId) {
+        let app = document.getElementById("app");
+        app.insertAdjacentHTML("afterbegin", backendBanner());
+      }
+      bindBackend();
+      // The account pill and the banner are both rebuilt by the redraw above,
+      // so the save state has to be painted back onto them afterwards.
+      paintSaveState_();
+    }
+  };
+
+  bind = function () {
+    original.bind();
+    if (!backend.enabled || !backend.ready) return;
+    document.querySelectorAll("[data-role]").forEach((b) => (b.onclick = null));
+    const post = document.getElementById("postThesis");
+    if (post && backend.user.role === "student" && backend.activeClassId)
+      post.onclick = async () => {
+        let text = state.essay.thesis.trim();
+        if (!text) return;
+        post.disabled = true;
+        post.textContent = "Posting...";
+        try {
+          let r = await rpc("postThesisDiscussion", { classId: backend.activeClassId, text });
+          backend.discussion = r.discussion || [];
+          state.essay.discussion = backend.discussion;
+          save();
+          render();
+        } catch (e) {
+          alert(e.message);
+          post.disabled = false;
+          post.textContent = "Post Thesis to Class Discussion";
+        }
+      };
+  };
+  function bindBackend() {
+    let join = document.getElementById("joinClassBtn");
+    if (join) join.onclick = joinCurrent;
+    let cname = document.getElementById("confirmNameBtn");
+    if (cname) cname.onclick = confirmNameCurrent;
+    let create = document.getElementById("createClassBtn");
+    if (create) create.onclick = createNewClass;
+    document
+      .querySelectorAll(".class-pill")
+      .forEach((b) => (b.onclick = () => loadDashboard(b.dataset.classid)));
+    document
+      .querySelectorAll(".classEditBtn")
+      .forEach((b) => (b.onclick = () => openEditClass(b.dataset.classid)));
+    document.querySelectorAll(".classDeleteBtn").forEach((b) => {
+      b.onclick = () => {
+        if (b.dataset.armed === "1") confirmDeleteClass(b, b.dataset.classid);
+        else armDeleteButton(b);
+      };
+    });
+    let toggleNew = document.getElementById("toggleNewClass");
+    if (toggleNew)
+      toggleNew.onclick = () => {
+        let p = document.getElementById("newClassPanel");
+        if (p) p.classList.toggle("hide");
+      };
+    let ref = document.getElementById("refreshRoster");
+    if (ref) ref.onclick = () => loadDashboard(backend.activeClassId);
+    if (state.view === "manage" && backend.user && backend.user.role !== "student") setTimeout(() => loadCanvasStatus(false), 0);
+    let openBatch = document.getElementById("openBatchGrade");
+    if (openBatch)
+      openBatch.onclick = () => {
+        state.view = "batchGrade";
+        if (!backend.batchSceneKey) backend.batchSceneKey = Object.keys(CHAPTERS).sort(sceneSort)[0];
+        render();
+        loadSceneResponses(backend.batchSceneKey);
+      };
+    let backToDash = document.getElementById("backToDashboard");
+    if (backToDash)
+      backToDash.onclick = () => {
+        state.view = "manage";
+        render();
+      };
+    let sceneSelect = document.getElementById("batchSceneSelect");
+    if (sceneSelect) sceneSelect.onchange = () => loadSceneResponses(sceneSelect.value);
+    let excludeAll = document.getElementById("excludeAllBtn");
+    if (excludeAll) excludeAll.onclick = toggleExcludeWholeClass_;
+    let hideUn = document.getElementById("hideUnsubmitted");
+    if (hideUn)
+      hideUn.onchange = () => {
+        backend.batchHideUnsubmitted = hideUn.checked;
+        refreshBatchView_();
+      };
+    document.querySelectorAll(".score-btn[data-email]").forEach((btn) => {
+      btn.onclick = () => {
+        let email = btn.dataset.email;
+        let score = Number(btn.dataset.score);
+        let newScore = btn.classList.contains("selected") ? null : score;
+        applyBatchLocalUpdate_(email, { score: newScore });
+        updateBatchRowUI_(email);
+        saveBatchGradeItem_(email, { score: newScore, excluded: (getBatchResponse_(email) || {}).excluded });
+      };
+    });
+    document.querySelectorAll(".batchExcludeToggle").forEach((cb) => {
+      cb.onchange = () => {
+        let email = cb.dataset.email;
+        applyBatchLocalUpdate_(email, { excluded: cb.checked });
+        updateBatchRowUI_(email);
+        saveBatchGradeItem_(email, { excluded: cb.checked, score: (getBatchResponse_(email) || {}).score });
+      };
+    });
+    document.querySelectorAll(".dokManualScore[data-email]").forEach((input) => {
+      input.onchange = () => {
+        let email = input.dataset.email;
+        let score = teacherScoreValue_(input);
+        if (score === undefined) return; // out of range; the box keeps focus
+        applyBatchLocalUpdate_(email, { score: score, excluded: false });
+        updateBatchRowUI_(email);
+        saveBatchGradeItem_(email, { score: score, excluded: false });
+      };
+    });
+    document.querySelectorAll(".keepMarkBtn").forEach((btn) => {
+      btn.onclick = () => {
+        let email = btn.dataset.email;
+        let r = getBatchResponse_(email);
+        if (!r || !hasScore_(r.score)) return;
+        // Re-saving the same score refreshes the snapshot the flag compares
+        // against, so this says "I've read the new version and it still stands".
+        saveBatchGradeItem_(email, { score: r.score, excluded: r.excluded, comment: r.comment || "" });
+        updateBatchRowUI_(email);
+      };
+    });
+    document.querySelectorAll(".batchComment").forEach((ta) => {
+      ta.onblur = () => {
+        let email = ta.dataset.email;
+        let r = getBatchResponse_(email);
+        if (!r) return;
+        r.comment = ta.value;
+        saveBatchGradeItem_(email, { score: r.score, excluded: r.excluded, comment: ta.value });
+      };
+    });
+    // ---- the grading tiles ----
+    let refreshHub = document.getElementById("refreshHub");
+    if (refreshHub)
+      refreshHub.onclick = () => {
+        refreshHub.disabled = true;
+        loadGradingHub(backend.activeClassId, true).finally(() => {
+          let b = document.getElementById("refreshHub");
+          if (b) b.disabled = false;
+        });
+      };
+    // The whole tile is the button. The controls inside it are not -- clicking
+    // "Released" or "CSV" must not also throw you onto the marking screen.
+    document.querySelectorAll("[data-hubopen]").forEach((tile) => {
+      const open = () => {
+        if (tile.dataset.hubopen === "act") {
+          let scene = tile.dataset.scene || Object.keys(CHAPTERS).sort(sceneSort)[0];
+          state.view = "batchGrade";
+          backend.batchSceneKey = scene;
+          render();
+          loadSceneResponses(scene);
+        } else {
+          state.view = "essayGrade";
+          backend.essayStepKey = tile.dataset.key;
+          render();
+          loadEssayResponses(tile.dataset.key);
+        }
+      };
+      tile.onclick = (ev) => {
+        if (ev.target.closest(".hub-tile-controls,.hub-tile-canvas")) return;
+        open();
+      };
+      tile.onkeydown = (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          open();
+        }
+      };
+    });
+    // "Don't grade this Act" -- the whole Act, multiple choice and written work
+    // alike, for every student. Confirmed because it changes what the unit is
+    // out of for the entire class; reversible because the scores stay put.
+    // One click from the tile: open the essay as far as this stage. The stages
+    // are sequential, so this opens everything up to it, never a gap.
+    document.querySelectorAll(".essayOpenThroughBtn").forEach((b) => {
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        state.releasedEssayThrough = b.dataset.estep;
+        save();
+        render();
+      };
+    });
+    document.querySelectorAll(".actNoGradeBtn").forEach((b) => {
+      b.onclick = async (ev) => {
+        ev.stopPropagation();
+        let act = Number(b.dataset.act);
+        let next = !b.classList.contains("is-excluded");
+        if (
+          next &&
+          !confirm(
+            `Leave Chapter ${act} out of the grade for everyone in this class?\n\n` +
+              `It stops counting for every student — the multiple choice as well as the written responses — and the unit is worth that much less. ` +
+              `Any scores you have already entered are kept, so you can count it again later and they all come back.`,
+          )
+        )
+          return;
+        let note = document.getElementById(asgStatusId_("act:" + act));
+        b.disabled = true;
+        if (note) note.textContent = next ? "Removing Chapter " + act + " from the grade…" : "Counting Chapter " + act + " again…";
+        try {
+          let res = await rpc("setGradeItemForClass", { classId: backend.activeClassId, act: act, excluded: next });
+          invalidateDashboardCache_();
+          await loadGradingHub(backend.activeClassId, true);
+          await loadDashboard(backend.activeClassId, false);
+          if (state.view === "manage") render();
+          let after = document.getElementById(asgStatusId_("act:" + act));
+          if (after)
+            after.textContent = next
+              ? `Chapter ${act} is out of the grade for all ${res.updated + res.created ? Math.round((res.updated + res.created) / res.items) : 0} students. Press "Count it again" to bring it back.`
+              : `Chapter ${act} counts again.`;
+        } catch (e) {
+          b.disabled = false;
+          if (note) note.textContent = "Could not update the whole class: " + (e.message || String(e));
+        }
+      };
+    });
+    document.querySelectorAll(".hubCanvasBtn").forEach((b) => {
+      b.onclick = (ev) => {
+        ev.stopPropagation();
+        if (!canvasLinked_()) {
+          openCanvasSetupModal();
+          return;
+        }
+        openCanvasActModal(b.dataset.asg);
+      };
+    });
+    let rosterCard = document.getElementById("rosterCard");
+    if (rosterCard) rosterCard.ontoggle = () => { backend.rosterOpen = rosterCard.open; };
+
+    // ---- the essay marking screen ----
+    let openEssay = document.getElementById("openEssayGrade");
+    if (openEssay)
+      openEssay.onclick = () => {
+        state.view = "essayGrade";
+        if (!backend.essayStepKey) backend.essayStepKey = ESSAY_GRADE_STEPS[0];
+        render();
+        loadEssayResponses(backend.essayStepKey);
+      };
+    let stepSelect = document.getElementById("essayStepSelect");
+    if (stepSelect) stepSelect.onchange = () => loadEssayResponses(stepSelect.value);
+    let essayExcludeAll = document.getElementById("essayExcludeAllBtn");
+    if (essayExcludeAll) essayExcludeAll.onclick = toggleExcludeEssayStepForClass_;
+    document.querySelectorAll(".essayScoreBtn,.essayCompleteBtn").forEach((btn) => {
+      btn.onclick = () => {
+        let email = btn.dataset.email;
+        let score = Number(btn.dataset.score);
+        let newScore = btn.classList.contains("selected") ? null : score;
+        applyEssayLocalUpdate_(email, { score: newScore });
+        updateEssayRowUI_(email);
+        saveEssayGradeItem_(email, { score: newScore, excluded: (getEssayRow_(email) || {}).excluded });
+      };
+    });
+    document.querySelectorAll(".essayManualScore[data-email]").forEach((input) => {
+      input.onchange = () => {
+        let email = input.dataset.email;
+        let score = teacherScoreValue_(input, DOK_POINTS);
+        if (score === undefined) return;
+        applyEssayLocalUpdate_(email, { score: score, excluded: false });
+        updateEssayRowUI_(email);
+        saveEssayGradeItem_(email, { score: score, excluded: false });
+      };
+    });
+    document.querySelectorAll(".essayExcludeToggle").forEach((cb) => {
+      cb.onchange = () => {
+        let email = cb.dataset.email;
+        applyEssayLocalUpdate_(email, { excluded: cb.checked });
+        updateEssayRowUI_(email);
+        saveEssayGradeItem_(email, { excluded: cb.checked, score: (getEssayRow_(email) || {}).teacherScore });
+      };
+    });
+    document.querySelectorAll(".essayKeepBtn").forEach((btn) => {
+      btn.onclick = () => {
+        let email = btn.dataset.email;
+        let r = getEssayRow_(email);
+        if (!r || !hasScore_(r.teacherScore)) return;
+        applyEssayLocalUpdate_(email, { score: r.teacherScore });
+        updateEssayRowUI_(email);
+        saveEssayGradeItem_(email, { score: r.teacherScore, excluded: r.excluded, comment: r.comment || "" });
+      };
+    });
+    document.querySelectorAll(".essayComment").forEach((ta) => {
+      ta.onblur = () => {
+        let email = ta.dataset.email;
+        let r = getEssayRow_(email);
+        if (!r) return;
+        r.comment = ta.value;
+        saveEssayGradeItem_(email, { score: r.teacherScore, excluded: r.excluded, comment: ta.value });
+      };
+    });
+    document.querySelectorAll(".critScoreBtn").forEach((btn) => {
+      btn.onclick = () => {
+        let email = btn.dataset.email, crit = btn.dataset.crit;
+        let newScore = btn.classList.contains("selected") ? null : Number(btn.dataset.score);
+        applyFinalLocalUpdate_(email, crit, { score: newScore });
+        updateFinalRowUI_(email);
+        saveFinalGradeItem_(email, crit, { score: newScore, excluded: false });
+      };
+    });
+    document.querySelectorAll(".critExcludeToggle").forEach((cb) => {
+      cb.onchange = () => {
+        let email = cb.dataset.email, crit = cb.dataset.crit;
+        applyFinalLocalUpdate_(email, crit, { excluded: cb.checked });
+        updateFinalRowUI_(email);
+        let rec = (getEssayRow_(email) || { criteria: {} }).criteria[crit] || {};
+        saveFinalGradeItem_(email, crit, { excluded: cb.checked, score: rec.teacherScore });
+      };
+    });
+    document.querySelectorAll(".critComment").forEach((ta) => {
+      ta.onblur = () => {
+        let email = ta.dataset.email, crit = ta.dataset.crit;
+        let rec = (getEssayRow_(email) || { criteria: {} }).criteria[crit];
+        if (!rec) return;
+        rec.comment = ta.value;
+        saveFinalGradeItem_(email, crit, { score: rec.teacherScore, excluded: rec.excluded, comment: ta.value });
+      };
+    });
+    document
+      .querySelectorAll(".viewStudent")
+      .forEach((b) => (b.onclick = () => openStudentWork(b.dataset.email)));
+    document.querySelectorAll(".essayJump").forEach((b) => {
+      b.onclick = () => {
+        state.view = "essayGrade";
+        backend.essayStepKey = b.dataset.step;
+        render();
+        loadEssayResponses(b.dataset.step);
+      };
+    });
+    document
+      .querySelectorAll(".gradebookJump")
+      .forEach((b) => (b.onclick = () => openStudentWork(b.dataset.email, Number(b.dataset.act))));
+    document.querySelectorAll(".push-act-btn").forEach((b) => {
+      b.onclick = () => pushActToCanvas(b.dataset.asg, b);
+    });
+    document.querySelectorAll(".canvas-setup-btn").forEach((b) => {
+      b.onclick = () => openCanvasActModal(b.dataset.asg);
+    });
+    let openSetup = document.getElementById("openCanvasSetup");
+    if (openSetup) openSetup.onclick = openCanvasSetupModal;
+    let cConnect = document.getElementById("canvasConnectBtn");
+    if (cConnect)
+      cConnect.onclick = async () => {
+        let baseUrl = (document.getElementById("canvasBaseUrl") || {}).value || "";
+        let token = (document.getElementById("canvasToken") || {}).value || "";
+        if (!baseUrl.trim() || !token.trim()) return canvasMsg_("Enter both your Canvas address and an access token.", true);
+        cConnect.disabled = true;
+        canvasMsg_("Checking the token with Canvas…");
+        try {
+          await rpc("saveCanvasConnection", { baseUrl: baseUrl, token: token });
+          await loadCanvasStatus(true);
+          render();
+          openCanvasSetupModal();
+        } catch (e) {
+          canvasMsg_(e.message, true);
+          cConnect.disabled = false;
+        }
+      };
+    let cDisconnect = document.getElementById("canvasDisconnectBtn");
+    if (cDisconnect)
+      cDisconnect.onclick = async () => {
+        try {
+          await rpc("clearCanvasConnection");
+          backend.canvas = { checked: true, connected: false };
+          render();
+          openCanvasSetupModal();
+        } catch (e) {
+          canvasMsg_(e.message, true);
+        }
+      };
+    let cCourse = document.getElementById("canvasCourseSelect");
+    if (cCourse)
+      cCourse.onchange = async () => {
+        if (!cCourse.value) return;
+        canvasMsg_("Loading that course's assignment groups…");
+        try {
+          let g = await rpc("listCanvasAssignmentGroups", { courseId: cCourse.value });
+          backend.canvas.groups = g.groups || [];
+          let sel = document.getElementById("canvasGroupSelect");
+          if (sel)
+            sel.innerHTML = `<option value="">Course default</option>` +
+              backend.canvas.groups.map((x) => `<option value="${esc(x.id)}">${esc(x.name)}</option>`).join("");
+          canvasMsg_("");
+        } catch (e) {
+          canvasMsg_(e.message, true);
+        }
+      };
+    let cLink = document.getElementById("canvasLinkBtn");
+    if (cLink)
+      cLink.onclick = async () => {
+        let courseId = (document.getElementById("canvasCourseSelect") || {}).value || "";
+        if (!courseId) return canvasMsg_("Choose a Canvas course first.", true);
+        cLink.disabled = true;
+        canvasMsg_("Linking…");
+        try {
+          await rpc("linkCanvasCourse", {
+            classId: backend.activeClassId,
+            courseId: courseId,
+            assignmentGroupId: (document.getElementById("canvasGroupSelect") || {}).value || "",
+          });
+          invalidateDashboardCache_();
+          await loadDashboard(backend.activeClassId);
+          openCanvasSetupModal();
+        } catch (e) {
+          canvasMsg_(e.message, true);
+          cLink.disabled = false;
+        }
+      };
+    let cUnlink = document.getElementById("canvasUnlinkBtn");
+    if (cUnlink)
+      cUnlink.onclick = async () => {
+        try {
+          await rpc("unlinkCanvasCourse", { classId: backend.activeClassId });
+          invalidateDashboardCache_();
+          await loadDashboard(backend.activeClassId);
+          openCanvasSetupModal();
+        } catch (e) {
+          canvasMsg_(e.message, true);
+        }
+      };
+    document
+      .querySelectorAll(".export-act-btn")
+      .forEach((b) => (b.onclick = () => exportAct(b.dataset.asg)));
+    let add = document.getElementById("addTeacherBtn");
+    if (add) add.onclick = addTeacher;
+    document.querySelectorAll(".accessToggle").forEach((b) => (b.onclick = () => toggleAccess(b)));
+  }
+
+  async function openStudentWork(email, jumpToAct) {
+    document.getElementById("modalRoot").innerHTML =
+      '<div class="modal"><div class="modalbox"><h3>Loading student work...</h3></div></div>';
+    try {
+      let r = await rpc("getStudentWork", { classId: backend.activeClassId, studentEmail: email });
+      normalizeGradeSummary_(r.gradeSummary);
+      backend.studentDetail = r;
+      renderStudentModal(r);
+      if (jumpToAct) {
+        let block = document.getElementById("actBlock" + jumpToAct);
+        if (block) {
+          block.scrollIntoView({ behavior: "smooth", block: "start" });
+          block.classList.add("jump-highlight");
+          setTimeout(() => block.classList.remove("jump-highlight"), 1600);
+        }
+      }
+    } catch (e) {
+      document.getElementById("modalRoot").innerHTML =
+        `<div class="modal"><div class="modalbox"><h3>Could not load work</h3><p>${esc(e.message)}</p><button class="btn modal-dismiss" id="closeStudent">Close</button></div></div>`;
+      document.getElementById("closeStudent").onclick = () =>
+        (document.getElementById("modalRoot").innerHTML = "");
+    }
+  }
+  function activityHasContent(v) {
+    if (v == null) return false;
+    if (typeof v === "string") return v.trim().length > 0;
+    if (typeof v === "object") {
+      if (Array.isArray(v.table) && v.table.some((row) => Array.isArray(row) && row.some((c) => String(c || "").trim())))
+        return true;
+      if (Array.isArray(v.fields) && v.fields.some((f) => String(f || "").trim())) return true;
+      if (v.reflection && String(v.reflection).trim()) return true;
+      return false;
+    }
+    return false;
+  }
+  function formatActivityResponseHtml(title, v) {
+    if (typeof v === "string") return `<p>${esc(v)}</p>`;
+    let detail = (typeof ACTIVITY_DETAILS !== "undefined" && ACTIVITY_DETAILS[title]) || {};
+    let h = "";
+    if (Array.isArray(v.table) && v.table.length) {
+      let cols = detail.table || [];
+      h += `<div style="overflow:auto"><table class="rubric"><thead><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}</tr></thead><tbody>${v.table.map((row) => `<tr>${row.map((c) => `<td>${esc(c || "")}</td>`).join("")}</tr>`).join("")}</tbody></table></div>`;
+    }
+    if (Array.isArray(v.fields) && v.fields.length) {
+      let labels = detail.fields || [];
+      h += v.fields
+        .map((val, i) =>
+          val && String(val).trim()
+            ? `<p><strong>${esc((labels[i] && labels[i].label) || "Field " + (i + 1))}:</strong> ${esc(val)}</p>`
+            : "",
+        )
+        .join("");
+    }
+    if (v.reflection && String(v.reflection).trim())
+      h += `<p><strong>${esc(detail.reflection || "Reflection")}:</strong> ${esc(v.reflection)}</p>`;
+    return h || '<p class="toolbar-note">No response submitted.</p>';
+  }
+  function scoreButtonRow(key, dok, email) {
+    let emailAttr = email ? ` data-email="${esc(email)}"` : "";
+    let attrs = `data-key="${esc(key)}"${emailAttr}`;
+    return (
+      rubricLevelRow_(dok.score, "score-btn", attrs) +
+      teacherScoreInputHtml_("dokManualScore", dok.score, attrs) +
+      offRubricNoteHtml_(dok.score)
+    );
+  }
+
+  function mcItemHtml(key, s, gs) {
+    let scene = (gs && gs.scenes && gs.scenes[key]) || { mc: { score: null, excluded: false } };
+    let q = QUESTIONS[key];
+    let info = answerInfo(key, s.answers[key]);
+    let pickLabels = (info.picks || []).map((i) => (q ? q[1][i] : null) || "?").join(" → ") || "No answer";
+    let mcLabel =
+      scene.mc.score === 1
+        ? "✓ Correct on the first try — " + MC_POINTS + " pts"
+        : scene.mc.score === 0.5
+          ? "✓ Correct on the second try — " + MC_POINTS / 2 + " pts"
+          : scene.mc.score === 0
+            ? "✗ Incorrect after 2 tries — 0 pts"
+            : "Not attempted yet";
+    return `<div class="item-grade-block" data-scene="${key}">
+      <h5>Chapter ${CHAPTERS[key] ? CHAPTERS[key].act : key}</h5>
+      <div class="grade-row-mc"><div class="mc-summary">${esc(q ? q[0] : "")}<br><small>Answer: ${esc(pickLabels)} — ${mcLabel}</small></div><label class="exclude-toggle"><input type="checkbox" class="mcExcludeToggle" data-key="${key}" ${scene.mc.excluded ? "checked" : ""}> Exclude MC from grade</label></div>
+    </div>`;
+  }
+
+  function dokItemHtml(key, s, gs) {
+    let scene = (gs && gs.scenes && gs.scenes[key]) || { dok: { score: null, excluded: false, comment: "" } };
+    let dokText = String((s.dok || {})[key] || "").trim();
+    let q = QUESTIONS[key];
+    return `<div class="item-grade-block" data-scene="${key}">
+      <h5>Chapter ${CHAPTERS[key] ? CHAPTERS[key].act : key}</h5>
+      <p class="dok-prompt">${esc(q ? q[3] : "")}</p>
+      <div class="response-box">${dokText ? esc(dokText) : "<em>No written response submitted yet.</em>"}</div>
+      <div class="grade-row-dok">${scoreButtonRow(key, scene.dok)}<label class="exclude-toggle"><input type="checkbox" class="dokExcludeToggle" data-key="${key}" ${scene.dok.excluded ? "checked" : ""}> Exclude written response from grade</label><textarea class="dokComment" data-key="${key}" placeholder="Optional feedback comment for the student">${esc(scene.dok.comment || "")}</textarea></div>
+    </div>`;
+  }
+
+  function renderStudentModal(r) {
+    // Grading a scene calls this again to redraw with the new score, but rebuilding
+    // .modalbox's innerHTML resets its scroll position to the top — annoying when a
+    // teacher is working their way down a long list of scenes. Remember where they
+    // were (and which tab they were on) and put both back after the rebuild.
+    let modalRootEl = document.getElementById("modalRoot");
+    let existingBox = modalRootEl.querySelector(".modalbox");
+    let savedScroll = existingBox ? existingBox.scrollTop : 0;
+    let existingActiveTab = modalRootEl.querySelector(".detailTab.active");
+    let savedTab = existingActiveTab ? existingActiveTab.dataset.tab : "reading";
+    let s = normalizeState(r.state || {}, null);
+    let gs = r.gradeSummary || { scenes: {}, acts: {} };
+    let rubricLegend = `<div class="rubric-legend">${DOK_RUBRIC.slice(1)
+      .map((d, i) => `<span class="rubric-chip" title="${esc(d)}">${i + 1}</span>`)
+      .join("")}<small class="rubric-legend-note">Hover a number for the full rubric descriptor. Click a scene's written-response score to grade it; use the checkboxes to leave a question out of the final grade.</small></div>`;
+    let dokSection = [1, 2, 3, 4, 5, 6, 7, 8, 9]
+      .map((act) => {
+        let keys = Object.keys(CHAPTERS)
+          .filter((k) => CHAPTERS[k].act === act)
+          .sort(sceneSort);
+        let mcBlocks = keys.map((k) => mcItemHtml(k, s, gs)).join("");
+        let dokBlocks = keys.map((k) => dokItemHtml(k, s, gs)).join("");
+        let actTotal = gs.acts[act] || { earned: 0, possible: 0 };
+        return `<div class="grade-act-block" id="actBlock${act}"><h4>Chapter ${act} <span class="pill" id="actTotal${act}">${actTotal.earned}/${actTotal.possible}</span>${actPendingNoteHtml_(actTotal)}</h4><h5 class="act-subhead">Multiple Choice</h5>${mcBlocks}<h5 class="act-subhead">Written Responses</h5>${dokBlocks}</div>`;
+      })
+      .join("");
+    let evidence = (s.evidence || [])
+      .map(
+        (x) =>
+          `<div class="response-box"><strong>Chapter ${x.act} · ${esc((EQ.find((e) => e.id === x.eq) || {}).label || x.eq)}</strong><br>“${esc(x.quote)}”<p>${esc(x.note)}</p></div>`,
+      )
+      .join("");
+    let acts = Object.entries(s.activityResponses || {})
+      .filter(([, v]) => activityHasContent(v))
+      .map(([k, v]) => `<div class="response-box"><strong>${esc(k)}</strong>${formatActivityResponseHtml(k, v)}</div>`)
+      .join("");
+    let e = s.essay || {};
+    // A read-only summary of where this student's essay grades stand. Marking
+    // happens on the Grade the Essay screen, where the whole class is in one
+    // place -- this is here so the scores are visible beside the drafts.
+    let eg = (r.gradeSummary || {}).essay;
+    let essayScores = eg
+      ? `<div class="essay-score-strip">${ESSAY_GRADE_STEPS.map((k) => {
+          if (k === "final") {
+            let t = eg.finalTotal || {};
+            return `<span class="mini-chip ${t.hasAnyResult ? "batch-badge-graded" : ""}">Final Essay ${t.hasAnyResult ? t.earned + "/" + t.possible : "not scored"}</span>`;
+          }
+          let rec = (eg.steps || {})[k] || {};
+          let val = rec.excluded
+            ? "excused"
+            : hasScore_(rec.score)
+              ? k === "thesis"
+                ? Number(rec.score) > 0
+                  ? "complete"
+                  : "not complete"
+                : rec.score + "/" + rec.possible
+              : rec.submitted
+                ? "not marked yet"
+                : "not done";
+          let cls = rec.excluded ? "batch-badge-excluded" : hasScore_(rec.score) ? "batch-badge-graded" : rec.submitted ? "batch-badge-needs" : "";
+          return `<span class="mini-chip ${cls}">${esc(ESSAY_GRADE_LABELS[k])} ${esc(val)}</span>`;
+        }).join("")}</div>`
+      : "";
+    let essay = essayScores + `<div class="response-box"><strong>Thesis</strong><p>${esc(e.thesis || "Not drafted")}</p></div>${(e.bodies || []).map((b, i) => `<div class="response-box"><strong>Body Paragraph ${i + 1}${i >= 3 ? " (extra)" : ""}</strong><p>${esc(b || "Not drafted")}</p></div>`).join("")}${String(e.rebuttal || "").trim() ? `<div class="response-box"><strong>Counterargument</strong><p>${esc(e.rebuttal)}</p></div>` : ""}<div class="response-box"><strong>Introduction</strong><p>${esc(e.intro || "Not drafted")}</p></div><div class="response-box"><strong>Conclusion</strong><p>${esc(e.conclusion || "Not drafted")}</p></div>`;
+    let self = ["Meaning", "Style", "Form", "Conventions"]
+      .map(
+        (c) =>
+          `<div class="response-box"><strong>${c}</strong><br>Selected level: ${e.selfEval && e.selfEval[c] !== undefined ? Number(e.selfEval[c]) + 1 : "Not selected"}<p>${esc((e.selfComments || {})[c] || "No comment")}</p></div>`,
+      )
+      .join("");
+    let roster2 = (backend.dashboard && backend.dashboard.students) || [];
+    let myIdx = roster2.findIndex((x) => x.email === r.student.email);
+    let prevStu = myIdx > 0 ? roster2[myIdx - 1] : null;
+    let nextStu = myIdx >= 0 && myIdx < roster2.length - 1 ? roster2[myIdx + 1] : null;
+    let navHtml =
+      roster2.length > 1
+        ? `<div class="student-nav"><button class="btn" id="prevStudentBtn" ${prevStu ? "" : "disabled"}>← ${prevStu ? esc(prevStu.name) : "Prev"}</button><span class="toolbar-note">${myIdx >= 0 ? myIdx + 1 : "?"} of ${roster2.length}</span><button class="btn" id="nextStudentBtn" ${nextStu ? "" : "disabled"}>${nextStu ? esc(nextStu.name) : "Next"} →</button></div>`
+        : "";
+    let tabDefs = [
+      ["reading", "Reading"],
+      ["evidence", "Evidence"],
+      ["activities", "Activities"],
+      ["essay", "Essay"],
+      ["self", "Self-Assessment"],
+    ];
+    let tabsHtml = tabDefs
+      .map(([id, label]) => `<button class="btn detailTab${id === savedTab ? " active" : ""}" data-tab="${id}">${label}</button>`)
+      .join("");
+    let paneHtml = (id, inner) =>
+      `<div id="detail-${id}" class="detailPane${id === savedTab ? "" : " hide"}">${inner}</div>`;
+    document.getElementById("modalRoot").innerHTML =
+      `<div class="modal"><div class="modalbox" style="max-width:1000px;max-height:90vh;overflow:auto"><div class="pill">Student Work</div><h2>${esc(r.student.name)}</h2><p>${esc(r.student.email)} · Last saved ${r.updatedAt ? esc(new Date(r.updatedAt).toLocaleString()) : "not yet"}</p>${navHtml}<div class="student-detail-tabs">${tabsHtml}</div>${paneHtml("reading", `<h3>Reading &amp; Grading, by Scene</h3>${rubricLegend}${dokSection}`)}${paneHtml("evidence", `<h3>Evidence Bank</h3>${evidence || "<p>No evidence saved yet.</p>"}`)}${paneHtml("activities", `<h3>Activities</h3>${acts || "<p>No activity responses yet.</p>"}`)}${paneHtml("essay", `<h3>Essay Drafts</h3>${essay}`)}${paneHtml("self", `<h3>Self-Assessment</h3>${self}`)}<div class="modal-actions"><button class="btn primary modal-dismiss" id="closeStudent">Close</button></div></div></div>`;
+    let newBox = document.getElementById("modalRoot").querySelector(".modalbox");
+    if (newBox) newBox.scrollTop = savedScroll;
+    document.getElementById("closeStudent").onclick = () => {
+      document.getElementById("modalRoot").innerHTML = "";
+      if (state.view === "manage") render();
+    };
+    let prevBtn = document.getElementById("prevStudentBtn");
+    if (prevBtn && prevStu) prevBtn.onclick = () => openStudentWork(prevStu.email);
+    let nextBtn = document.getElementById("nextStudentBtn");
+    if (nextBtn && nextStu) nextBtn.onclick = () => openStudentWork(nextStu.email);
+    async function saveGradeItem(itemType, key, patch) {
+      try {
+        await rpc("setGradeItem", {
+          classId: backend.activeClassId,
+          studentEmail: r.student.email,
+          itemType,
+          itemKey: key,
+          score: patch.score !== undefined ? patch.score : null,
+          excluded: !!patch.excluded,
+          comment: patch.comment !== undefined ? patch.comment : (gs.scenes[key] && gs.scenes[key].dok.comment) || "",
+        });
+        if (backend.dashboard) {
+          let stu = backend.dashboard.students.find((x) => x.email.toLowerCase() === r.student.email.toLowerCase());
+          if (stu) stu.gradeSummary = gs;
+        }
+      } catch (e) {
+        alert("Could not save that grade -- reloading this student to double check: " + e.message);
+        await refreshStudentModal();
+      }
+    }
+    async function refreshStudentModal() {
+      try {
+        let fresh = await rpc("getStudentWork", { classId: backend.activeClassId, studentEmail: r.student.email });
+        normalizeGradeSummary_(fresh.gradeSummary);
+        backend.studentDetail = fresh;
+        renderStudentModal(fresh);
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+    document.querySelectorAll(".score-btn").forEach((btn) => {
+      btn.onclick = () => {
+        let key = btn.dataset.key;
+        let score = Number(btn.dataset.score);
+        let selected = btn.classList.contains("selected");
+        let newScore = selected ? null : score;
+        applyLocalGradeItemUpdate(gs, key, "dok", { excluded: false, score: newScore });
+        renderStudentModal(r);
+        saveGradeItem("dok", key, { excluded: false, score: newScore });
+      };
+    });
+    document.querySelectorAll(".dokExcludeToggle").forEach((cb) => {
+      cb.onchange = () => {
+        let key = cb.dataset.key;
+        let scene = gs.scenes[key];
+        applyLocalGradeItemUpdate(gs, key, "dok", { excluded: cb.checked, score: scene ? scene.dok.score : null });
+        renderStudentModal(r);
+        saveGradeItem("dok", key, { excluded: cb.checked, score: gs.scenes[key].dok.score });
+      };
+    });
+    document.querySelectorAll(".mcExcludeToggle").forEach((cb) => {
+      cb.onchange = () => {
+        let key = cb.dataset.key;
+        applyLocalGradeItemUpdate(gs, key, "mc", { excluded: cb.checked });
+        renderStudentModal(r);
+        saveGradeItem("mc", key, { excluded: cb.checked, comment: "" });
+      };
+    });
+    document.querySelectorAll(".dokComment").forEach((ta) => {
+      ta.onblur = () => {
+        let key = ta.dataset.key;
+        let scene = gs.scenes[key];
+        if (!scene) return;
+        scene.dok.comment = ta.value;
+        saveGradeItem("dok", key, { excluded: scene.dok.excluded, score: scene.dok.score, comment: ta.value });
+      };
+    });
+    document.querySelectorAll(".detailTab").forEach(
+      (b) =>
+        (b.onclick = () => {
+          document
+            .querySelectorAll(".detailTab")
+            .forEach((x) => x.classList.toggle("active", x === b));
+          document.querySelectorAll(".detailPane").forEach((x) => x.classList.add("hide"));
+          document.getElementById("detail-" + b.dataset.tab).classList.remove("hide");
+        }),
+    );
+  }
+  function sceneSort(a, b) {
+    let [aa, as] = a.split(".").map(Number),
+      [ba, bs] = b.split(".").map(Number);
+    return aa - ba || as - bs;
+  }
+
+  if (backend.enabled) {
+    setAccountHeader();
+    bootstrap();
+  } else {
+    backend.ready = true;
+    render();
+  }
+})();
+
+__MB.BackendClient = 'ok';
+</script>

@@ -1,0 +1,2129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vocabulary Root Word Study</title>
+<style>
+  /* ===== Palette: cream paper, deep teal, oxblood, ochre — matches Literature Circles ===== */
+  :root {
+    --paper: #f5f1e8;
+    --sheet: #fffdf9;
+    --sunk: #f9f6f0;
+    --ink: #24302c;
+    --ink-soft: #3d4843;
+    --muted: #5f655e;
+    --faint: #8a8d84;
+    --rule: #ddd5c5;
+    --rule-soft: #ebe5d8;
+    --teal: #2b5552;
+    --teal-deep: #1f403e;
+    --teal-soft: #e4edeb;
+    --wine: #7a3b38;
+    --wine-soft: #f4e8e5;
+    --ochre: #845e1c;
+    --ochre-soft: #f5ecd9;
+    --good: #2e6a45;
+    --good-soft: #e3f0e6;
+    --bad: #a1392d;
+    --bad-soft: #f8e6e2;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --radius: 12px;
+    --gutter: clamp(18px, 5vw, 56px);
+    --pad: clamp(20px, 4vw, 44px);
+  }
+
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.6;
+  }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  :focus-visible { outline: 3px solid rgba(43, 85, 82, 0.45); outline-offset: 2px; }
+  .hidden { display: none !important; }
+  a { color: var(--teal); text-underline-offset: 3px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 0.875rem; }
+  .center { text-align: center; }
+
+  /* ===== Masthead ===== */
+  .masthead { border-bottom: 1px solid var(--rule); background: var(--sheet); }
+  .masthead-inner {
+    max-width: 1040px; margin: 0 auto; padding: 16px var(--gutter);
+    display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap;
+  }
+  .wordmark { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .wordmark .eyebrow { font-size: 0.72rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--wine); font-weight: 600; }
+  .wordmark h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(1.35rem, 3.2vw, 1.75rem); margin: 0; letter-spacing: 0.005em; }
+  .account { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 0.85rem; color: var(--muted); }
+  .account b { color: var(--ink-soft); font-weight: 600; }
+  .seg { display: inline-flex; border: 1px solid var(--rule); border-radius: 999px; overflow: hidden; background: var(--sunk); }
+  .seg button { border: 0; background: transparent; padding: 6px 14px; cursor: pointer; font-size: 0.82rem; color: var(--muted); }
+  .seg button.on { background: var(--teal); color: #fff; }
+
+  .wrap { max-width: 1040px; margin: 0 auto; padding: clamp(24px, 4vw, 44px) var(--gutter) 80px; }
+  .wrap.narrow-read > .panel { max-width: 880px; margin-left: auto; margin-right: auto; }
+
+  /* ===== Panels & type ===== */
+  .panel {
+    background: var(--sheet);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    padding: var(--pad);
+    margin-bottom: 24px;
+    box-shadow: 0 1px 2px rgba(60, 50, 30, 0.04);
+  }
+  h2, h3 { font-family: var(--serif); font-weight: 600; line-height: 1.25; color: var(--ink); }
+  h2 { font-size: clamp(1.35rem, 3vw, 1.7rem); margin: 0 0 8px; }
+  h3 { font-size: 1.2rem; margin: 0 0 6px; }
+  .lede { color: var(--ink-soft); max-width: 62ch; margin: 0 0 4px; }
+  .kicker { font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--wine); font-weight: 600; margin: 0 0 6px; }
+  .rule { border: 0; border-top: 1px solid var(--rule-soft); margin: 24px 0; }
+
+  /* ===== Buttons ===== */
+  .btn {
+    display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+    font-weight: 600; font-size: 0.95rem;
+    background: var(--teal); color: #fff;
+    border: 1px solid var(--teal); border-radius: 8px;
+    padding: 11px 20px; cursor: pointer; text-decoration: none;
+    transition: background 0.12s, border-color 0.12s, color 0.12s;
+  }
+  .btn:hover { background: var(--teal-deep); border-color: var(--teal-deep); }
+  .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .btn.secondary { background: var(--sheet); color: var(--teal); border-color: #b9c9c6; }
+  .btn.secondary:hover { background: var(--teal-soft); }
+  .btn.wine { background: var(--wine); border-color: var(--wine); }
+  .btn.wine:hover { background: #5f2c2a; }
+  .btn.quiet { background: transparent; border-color: transparent; color: var(--teal); padding: 8px 10px; }
+  .btn.quiet:hover { background: var(--teal-soft); }
+  .btn.danger { background: var(--sheet); color: var(--bad); border-color: #e2b9b2; }
+  .btn.danger:hover { background: var(--bad-soft); }
+  .btn.small { font-size: 0.84rem; padding: 7px 13px; }
+  .linkish { background: none; border: 0; padding: 4px 0; color: var(--teal); cursor: pointer; font-weight: 600; font-size: 0.9rem; text-decoration: underline; text-underline-offset: 3px; }
+  .btn-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+  .btn-row.spread { justify-content: space-between; }
+
+  /* ===== Chips, notes ===== */
+  .chip { display: inline-block; font-size: 0.76rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: var(--sunk); border: 1px solid var(--rule); color: var(--muted); white-space: nowrap; }
+  .chip.good { background: var(--good-soft); border-color: #bcd8c5; color: var(--good); }
+  .chip.warn { background: var(--ochre-soft); border-color: #e3cfa4; color: var(--ochre); }
+  .chip.bad { background: var(--bad-soft); border-color: #e7c0b9; color: var(--bad); }
+  .chip.teal { background: var(--teal-soft); border-color: #c3d5d2; color: var(--teal); }
+  .note { border-radius: 10px; padding: 14px 16px; font-size: 0.92rem; background: var(--sunk); border: 1px solid var(--rule-soft); }
+  .note.warn { background: var(--ochre-soft); border-color: #e8d6b0; }
+  .note.bad { background: var(--bad-soft); border-color: #ecc9c2; color: #6e2a22; }
+  .note.good { background: var(--good-soft); border-color: #c5ddcc; }
+
+  /* ===== Forms ===== */
+  label.field { display: block; font-size: 0.85rem; font-weight: 600; color: var(--ink-soft); margin-bottom: 12px; }
+  label.field > span { display: block; margin-bottom: 5px; }
+  .input, select.input, textarea.input {
+    width: 100%; background: #fff; border: 1px solid #cfc6b4; border-radius: 8px; padding: 10px 12px; font-size: 0.95rem;
+  }
+  .input:focus { outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(43, 85, 82, 0.15); }
+  .inline-form { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .inline-form .input { flex: 1; min-width: 180px; width: auto; }
+
+  /* ===== Sign-in ===== */
+  .signin-error { color: var(--bad); font-size: 0.92rem; margin: 8px 0 0; }
+
+  /* ===== Student home ===== */
+  .home-intro { display: grid; grid-template-columns: 1fr; gap: 20px; }
+  .class-strip { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 14px 16px; border-radius: 10px; background: var(--sunk); border: 1px solid var(--rule-soft); margin-top: 20px; font-size: 0.92rem; }
+  .class-strip .inline-form .input { min-width: 140px; max-width: 200px; text-transform: uppercase; letter-spacing: 0.12em; }
+
+  .week-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(178px, 1fr)); gap: 14px; margin-top: 8px; }
+  .week-tile {
+    text-align: left; background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 16px 16px 14px; cursor: pointer; display: flex; flex-direction: column; gap: 6px;
+    transition: border-color 0.12s, box-shadow 0.12s, transform 0.12s;
+  }
+  .week-tile:hover { border-color: var(--teal); box-shadow: 0 3px 10px rgba(43, 85, 82, 0.08); transform: translateY(-1px); }
+  .week-tile .wk-label { font-family: var(--serif); font-size: 1.15rem; font-weight: 600; }
+  .week-tile .wk-sub { font-size: 0.78rem; color: var(--muted); line-height: 1.35; }
+  .bar { height: 6px; border-radius: 999px; background: var(--rule-soft); overflow: hidden; margin-top: 4px; }
+  .bar > i { display: block; height: 100%; background: var(--teal); border-radius: 999px; }
+  .week-tile .wk-meta { display: flex; justify-content: space-between; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 0.78rem; color: var(--muted); }
+  .week-tile.complete { border-color: #aac6c1; background: #fbfdfc; }
+
+  /* ===== Week page ===== */
+  .crumbs { margin: 0 0 14px; }
+  .step-list { display: flex; flex-direction: column; gap: 10px; margin: 18px 0 0; padding: 0; list-style: none; }
+  .step {
+    width: 100%; display: flex; align-items: center; gap: 16px; text-align: left;
+    background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px; padding: 14px 16px; cursor: pointer;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .step:hover { border-color: var(--teal); background: #fcfdfc; }
+  .step .num {
+    flex-shrink: 0; width: 38px; height: 38px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-family: var(--serif); font-weight: 600; font-size: 1.05rem; background: var(--teal-soft); color: var(--teal); border: 1px solid #c3d5d2;
+  }
+  .step .txt { flex: 1; min-width: 0; }
+  .step .txt strong { display: block; font-size: 1rem; }
+  .step .txt span { display: block; font-size: 0.86rem; color: var(--muted); }
+  .step .go { color: var(--faint); font-size: 1.1rem; }
+  .step.done .num { background: var(--teal); color: #fff; border-color: var(--teal); }
+  .step.tools .num { background: var(--ochre-soft); color: var(--ochre); border-color: #e3cfa4; }
+  .step.quiz { border-color: #d9bdb8; }
+  .step.quiz .num { background: var(--wine-soft); color: var(--wine); border-color: #dfc0bb; }
+  .step.quiz:hover { border-color: var(--wine); }
+  .step.locked { cursor: default; opacity: 0.75; }
+  .step.locked:hover { border-color: var(--rule); background: var(--sheet); }
+  .section-label { font-size: 0.74rem; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 28px 0 0; }
+
+  /* ===== Day work ===== */
+  .stepper { display: flex; gap: 8px; margin-bottom: 20px; overflow-x: auto; padding-bottom: 4px; }
+  .step-pill {
+    flex: 1; min-width: 84px; text-align: center; background: var(--sheet); border: 1px solid var(--rule); border-radius: 10px;
+    padding: 9px 6px; cursor: pointer; font-size: 0.78rem; color: var(--muted); line-height: 1.3;
+  }
+  .step-pill .step-num { display: block; font-family: var(--serif); font-size: 1.05rem; font-weight: 600; color: var(--ink); }
+  .step-pill.active { border-color: var(--teal); background: var(--teal-soft); color: var(--teal); }
+  .step-pill.active .step-num { color: var(--teal); }
+  .step-pill.done .step-num::after { content: " \2713"; color: var(--good); font-size: 0.85em; }
+
+  .day-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+  .day-badge { font-size: 0.74rem; font-weight: 700; letter-spacing: 0.1em; padding: 5px 12px; border-radius: 6px; color: #fff; }
+  .accent-a { --acc: var(--teal); --acc-soft: var(--teal-soft); }
+  .accent-b { --acc: var(--wine); --acc-soft: var(--wine-soft); }
+  .accent-c { --acc: var(--ochre); --acc-soft: var(--ochre-soft); }
+  .day-badge { background: var(--acc); }
+  .day-meta { color: var(--muted); font-size: 0.92rem; }
+  .day-meta strong { color: var(--ink); }
+  .day-instruction { color: var(--muted); font-size: 0.92rem; margin: 2px 0 22px; }
+
+  .root-block { border-top: 1px solid var(--rule-soft); padding: 20px 0 22px; }
+  .root-block:first-of-type { border-top: 0; padding-top: 6px; }
+  .root-name { font-family: var(--serif); font-size: 1.45rem; font-weight: 600; margin: 0; color: var(--acc); letter-spacing: 0.02em; }
+  .root-meaning { margin: 0 0 4px; font-size: 1rem; }
+  .root-meaning em { font-family: var(--serif); font-size: 1.08rem; }
+  .root-origin { color: var(--faint); font-size: 0.82rem; }
+  .root-examples { font-size: 0.88rem; color: var(--muted); margin: 0 0 12px; }
+  textarea.sentence-box {
+    width: 100%; min-height: 72px; background: #fff; border: 1px solid #cfc6b4; border-radius: 8px;
+    padding: 12px 14px; font-size: 1rem; line-height: 1.55; resize: vertical;
+  }
+  textarea.sentence-box:focus { outline: none; border-color: var(--acc); box-shadow: 0 0 0 3px var(--acc-soft); }
+  .tip-line { font-size: 0.84rem; color: var(--ochre); margin-top: 6px; line-height: 1.45; }
+  .nav-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 26px; }
+  .save-bar { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .sync-status { font-size: 0.84rem; color: var(--faint); }
+  .sync-status.saving { color: var(--ochre); }
+  .sync-status.saved { color: var(--good); }
+  .sync-status.error { color: var(--bad); }
+
+  /* ===== Study tools ===== */
+  .tool-tabs, .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--rule); margin-bottom: 22px; overflow-x: auto; }
+  .tool-tab, .tab {
+    background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 14px; cursor: pointer;
+    font-weight: 600; font-size: 0.95rem; color: var(--muted); white-space: nowrap; margin-bottom: -1px;
+  }
+  .tool-tab.active, .tab.active { color: var(--teal); border-bottom-color: var(--teal); }
+
+  .flash-wrap { display: flex; flex-direction: column; align-items: center; }
+  .flash-filter { margin-bottom: 14px; display: flex; align-items: center; gap: 8px; font-size: 0.88rem; color: var(--muted); }
+  .flash-filter select { width: auto; }
+  .flash-stats { font-size: 0.86rem; color: var(--muted); text-align: center; margin-bottom: 10px; }
+  .flashcard-scene { width: 100%; max-width: 480px; height: 260px; perspective: 1200px; margin-bottom: 18px; }
+  .flashcard { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.5s; cursor: pointer; }
+  .flashcard.flipped { transform: rotateY(180deg); }
+  .flash-face {
+    position: absolute; inset: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; border-radius: 14px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; text-align: center;
+    border: 1px solid var(--rule); background: #fff; box-shadow: 0 2px 8px rgba(60, 50, 30, 0.06);
+  }
+  .flash-front .big-root { font-family: var(--serif); font-size: 2.4rem; font-weight: 600; color: var(--teal); letter-spacing: 0.04em; }
+  .flash-front .hint { font-size: 0.8rem; color: var(--faint); margin-top: 12px; }
+  .flash-back { transform: rotateY(180deg); overflow-y: auto; background: var(--sunk); }
+  .flash-back .meaning { font-family: var(--serif); font-style: italic; font-size: 1.35rem; margin-bottom: 10px; }
+  .flash-back .examples { font-size: 0.86rem; color: var(--teal); margin-bottom: 12px; }
+  .flash-back .my-sentence { font-size: 0.86rem; background: var(--ochre-soft); border-radius: 8px; padding: 8px 12px; }
+  .flash-controls, .flash-rate-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin-bottom: 14px; }
+
+  /* ===== Matching game / pretest ===== */
+  .mg-statbar { display: flex; justify-content: center; gap: 8px; flex-wrap: wrap; margin: 4px 0 14px; }
+  .mg-stat { font-size: 0.84rem; color: var(--muted); background: var(--sunk); border: 1px solid var(--rule-soft); border-radius: 999px; padding: 4px 12px; }
+  .mg-stat strong { color: var(--ink); }
+  .mg-progress-track { height: 6px; width: 100%; max-width: 420px; margin: 0 auto 20px; background: var(--rule-soft); border-radius: 999px; overflow: hidden; }
+  .mg-progress-fill { height: 100%; background: var(--teal); border-radius: 999px; transition: width 0.35s ease; }
+  .mg-board { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  @media (max-width: 560px) { .mg-board { gap: 10px; } }
+  .mg-col-label { text-transform: uppercase; letter-spacing: 0.12em; font-size: 0.7rem; color: var(--muted); margin-bottom: 8px; text-align: center; font-weight: 700; }
+  .mg-cards { display: flex; flex-direction: column; gap: 8px; }
+  .mg-card {
+    background: #fff; border: 1px solid #d3cab9; border-radius: 9px; padding: 11px 12px; cursor: pointer;
+    font-size: 0.95rem; line-height: 1.3; min-height: 46px; display: flex; align-items: center; justify-content: center; text-align: center;
+    user-select: none; transition: background 0.12s, border-color 0.12s;
+  }
+  .mg-term { font-family: var(--serif); font-weight: 600; letter-spacing: 0.03em; }
+  .mg-card:hover:not(.matched) { border-color: var(--teal); background: #fbfdfc; }
+  .mg-card.selected { border-color: var(--teal); background: var(--teal-soft); box-shadow: 0 0 0 2px rgba(43, 85, 82, 0.2); }
+  .mg-card.correct { background: var(--good-soft); border-color: #a9cdb4; }
+  .mg-card.incorrect { background: var(--bad-soft); border-color: #e2aaa1; animation: mgshake 0.35s ease; }
+  .mg-card.matched { opacity: 0.45; pointer-events: none; }
+  @keyframes mgshake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  .mg-complete { text-align: center; background: var(--sunk); border: 1px solid var(--rule-soft); border-radius: 12px; padding: 34px 20px; }
+
+  /* ===== Final quiz ===== */
+  .quiz-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+  .score-pill { font-family: var(--serif); font-size: 1.05rem; font-weight: 600; background: var(--sunk); border: 1px solid var(--rule); border-radius: 999px; padding: 5px 14px; white-space: nowrap; }
+  .qdots { display: grid; grid-template-columns: repeat(12, 1fr); gap: 6px; margin: 20px 0 26px; }
+  .qdot {
+    height: 34px; border-radius: 7px; border: 1px solid var(--rule); background: #fff; cursor: pointer;
+    font-size: 0.8rem; font-weight: 600; color: var(--muted); padding: 0;
+  }
+  .qdot.cur { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); color: var(--ink); }
+  .qdot.right1 { background: var(--good); border-color: var(--good); color: #fff; }
+  .qdot.right2 { background: #8fbf9f; border-color: #8fbf9f; color: #11331e; }
+  .qdot.missed { background: var(--bad-soft); border-color: #e2aaa1; color: var(--bad); }
+  .qdot.tried { background: var(--ochre-soft); border-color: #e3cfa4; color: var(--ochre); }
+  @media (max-width: 520px) { .qdots { grid-template-columns: repeat(6, 1fr); } }
+  .q-card { max-width: 680px; margin: 0 auto; }
+  .q-count { font-size: 0.8rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin: 0 0 6px; }
+  .q-lead { font-size: 1.08rem; margin: 0 0 14px; color: var(--ink-soft); }
+  .q-focus { font-family: var(--serif); font-size: clamp(1.9rem, 6vw, 2.5rem); font-weight: 600; letter-spacing: 0.02em; margin: 0 0 22px; color: var(--teal); line-height: 1.15; word-break: break-word; }
+  .choices { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 560px) { .choices { grid-template-columns: 1fr; } }
+  .choice {
+    display: flex; align-items: center; gap: 12px; text-align: left; width: 100%;
+    background: #fff; border: 1px solid #d3cab9; border-radius: 10px; padding: 14px 16px; cursor: pointer; font-size: 1.02rem;
+    transition: border-color 0.12s, background 0.12s;
+  }
+  .choice .letter {
+    flex-shrink: 0; width: 28px; height: 28px; border-radius: 50%; border: 1px solid var(--rule);
+    display: flex; align-items: center; justify-content: center; font-size: 0.82rem; font-weight: 700; color: var(--muted); background: var(--sunk);
+  }
+  .choice:hover:not(:disabled) { border-color: var(--teal); background: #fbfdfc; }
+  .choice:disabled { cursor: default; }
+  .choice.is-wrong { background: var(--bad-soft); border-color: #e2aaa1; color: #6e2a22; text-decoration: line-through; text-decoration-color: rgba(161, 57, 45, 0.5); }
+  .choice.is-right { background: var(--good-soft); border-color: #9cc6aa; color: #1d4a2e; font-weight: 600; }
+  .choice.is-answer { border-color: var(--good); border-style: dashed; }
+  .choice.is-right .letter { background: var(--good); color: #fff; border-color: var(--good); }
+  .choice.is-wrong .letter { background: var(--bad); color: #fff; border-color: var(--bad); }
+  .feedback { min-height: 28px; margin: 16px 0 0; font-weight: 600; }
+  .feedback.good { color: var(--good); }
+  .feedback.try { color: var(--ochre); }
+  .feedback.bad { color: var(--bad); }
+  .rules { list-style: none; padding: 0; margin: 16px 0 22px; display: grid; gap: 10px; }
+  .rules li { display: flex; gap: 12px; align-items: baseline; }
+  .rules li b { font-family: var(--serif); font-size: 1.1rem; min-width: 64px; color: var(--teal); }
+  .result-score { font-family: var(--serif); font-size: clamp(2.6rem, 9vw, 3.6rem); font-weight: 600; line-height: 1; color: var(--teal); }
+  .result-score small { font-size: 0.45em; color: var(--muted); font-weight: 400; }
+  .breakdown { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; margin: 14px 0 6px; }
+  .review-list { list-style: none; padding: 0; margin: 20px 0 0; }
+  .review-list li { border-top: 1px solid var(--rule-soft); padding: 12px 0; display: grid; grid-template-columns: 32px 1fr auto; gap: 10px; align-items: baseline; }
+  .review-list .rq { font-weight: 600; color: var(--muted); font-size: 0.86rem; }
+  .review-list .rprompt { font-size: 0.95rem; }
+  .review-list .rprompt b { font-family: var(--serif); }
+  .review-list .rans { font-size: 0.86rem; color: var(--muted); }
+
+  /* ===== Teacher ===== */
+  .t-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 14px; flex-wrap: wrap; margin-bottom: 18px; }
+  .t-head .class-pick { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .t-head select.input { width: auto; min-width: 220px; max-width: 100%; }
+  .week-pills { display: flex; gap: 6px; overflow-x: auto; padding-bottom: 6px; margin-bottom: 18px; }
+  .wpill { flex-shrink: 0; min-width: 48px; background: #fff; border: 1px solid var(--rule); border-radius: 8px; padding: 6px 8px; cursor: pointer; font-size: 0.82rem; font-weight: 600; color: var(--muted); position: relative; }
+  .wpill.on { background: var(--teal); color: #fff; border-color: var(--teal); }
+  .wpill.open::after { content: ""; position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--good); }
+  .wpill.on.open::after { background: #b8e3c4; }
+  .wpill.hid { border-style: dashed; color: var(--faint); background: var(--sunk); }
+  .wpill.hid.on { background: var(--muted); color: #fff; border-style: dashed; }
+  .week-card { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 340px); gap: 16px 24px; align-items: start; }
+  @media (max-width: 720px) { .week-card { grid-template-columns: 1fr; } }
+  .stats { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 10px; }
+  .stat .v { font-family: var(--serif); font-size: 1.5rem; font-weight: 600; line-height: 1.1; }
+  .stat .l { font-size: 0.78rem; color: var(--muted); }
+  .switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; font-size: 0.92rem; user-select: none; }
+  .switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+  .switch .track { width: 44px; height: 24px; border-radius: 999px; background: #cfc8b9; position: relative; transition: background 0.15s; flex-shrink: 0; }
+  .switch .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: transform 0.15s; box-shadow: 0 1px 2px rgba(0,0,0,0.2); }
+  .switch input:checked + .track { background: var(--good); }
+  .switch input:checked + .track::after { transform: translateX(20px); }
+  .switch input:focus-visible + .track { outline: 3px solid rgba(43, 85, 82, 0.45); outline-offset: 2px; }
+  .table-wrap { overflow-x: auto; border: 1px solid var(--rule); border-radius: 10px; background: #fff; }
+  table.grid { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  table.grid th { text-align: left; font-size: 0.74rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); font-weight: 700; background: var(--sunk); padding: 10px 12px; border-bottom: 1px solid var(--rule); white-space: nowrap; }
+  table.grid td { padding: 10px 12px; border-bottom: 1px solid var(--rule-soft); vertical-align: middle; }
+  table.grid tr:last-child td { border-bottom: 0; }
+  table.grid td.num, table.grid th.num { text-align: center; }
+  table.grid .who b { display: block; font-weight: 600; }
+  table.grid .who span { font-size: 0.8rem; color: var(--faint); }
+  table.grid .acts { white-space: nowrap; text-align: right; }
+  table.gb td, table.gb th { padding: 8px 8px; text-align: center; }
+  table.gb td:first-child, table.gb th:first-child { text-align: left; position: sticky; left: 0; background: inherit; min-width: 150px; }
+  table.gb tbody td:first-child { background: #fff; }
+  table.gb th:first-child { background: var(--sunk); }
+  .cellbtn { background: none; border: 0; cursor: pointer; font: inherit; padding: 2px 6px; border-radius: 6px; }
+  .cellbtn:hover { background: var(--teal-soft); }
+  .join-code { font-family: var(--serif); font-size: 2rem; letter-spacing: 0.18em; font-weight: 600; color: var(--teal); }
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 760px) { .two-col { grid-template-columns: 1fr; } }
+  .push-result { margin-top: 14px; }
+  .canvas-week .input { height: 44px; padding-top: 8px; padding-bottom: 8px; }
+  .push-result ul { margin: 6px 0 0; padding-left: 20px; }
+
+  /* ===== Modal ===== */
+  .modal-back { position: fixed; inset: 0; background: rgba(36, 48, 44, 0.42); display: flex; align-items: flex-start; justify-content: center; padding: 5vh 14px; z-index: 60; overflow-y: auto; }
+  .modal { background: var(--sheet); border-radius: 14px; border: 1px solid var(--rule); width: 100%; max-width: 760px; padding: var(--pad); box-shadow: 0 20px 50px rgba(30, 30, 20, 0.25); }
+  .modal.small { max-width: 460px; }
+  .modal-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; margin-bottom: 8px; }
+  .x-btn { background: none; border: 0; font-size: 1.6rem; line-height: 1; cursor: pointer; color: var(--muted); padding: 2px 8px; border-radius: 6px; }
+  .x-btn:hover { background: var(--sunk); }
+  .sent-list { list-style: none; padding: 0; margin: 8px 0 18px; }
+  .sent-list li { padding: 8px 0; border-top: 1px solid var(--rule-soft); font-size: 0.93rem; }
+  .sent-list li b { font-family: var(--serif); margin-right: 6px; }
+  .sent-list li .empty { color: var(--faint); font-style: italic; }
+
+  /* ===== Toast, footer ===== */
+  .toast {
+    position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%) translateY(16px);
+    background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 0.9rem; max-width: min(92vw, 520px);
+    opacity: 0; transition: opacity 0.2s, transform 0.2s; pointer-events: none; z-index: 80; box-shadow: 0 10px 24px rgba(0,0,0,0.18);
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+  footer { text-align: center; font-size: 0.78rem; color: var(--faint); padding: 0 var(--gutter) 40px; }
+  .spinner { display: inline-block; width: 16px; height: 16px; border: 2px solid var(--rule); border-top-color: var(--teal); border-radius: 50%; animation: spin 0.8s linear infinite; vertical-align: -3px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } .flashcard { transition: none; } }
+</style>
+</head>
+<body>
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="wordmark">
+      <span class="eyebrow">Vocabulary</span>
+      <h1>Root Word Study</h1>
+    </div>
+    <div class="account hidden" id="account">
+      <span id="account-label"></span>
+      <div class="seg hidden" id="role-seg" role="group" aria-label="Switch view">
+        <button type="button" data-view="teacher" id="seg-teacher">Teacher dashboard</button>
+        <button type="button" data-view="student" id="seg-student">Student view</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap" id="main">
+
+  <!-- SIGN-IN (detects the signed-in school Google account) -->
+  <section id="signin-gate" class="panel">
+    <p class="kicker">Welcome</p>
+    <h2>Twenty weeks of Greek and Latin roots</h2>
+    <p class="lede">Each day brings five new roots. For every root, write one original sentence using a new word built from it. Your work saves as you go.</p>
+    <div id="signin-checking" class="muted" style="padding:18px 0 4px;"><span class="spinner"></span>&nbsp; Checking your sign-in…</div>
+    <div id="signin-error-wrap" class="hidden">
+      <p id="signin-error" class="signin-error"></p>
+      <button class="btn" id="signin-retry-btn" style="margin-top:12px;">Try again</button>
+    </div>
+    <div id="signin-not-configured" class="note bad hidden" style="margin-top:16px;">
+      <b>Note for your teacher:</b> this page needs to be opened through its Google Apps Script web-app link (not as a standalone file) for sign-in and saving to work. See SETUP_GUIDE.txt.
+    </div>
+  </section>
+
+  <!-- NAME (asked once; first + last name typed by the student, email from Google) -->
+  <section id="name-screen" class="panel hidden">
+    <p class="kicker">One more step</p>
+    <h2>What's your name?</h2>
+    <p class="lede">Type your first and last name the way your teacher knows you. It goes with your sentences and quiz scores.</p>
+    <div id="name-form-holder" style="max-width:520px; margin-top:18px;"></div>
+  </section>
+
+  <!-- STUDENT HOME -->
+  <section id="home-screen" class="hidden">
+    <div class="panel">
+      <p class="kicker" id="home-hello">Your weeks</p>
+      <p class="small muted" id="home-me" style="margin:-2px 0 10px;"></p>
+      <h2>Pick a week</h2>
+      <p class="lede">Start each week with the pretest. Then write a sentence for every root, practice with flashcards and the matching game, and finish with the Final Quiz when your teacher opens it.</p>
+      <div class="class-strip" id="class-strip"></div>
+    </div>
+    <div class="week-grid" id="week-grid"></div>
+  </section>
+
+  <!-- WEEK PAGE -->
+  <section id="intro-screen" class="panel hidden">
+    <div class="crumbs"><button class="linkish" id="intro-home-btn">&larr; All weeks</button></div>
+    <p class="kicker" id="week-kicker"></p>
+    <h2 id="week-intro-title"></h2>
+
+    <div id="pretest-gate" class="hidden">
+      <p class="lede">Before this week's roots open up, take a quick pretest: a matching game with all 25 roots, so you can see what you already know. It isn't graded. It only takes a couple of minutes.</p>
+      <div class="btn-row" style="margin-top:18px;"><button class="btn" id="start-pretest-btn">Start the pretest</button></div>
+    </div>
+
+    <div id="intro-main-content" class="hidden">
+      <p class="lede">Choose a day to write your sentences. Study Tools and the Final Quiz are at the bottom.</p>
+      <ol class="step-list" id="intro-roadmap"></ol>
+      <p class="section-label">Practice and check</p>
+      <ol class="step-list" id="intro-extra"></ol>
+    </div>
+  </section>
+
+  <!-- PRETEST -->
+  <section id="pretest-screen" class="panel hidden">
+    <div class="crumbs"><button class="linkish" id="pretest-exit-btn">&larr; Back</button></div>
+    <p class="kicker">Pretest</p>
+    <h2>Match each root to its meaning</h2>
+    <p id="pretest-week-label" class="muted small"></p>
+    <div id="pretest-body"></div>
+  </section>
+
+  <!-- FINAL QUIZ -->
+  <section id="quiz-screen" class="panel hidden">
+    <div class="crumbs"><button class="linkish" id="quiz-exit-btn">&larr; Back to the week</button></div>
+    <div id="quiz-body"></div>
+  </section>
+
+  <!-- DAY WORK + STUDY TOOLS -->
+  <section id="app-screen" class="hidden">
+    <div class="crumbs"><button class="linkish" id="app-week-btn">&larr; Week overview</button> &nbsp;<span class="muted">·</span>&nbsp; <button class="linkish" id="app-home-btn">All weeks</button></div>
+    <div class="stepper" id="stepper"></div>
+    <div class="panel" id="stage-panel"></div>
+    <div class="panel save-bar" style="padding:16px 22px;">
+      <button class="btn secondary small" id="download-btn">Download my sentences (.txt)</button>
+      <span id="sync-status" class="sync-status"></span>
+    </div>
+  </section>
+
+  <!-- TEACHER DASHBOARD -->
+  <section id="teacher-screen" class="hidden">
+    <div class="t-head">
+      <div>
+        <p class="kicker">Teacher dashboard</p>
+        <h2 style="margin:0;" id="t-title">Your classes</h2>
+      </div>
+      <div class="class-pick" id="t-class-pick"></div>
+    </div>
+    <div id="t-body"></div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div id="modal-root"></div>
+<footer>Vocabulary Root Word Study · <span id="ver"></span></footer>
+<script>
+(function () {
+  // ====== DATA ======
+  // The root lists come from RootWords.gs (inserted by the server when the page is served),
+  // so the page and the Final Quiz always use the same list.
+  const WEEKS = <?!= rootDataJson ?>;
+  const APP_VERSION = "<?= appVersion ?>";
+
+  function rootKey(r) { return r.key || r.root; }
+  function allRootsFor(week) { return week.days.flatMap(d => d.roots.map(r => ({ ...r, day: d.day }))); }
+
+  const state = {
+    email: "", name: "", firstName: "", lastName: "", role: "student", view: "student",
+    classes: [], openQuizzes: [], quizzes: {}, visibleWeeks: null,   // null = every week (no class yet, or staff) quizRules: { questions: 12, choices: 4, secondTry: 0.5 },
+    currentWeekIdx: -1,
+    current: -1,
+    sentences: {},
+    studyTab: "flashcards",
+    flash: { order: [], idx: 0, flipped: false, known: {}, learning: {}, reviewOnly: false, filterDay: "all" },
+    game: { rounds: [], roundIdx: 0, matchedTotal: 0, attempts: 0, correct: 0, roundMatched: 0, selTerm: null, selDef: null, lock: false },
+    pretestDone: {},
+    pretestScores: {},   // { [weekId]: { pct, known, total, at } } — first-try score on the pretest
+    pretest: { weekIdx: -1, rounds: [], roundIdx: 0, matchedTotal: 0, attempts: 0, correct: 0, roundMatched: 0, selTerm: null, selDef: null, lock: false },
+    quiz: { attempt: null, cur: 0, busy: false, weekIdx: -1 }
+  };
+
+  WEEKS.forEach(w => {
+    state.sentences[w.id] = {};
+    state.flash.known[w.id] = {};
+    state.flash.learning[w.id] = {};
+    state.pretestDone[w.id] = false;
+    allRootsFor(w).forEach(r => { state.sentences[w.id][rootKey(r)] = ""; });
+  });
+
+  // A week is open once its pretest is done, or if the student already has sentences in it
+  // (so nobody who started a week before the pretest existed gets locked out).
+  // Weeks the teacher has shown to this student's class(es).
+  function isWeekVisible(w) { return !state.visibleWeeks || state.visibleWeeks.indexOf(w.id) >= 0; }
+  function isWeekUnlocked(w) { return !!state.pretestDone[w.id] || weekProgress(w).done > 0; }
+  function currentWeek() { return state.currentWeekIdx >= 0 ? WEEKS[state.currentWeekIdx] : null; }
+
+  const el = id => document.getElementById(id);
+  const SCREENS = ["signin-gate", "name-screen", "home-screen", "intro-screen", "pretest-screen", "quiz-screen", "app-screen", "teacher-screen"];
+  function showScreen(id) {
+    SCREENS.forEach(s => el(s).classList.toggle("hidden", s !== id));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+  const homeScreen = el("home-screen"), introScreen = el("intro-screen"), pretestGateEl = el("pretest-gate");
+  const introMainContentEl = el("intro-main-content"), appScreen = el("app-screen"), stagePanel = el("stage-panel");
+  const stepperEl = el("stepper"), toastEl = el("toast"), syncStatusEl = el("sync-status");
+
+  function showToast(msg, ms) {
+    toastEl.textContent = msg;
+    toastEl.classList.add("show");
+    clearTimeout(showToast._t);
+    showToast._t = setTimeout(() => toastEl.classList.remove("show"), ms || 2800);
+  }
+  function escapeHtml(str) { const d = document.createElement("div"); d.textContent = str == null ? "" : String(str); return d.innerHTML; }
+  function shuffle(arr) { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; }
+  function fmtScore(n) { if (n == null || n === "") return "—"; const v = Number(n); return (Math.round(v * 2) / 2).toString().replace(/\.5$/, "½").replace(/^0½$/, "½"); }
+  // "Fri, Oct 23 at 11:59 PM" in the viewer's own time zone.
+  function fmtDue(iso) {
+    const d = new Date(iso); if (isNaN(d)) return "";
+    return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + " at " + d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  }
+  function dueFor(weekId) {
+    const ds = state.classes.map(c => (c.dueDates || {})[weekId]).filter(Boolean).sort();
+    return ds[0] || "";
+  }
+  function errText(e) { return (e && e.message ? e.message : String(e || "Something went wrong.")).replace(/^Exception:\s*/, "").replace(/^Error:\s*/, ""); }
+
+  function blockPasteAndDrop(textarea) {
+    textarea.addEventListener("paste", e => { e.preventDefault(); showToast("Pasting is turned off here. Write your own sentence in your own words."); });
+    textarea.addEventListener("drop", e => { e.preventDefault(); showToast("Drag-and-drop text isn't allowed here. Type it in your own words."); });
+  }
+
+  // ====== MODAL ======
+  function openModal(html, opts) {
+    const root = el("modal-root");
+    root.innerHTML = `<div class="modal-back" id="modal-back"><div class="modal ${opts && opts.small ? "small" : ""}" role="dialog" aria-modal="true">${html}</div></div>`;
+    const back = el("modal-back");
+    back.addEventListener("click", e => { if (e.target === back) closeModal(); });
+    root.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeModal));
+    document.addEventListener("keydown", modalEsc);
+    const first = root.querySelector("button, input, select, textarea");
+    if (first) setTimeout(() => first.focus(), 30);
+    return root.querySelector(".modal");
+  }
+  function modalEsc(e) { if (e.key === "Escape") closeModal(); }
+  function closeModal() { el("modal-root").innerHTML = ""; document.removeEventListener("keydown", modalEsc); }
+  function askConfirm(title, body, okLabel, danger) {
+    return new Promise(resolve => {
+      const m = openModal(`
+        <div class="modal-head"><h3>${escapeHtml(title)}</h3><button class="x-btn" data-close aria-label="Close">&times;</button></div>
+        <p class="muted" style="margin:0 0 20px;">${body}</p>
+        <div class="btn-row" style="justify-content:flex-end;">
+          <button class="btn secondary" data-close>Cancel</button>
+          <button class="btn ${danger ? "wine" : ""}" id="confirm-ok">${escapeHtml(okLabel || "OK")}</button>
+        </div>`, { small: true });
+      let done = false;
+      m.querySelector("#confirm-ok").addEventListener("click", () => { done = true; closeModal(); resolve(true); });
+      const obs = new MutationObserver(() => { if (!el("modal-back")) { obs.disconnect(); if (!done) resolve(false); } });
+      obs.observe(el("modal-root"), { childList: true });
+    });
+  }
+
+  // ====== BACKEND ======
+  // google.script.run calls Code.gs directly (same origin, signed in as the student).
+  function backendCall(fnName, args) {
+    return new Promise((resolve, reject) => {
+      if (!window.google || !google.script || !google.script.run) { reject(new Error("not-in-apps-script")); return; }
+      const runner = google.script.run.withSuccessHandler(resolve).withFailureHandler(err => reject(err));
+      runner[fnName].apply(runner, args || []);
+    });
+  }
+
+  function buildSyncData() {
+    return {
+      CurrentWeek: state.currentWeekIdx, CurrentDay: state.current,
+      SentencesJSON: state.sentences, FlashKnownJSON: state.flash.known,
+      FlashLearningJSON: state.flash.learning, PretestDoneJSON: state.pretestDone,
+      PretestScoreJSON: state.pretestScores
+    };
+  }
+  function setSyncStatus(kind, text) { if (!syncStatusEl) return; syncStatusEl.textContent = text; syncStatusEl.className = "sync-status " + kind; }
+
+  let syncSaveTimer = null, syncRetryTimer = null;
+  function syncSave(immediate) {
+    if (!state.email) return;
+    clearTimeout(syncSaveTimer);
+    const run = () => {
+      clearTimeout(syncRetryTimer);
+      setSyncStatus("saving", "Saving…");
+      backendCall("saveData", [buildSyncData()])
+        .then(res => {
+          if (res && res.ok) setSyncStatus("saved", "Saved");
+          else if (res && res.tooBig) { setSyncStatus("error", "Not saved: too long"); showToast(res.error, 9000); }
+          else { setSyncStatus("error", "Couldn't save. Trying again…"); syncRetryTimer = setTimeout(run, 5000); }
+        })
+        .catch(() => { setSyncStatus("error", "Offline. Trying again…"); syncRetryTimer = setTimeout(run, 8000); });
+    };
+    if (immediate) run(); else syncSaveTimer = setTimeout(run, 900);
+  }
+
+  // ================= HOME =================
+  function weekProgress(week) {
+    const roots = allRootsFor(week);
+    const done = roots.filter(r => (state.sentences[week.id][rootKey(r)] || "").trim().length > 0).length;
+    return { done, total: roots.length };
+  }
+
+  function quizChip(w) {
+    const q = state.quizzes[w.id];
+    if (q && q.status === "in_progress") return `<span class="chip warn">${q.score != null ? "Retake in progress" : "Quiz in progress"}</span>`;
+    if (q && q.score != null) return `<span class="chip good">Quiz ${fmtScore(q.score)}/${q.max}</span>`;
+    if (state.openQuizzes.indexOf(w.id) >= 0) return `<span class="chip teal">Quiz open</span>`;
+    return "";
+  }
+
+  function renderClassStrip() {
+    const strip = el("class-strip");
+    if (state.classes.length) {
+      strip.innerHTML = `<span>Class: <b>${state.classes.map(c => escapeHtml(c.className + (c.period ? " · Period " + c.period : ""))).join(", ")}</b></span>
+        <button class="linkish" id="join-another">Join another class</button>`;
+      el("join-another").addEventListener("click", () => { state._showJoin = true; renderClassStrip(); });
+      if (!state._showJoin) return;
+    }
+    strip.innerHTML = (state.classes.length ? "" : `<span><b>Join your class</b> to take the weekly Final Quiz. Your teacher has the code.</span>`) + `
+      <form class="inline-form" id="join-form" autocomplete="off">
+        <input class="input" id="join-code" maxlength="8" placeholder="Class code" aria-label="Class code">
+        <button class="btn small" type="submit" id="join-btn">Join</button>
+      </form>`;
+    el("join-form").addEventListener("submit", e => {
+      e.preventDefault();
+      const code = el("join-code").value.trim();
+      if (!code) return;
+      el("join-btn").disabled = true;
+      backendCall("joinRootClass", [{ joinCode: code }])
+        .then(res => {
+          state._showJoin = false;
+          return backendCall("getRootBootstrap", []).then(b => { if (b && b.ok) { state.classes = b.classes; state.openQuizzes = b.openQuizzes; state.quizzes = b.quizzes; state.visibleWeeks = b.visibleWeeks; } showToast("You joined " + res.classInfo.className + "."); renderHome(); });
+        })
+        .catch(err => { showToast(errText(err), 4200); el("join-btn").disabled = false; });
+    });
+  }
+
+  // First + last name form (used on first sign-in, and from "Change name").
+  function renderNameForm(holder, onDone, opts) {
+    holder.innerHTML = `
+      <form id="name-form" autocomplete="on" novalidate>
+        <div class="two-col" style="gap:14px;">
+          <label class="field"><span>First name</span><input class="input" id="nm-first" name="given-name" autocomplete="given-name" maxlength="40" value="${escapeHtml(state.firstName)}" required></label>
+          <label class="field"><span>Last name</span><input class="input" id="nm-last" name="family-name" autocomplete="family-name" maxlength="40" value="${escapeHtml(state.lastName)}" required></label>
+        </div>
+        <label class="field"><span>School email</span><input class="input" id="nm-email" value="${escapeHtml(state.email)}" readonly style="background:var(--sunk); color:var(--muted);"></label>
+        <p class="small muted" style="margin:-4px 0 14px;">Your email comes from your Google sign-in. If it isn't yours, sign out of Google and sign in with your own school account.</p>
+        <p class="signin-error" id="nm-error" role="alert" style="margin:0 0 10px;"></p>
+        <div class="btn-row">
+          <button class="btn" type="submit" id="nm-save">${opts && opts.label ? opts.label : "Continue"}</button>
+          ${opts && opts.cancel ? `<button class="btn secondary" type="button" data-close>Cancel</button>` : ""}
+        </div>
+      </form>`;
+    const form = holder.querySelector("#name-form");
+    form.addEventListener("submit", e => {
+      e.preventDefault();
+      const first = el("nm-first").value.trim(), last = el("nm-last").value.trim();
+      if (!first || !last) { el("nm-error").textContent = "Type both your first and last name."; (first ? el("nm-last") : el("nm-first")).focus(); return; }
+      el("nm-save").disabled = true; el("nm-error").textContent = "";
+      backendCall("saveMyName", [{ firstName: first, lastName: last }])
+        .then(r => { state.firstName = r.firstName; state.lastName = r.lastName; state.name = r.name; renderAccount(); onDone(r); })
+        .catch(err => { el("nm-error").textContent = errText(err); el("nm-save").disabled = false; });
+    });
+    if (opts && opts.cancel) holder.querySelectorAll("[data-close]").forEach(x => x.addEventListener("click", closeModal));
+    setTimeout(() => { const f = el(state.firstName ? "nm-save" : "nm-first"); if (f) f.focus(); }, 50);
+  }
+  function openNameModal() {
+    const m = openModal(`<div class="modal-head"><h3>Your name</h3><button class="x-btn" data-close aria-label="Close">&times;</button></div><div id="nm-holder"></div>`);
+    renderNameForm(m.querySelector("#nm-holder"), () => { closeModal(); showToast("Name saved."); renderHome(); }, { label: "Save", cancel: true });
+  }
+
+  function renderHome() {
+    el("home-hello").textContent = state.firstName ? "Hello, " + state.firstName : state.name ? "Hello, " + state.name.split(" ")[0] : "Your weeks";
+    el("home-me").innerHTML = state.role === "student"
+      ? `${escapeHtml(state.name)} · ${escapeHtml(state.email)} · <button class="linkish small" id="change-name">Change name</button>` : "";
+    if (el("change-name")) el("change-name").addEventListener("click", openNameModal);
+    renderClassStrip();
+    const shown = WEEKS.filter(isWeekVisible);
+    if (!shown.length) {
+      el("week-grid").innerHTML = `<div class="note" style="grid-column:1/-1;">Your teacher hasn't opened any weeks yet. Check back soon.</div>`;
+      return;
+    }
+    el("week-grid").innerHTML = WEEKS.map((w, i) => {
+      if (!isWeekVisible(w)) return "";
+      const prog = weekProgress(w), pct = Math.round(prog.done / prog.total * 100);
+      const complete = prog.done === prog.total;
+      const status = !isWeekUnlocked(w) ? `<span class="chip">Pretest first</span>` : complete ? `<span class="chip good">All sentences</span>` : "";
+      return `
+        <button class="week-tile ${complete ? "complete" : ""}" data-idx="${i}">
+          <span class="wk-label">${w.label}</span>
+          <span class="wk-sub">${escapeHtml(w.subtitle.replace(/^Word Within the Word — /, ""))}</span>
+          <span class="bar" aria-hidden="true"><i style="width:${pct}%"></i></span>
+          <span class="wk-meta"><span>${prog.done} of ${prog.total} sentences</span></span>
+          <span class="wk-meta">${status}${quizChip(w)}</span>
+        </button>`;
+    }).join("");
+    el("week-grid").querySelectorAll(".week-tile").forEach(t => t.addEventListener("click", () => enterWeek(parseInt(t.dataset.idx, 10))));
+  }
+
+  function goHome() {
+    state.currentWeekIdx = -1;
+    showScreen("home-screen");
+    renderHome();
+  }
+
+  function enterWeek(weekIdx) {
+    if (!WEEKS[weekIdx] || !isWeekVisible(WEEKS[weekIdx])) { showToast("That week isn't open right now."); return goHome(); }
+    state.currentWeekIdx = weekIdx;
+    const w = currentWeek();
+    el("week-kicker").textContent = w.label;
+    el("week-intro-title").textContent = w.subtitle;
+    renderIntroGateOrContent();
+    showScreen("intro-screen");
+  }
+
+  function renderIntroGateOrContent() {
+    const w = currentWeek(), unlocked = isWeekUnlocked(w);
+    pretestGateEl.classList.toggle("hidden", unlocked);
+    introMainContentEl.classList.toggle("hidden", !unlocked);
+    if (unlocked) buildIntroRoadmap();
+  }
+
+  function quizStepInfo(w) {
+    const q = state.quizzes[w.id];
+    if (q && q.status === "in_progress") return { sub: `In progress: ${q.answered} of ${q.max} answered. Pick up where you left off.${q.score != null ? " Best so far: " + fmtScore(q.score) + "." : ""}`, cls: "", num: "Q" };
+    if (q && q.score != null) {
+      const more = q.canStart ? (q.unlimited ? " You can try again." : ` You can try again (${q.left} left).`) : "";
+      return { sub: `${q.used > 1 ? "Best score" : "Done"}: ${fmtScore(q.score)} out of ${q.max}. See your answers.${more}`, cls: "done", num: "✓" };
+    }
+    if (state.role !== "student") return { sub: "Teacher preview: try the quiz yourself. Nothing is sent anywhere.", cls: "", num: "Q" };
+    if (!state.classes.length) return { sub: "Join your class on the home page to take the quiz.", cls: "locked", num: "Q" };
+    if (state.openQuizzes.indexOf(w.id) < 0) return { sub: "Opens when your teacher is ready, usually at the end of the week." + (dueFor(w.id) ? " Due " + fmtDue(dueFor(w.id)) + "." : ""), cls: "locked", num: "Q" };
+    return { sub: "12 questions. Open now." + (dueFor(w.id) ? " Due " + fmtDue(dueFor(w.id)) + "." : ""), cls: "", num: "Q" };
+  }
+
+  function buildIntroRoadmap() {
+    const w = currentWeek();
+    el("intro-roadmap").innerHTML = w.days.map((d, i) => {
+      const done = dayDone(i);
+      return `<li><button class="step ${done ? "done" : ""}" data-idx="${i}">
+        <span class="num">${done ? "✓" : d.day}</span>
+        <span class="txt"><strong>${d.label}</strong><span>${d.roots.map(r => r.root).join(", ")}</span></span>
+        <span class="go" aria-hidden="true">&rarr;</span></button></li>`;
+    }).join("");
+    el("intro-roadmap").querySelectorAll(".step").forEach(s => s.addEventListener("click", () => enterAppAt(parseInt(s.dataset.idx, 10))));
+    const qi = quizStepInfo(w);
+    el("intro-extra").innerHTML = `
+      <li><button class="step tools" id="intro-study-btn"><span class="num">S</span>
+        <span class="txt"><strong>Study Tools</strong><span>Flashcards and the matching game. Use them any time.</span></span><span class="go" aria-hidden="true">&rarr;</span></button></li>
+      <li><button class="step quiz ${qi.cls}" id="intro-quiz-btn"><span class="num">${qi.num}</span>
+        <span class="txt"><strong>Final Quiz</strong><span>${escapeHtml(qi.sub)}</span></span><span class="go" aria-hidden="true">&rarr;</span></button></li>`;
+    el("intro-study-btn").addEventListener("click", () => enterAppAt(studyIdx()));
+    el("intro-quiz-btn").addEventListener("click", () => openQuiz(state.currentWeekIdx));
+  }
+
+  function enterAppAt(idx) { showScreen("app-screen"); goTo(idx); }
+  function numStages() { return currentWeek().days.length; }
+  function studyIdx() { return numStages(); }
+  function dayDone(dayIdx) { const w = currentWeek(); return w.days[dayIdx].roots.every(r => (state.sentences[w.id][rootKey(r)] || "").trim().length > 0); }
+
+  function renderStepper() {
+    const w = currentWeek();
+    stepperEl.innerHTML = w.days.map((d, i) => `
+      <button class="step-pill ${state.current === i ? "active" : ""} ${dayDone(i) ? "done" : ""}" data-idx="${i}">
+        <span class="step-num">Day ${d.day}</span></button>`).join("") + `
+      <button class="step-pill ${state.current === studyIdx() ? "active" : ""}" data-idx="${studyIdx()}"><span class="step-num">Study</span></button>`;
+    stepperEl.querySelectorAll(".step-pill").forEach(p => p.addEventListener("click", () => goTo(parseInt(p.dataset.idx, 10))));
+  }
+
+  function goTo(idx) {
+    state.current = idx;
+    if (idx < numStages()) renderDay(idx); else renderStudyTools();
+    renderStepper();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    syncSave(true);
+  }
+
+  // One sentence, not an essay: also keeps a full year of writing well inside what the Sheet can hold.
+  const SENTENCE_MAX = 400;
+  function checkSentenceTips(rootObj, sentence) {
+    const tips = [], trimmed = (sentence || "").trim();
+    if (!trimmed) return tips;
+    if (trimmed.length > SENTENCE_MAX - 60) tips.push(`${trimmed.length} of ${SENTENCE_MAX} characters. Keep it to one sentence.`);
+    const words = trimmed.toLowerCase().match(/[a-z']+/g) || [];
+    const hasVariant = words.some(w => rootObj.variants.some(v => w.includes(v.replace(/-/g, ""))));
+    if (!hasVariant) tips.push(`Tip: include a word that contains the root “${rootObj.root}”.`);
+    const usedExample = rootObj.examples.find(ex => words.includes(ex.toLowerCase()));
+    if (usedExample) tips.push(`Tip: “${usedExample}” is already an example. Try a different ${rootObj.root} word for extra practice.`);
+    return tips;
+  }
+
+  function renderDay(dayIdx) {
+    const w = currentWeek(), d = w.days[dayIdx];
+    const rootsHtml = d.roots.map(r => {
+      const rk = rootKey(r), tips = checkSentenceTips(r, state.sentences[w.id][rk]);
+      return `
+        <div class="root-block">
+          <h3 class="root-name">${escapeHtml(r.display)}</h3>
+          <p class="root-meaning">means <em>“${escapeHtml(r.meaning)}”</em>${r.origin ? ` <span class="root-origin">· ${escapeHtml(r.origin)}</span>` : ""}</p>
+          <p class="root-examples">${r.examples.map(escapeHtml).join(", ")}</p>
+          <textarea class="sentence-box" maxlength="${SENTENCE_MAX}" data-root="${rk}" aria-label="Sentence for ${escapeHtml(r.display)}" placeholder="Write a sentence using a new ${escapeHtml(r.root)} word…">${escapeHtml(state.sentences[w.id][rk])}</textarea>
+          <div class="tips" data-tips-for="${rk}">${tips.map(t => `<div class="tip-line">${escapeHtml(t)}</div>`).join("")}</div>
+        </div>`;
+    }).join("");
+
+    stagePanel.className = "panel accent-" + d.accent;
+    stagePanel.innerHTML = `
+      <div class="day-head"><span class="day-badge">DAY ${d.day}</span><span class="day-meta">${w.label} · ${d.roots.length} roots</span></div>
+      <p class="day-instruction">Write one sentence per root, using a new word each time.</p>
+      ${rootsHtml}
+      <div class="nav-row">
+        <button class="btn secondary" id="prev-btn" ${dayIdx === 0 ? "disabled" : ""}>&larr; Back</button>
+        <button class="btn" id="next-btn">${dayIdx === numStages() - 1 ? "Finish " + w.label + " &rarr;" : "Next day &rarr;"}</button>
+      </div>`;
+
+    stagePanel.querySelectorAll(".sentence-box").forEach(box => {
+      blockPasteAndDrop(box);
+      box.addEventListener("input", () => {
+        const rk = box.dataset.root;
+        state.sentences[w.id][rk] = box.value;
+        const rootObj = d.roots.find(r => rootKey(r) === rk);
+        stagePanel.querySelector(`[data-tips-for="${rk}"]`).innerHTML = checkSentenceTips(rootObj, box.value).map(t => `<div class="tip-line">${escapeHtml(t)}</div>`).join("");
+        renderStepper();
+        syncSave();
+      });
+    });
+    el("prev-btn").addEventListener("click", () => goTo(dayIdx - 1));
+    el("next-btn").addEventListener("click", () => { if (dayIdx === numStages() - 1) renderCompletion(); else goTo(dayIdx + 1); });
+  }
+
+  function renderCompletion() {
+    const w = currentWeek();
+    state.current = numStages();
+    const roots = allRootsFor(w);
+    const totalDone = roots.filter(r => (state.sentences[w.id][rootKey(r)] || "").trim().length > 0).length;
+    stagePanel.className = "panel";
+    stagePanel.innerHTML = `
+      <div class="center" style="padding:10px 0;">
+        <p class="kicker">${w.label}</p>
+        <h2>${totalDone === roots.length ? "Every sentence written" : "End of the week"}</h2>
+        <p class="muted">You wrote ${totalDone} of ${roots.length} sentences this week.</p>
+        <div class="btn-row" style="justify-content:center; margin-top:20px;">
+          <button class="btn" id="go-study-btn">Go to Study Tools</button>
+          <button class="btn wine" id="go-quiz-btn">Final Quiz</button>
+          <button class="btn secondary" id="go-home-btn">All weeks</button>
+        </div>
+      </div>`;
+    renderStepper();
+    el("go-study-btn").addEventListener("click", () => goTo(studyIdx()));
+    el("go-quiz-btn").addEventListener("click", () => openQuiz(state.currentWeekIdx));
+    el("go-home-btn").addEventListener("click", goHome);
+  }
+
+  function downloadSentences() {
+    const w = currentWeek(); if (!w) return;
+    let content = `VOCABULARY ROOT WORD STUDY — ${w.label.toUpperCase()} (${w.subtitle})\n` + "=".repeat(40) + "\n\n";
+    w.days.forEach(d => {
+      content += `DAY ${d.day}\n` + "-".repeat(30) + "\n";
+      d.roots.forEach(r => { content += `${r.display} (${r.meaning}): ${(state.sentences[w.id][rootKey(r)] || "").trim() || "(not written yet)"}\n`; });
+      content += "\n";
+    });
+    triggerDownload(content, `vocab-${w.id}-sentences.txt`, "text/plain");
+  }
+  function triggerDownload(content, filename, mime) {
+    const blob = new Blob([content], { type: mime }), url = URL.createObjectURL(blob), a = document.createElement("a");
+    a.href = url; a.download = filename; document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  // ================= STUDY TOOLS =================
+  function renderStudyTools() {
+    stagePanel.className = "panel";
+    stagePanel.innerHTML = `
+      <div class="tool-tabs" role="tablist">
+        <button class="tool-tab ${state.studyTab === "flashcards" ? "active" : ""}" id="tab-flash">Flashcards</button>
+        <button class="tool-tab ${state.studyTab === "game" ? "active" : ""}" id="tab-game">Matching game</button>
+      </div>
+      <div id="tool-body"></div>`;
+    el("tab-flash").addEventListener("click", () => { state.studyTab = "flashcards"; renderStudyTools(); });
+    el("tab-game").addEventListener("click", () => { state.studyTab = "game"; renderStudyTools(); });
+    if (state.studyTab === "flashcards") renderFlashcards(); else renderGame();
+  }
+
+  function flashDeckSource() {
+    const all = allRootsFor(currentWeek());
+    return state.flash.filterDay === "all" ? all : all.filter(r => r.day === parseInt(state.flash.filterDay, 10));
+  }
+  function ensureFlashOrder(reset) {
+    const w = currentWeek(), source = flashDeckSource();
+    let pool = source;
+    if (state.flash.reviewOnly) {
+      pool = source.filter(r => state.flash.learning[w.id][rootKey(r)] && !state.flash.known[w.id][rootKey(r)]);
+      if (pool.length === 0) pool = source;
+    }
+    if (reset || state.flash.order.length === 0) {
+      state.flash.order = shuffle(pool.map(r => rootKey(r)));
+      state.flash.idx = 0; state.flash.flipped = false;
+    }
+  }
+
+  function renderFlashcards() {
+    const w = currentWeek(), all = allRootsFor(w);
+    ensureFlashOrder(state.flash._needsReset);
+    state.flash._needsReset = false;
+    const body = el("tool-body");
+    if (state.flash.order.length === 0) { body.innerHTML = `<p class="center muted">No cards to show.</p>`; return; }
+    if (state.flash.idx >= state.flash.order.length) state.flash.idx = 0;
+    const rk = state.flash.order[state.flash.idx];
+    const rootObj = all.find(r => rootKey(r) === rk);
+    if (!rootObj) { state.flash._needsReset = true; state.flash.order = []; return renderFlashcards(); }
+    const sentence = state.sentences[w.id][rk] || "";
+    const knownCount = Object.keys(state.flash.known[w.id]).filter(k => state.flash.known[w.id][k]).length;
+    const learningCount = Object.keys(state.flash.learning[w.id]).filter(k => state.flash.learning[w.id][k] && !state.flash.known[w.id][k]).length;
+
+    body.innerHTML = `
+      <div class="flash-wrap">
+        <div class="flash-filter">
+          <label for="flash-day-filter">Show</label>
+          <select class="input" id="flash-day-filter">
+            <option value="all" ${state.flash.filterDay === "all" ? "selected" : ""}>All ${all.length} roots</option>
+            ${w.days.map(d => `<option value="${d.day}" ${state.flash.filterDay == d.day ? "selected" : ""}>Day ${d.day}</option>`).join("")}
+          </select>
+        </div>
+        <div class="flash-stats">Card ${state.flash.idx + 1} of ${state.flash.order.length} · Known ${knownCount} · Still learning ${learningCount}</div>
+        <div class="flashcard-scene">
+          <div class="flashcard ${state.flash.flipped ? "flipped" : ""}" id="flashcard" tabindex="0" role="button" aria-label="Flip card">
+            <div class="flash-face flash-front"><div class="big-root">${escapeHtml(rootObj.display)}</div><div class="hint">Click the card to flip it</div></div>
+            <div class="flash-face flash-back">
+              <div class="meaning">“${escapeHtml(rootObj.meaning)}”</div>
+              <div class="examples">${rootObj.examples.map(escapeHtml).join(", ")}</div>
+              ${sentence.trim() ? `<div class="my-sentence"><b>Your sentence:</b> ${escapeHtml(sentence)}</div>` : ""}
+            </div>
+          </div>
+        </div>
+        <div class="flash-controls">
+          <button class="btn secondary small" id="flash-prev">&larr; Previous</button>
+          <button class="btn secondary small" id="flash-shuffle">Shuffle</button>
+          <button class="btn secondary small" id="flash-next">Next &rarr;</button>
+        </div>
+        <div class="flash-rate-row">
+          <button class="btn small" id="flash-know">I know this</button>
+          <button class="btn wine small" id="flash-learning">Still learning</button>
+        </div>
+        <button class="linkish" id="flash-review-toggle">${state.flash.reviewOnly ? "Show all cards" : "Review “still learning” cards only"}</button>
+      </div>`;
+
+    const flip = () => { state.flash.flipped = !state.flash.flipped; renderFlashcards(); };
+    el("flashcard").addEventListener("click", flip);
+    el("flashcard").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flip(); } });
+    el("flash-day-filter").addEventListener("change", e => { state.flash.filterDay = e.target.value; state.flash._needsReset = true; renderFlashcards(); });
+    el("flash-prev").addEventListener("click", () => { state.flash.idx = (state.flash.idx - 1 + state.flash.order.length) % state.flash.order.length; state.flash.flipped = false; renderFlashcards(); });
+    el("flash-next").addEventListener("click", () => { state.flash.idx = (state.flash.idx + 1) % state.flash.order.length; state.flash.flipped = false; renderFlashcards(); });
+    el("flash-shuffle").addEventListener("click", () => { state.flash._needsReset = true; renderFlashcards(); });
+    el("flash-know").addEventListener("click", () => { state.flash.known[w.id][rk] = true; state.flash.learning[w.id][rk] = false; state.flash.idx = (state.flash.idx + 1) % state.flash.order.length; state.flash.flipped = false; renderFlashcards(); syncSave(); });
+    el("flash-learning").addEventListener("click", () => { state.flash.learning[w.id][rk] = true; state.flash.known[w.id][rk] = false; state.flash.idx = (state.flash.idx + 1) % state.flash.order.length; state.flash.flipped = false; renderFlashcards(); syncSave(); });
+    el("flash-review-toggle").addEventListener("click", () => { state.flash.reviewOnly = !state.flash.reviewOnly; state.flash._needsReset = true; renderFlashcards(); });
+  }
+
+  // --- Matching game (Study Tools) and the pretest share one engine with separate state ---
+  function buildRounds() { return currentWeek().days.map(d => d.roots.map(r => ({ term: r.display, def: r.meaning, id: rootKey(r) }))); }
+
+  function makeMatcher(g, ids, onStats, onRoundDone) {
+    function pick(cardEl, pair, which) {
+      if (g.lock || cardEl.classList.contains("matched")) return;
+      const key = which === "term" ? "selTerm" : "selDef";
+      if (g[key]) g[key].el.classList.remove("selected");
+      g[key] = { el: cardEl, pair };
+      cardEl.classList.add("selected");
+      if (!g.selTerm || !g.selDef) return;
+      g.lock = true; g.attempts++;
+      const tEl = g.selTerm.el, dEl = g.selDef.el;
+      // A root counts as "known" if the first time its root card is paired, the pair is right.
+      if (g.first && !(g.selTerm.pair.id in g.first)) g.first[g.selTerm.pair.id] = g.selTerm.pair.id === g.selDef.pair.id;
+      if (g.selTerm.pair.id === g.selDef.pair.id) {
+        g.correct++;
+        [tEl, dEl].forEach(x => { x.classList.remove("selected"); x.classList.add("correct", "matched"); });
+        g.roundMatched++; g.matchedTotal++; g.selTerm = null; g.selDef = null; g.lock = false;
+        onStats();
+        if (g.roundMatched === g.rounds[g.roundIdx].length) setTimeout(() => { g.roundIdx++; onRoundDone(); }, 550);
+      } else {
+        tEl.classList.add("incorrect"); dEl.classList.add("incorrect");
+        onStats();
+        setTimeout(() => { tEl.classList.remove("selected", "incorrect"); dEl.classList.remove("selected", "incorrect"); g.selTerm = null; g.selDef = null; g.lock = false; }, 650);
+      }
+    }
+    return function renderRound(area, label) {
+      g.roundMatched = 0; g.selTerm = null; g.selDef = null; g.lock = false;
+      const pairs = g.rounds[g.roundIdx];
+      area.innerHTML = `
+        <p class="center muted small" style="margin:0 0 10px;">${label}</p>
+        <div class="mg-board">
+          <div><div class="mg-col-label">Root</div><div class="mg-cards" id="${ids}-term-col"></div></div>
+          <div><div class="mg-col-label">Meaning</div><div class="mg-cards" id="${ids}-def-col"></div></div>
+        </div>`;
+      shuffle(pairs).forEach(p => { const c = document.createElement("button"); c.className = "mg-card mg-term"; c.textContent = p.term; c.addEventListener("click", () => pick(c, p, "term")); el(ids + "-term-col").appendChild(c); });
+      shuffle(pairs).forEach(p => { const c = document.createElement("button"); c.className = "mg-card"; c.textContent = p.def; c.addEventListener("click", () => pick(c, p, "def")); el(ids + "-def-col").appendChild(c); });
+      onStats();
+    };
+  }
+
+  function renderGame() {
+    const w = currentWeek(), all = allRootsFor(w), g = state.game;
+    el("tool-body").innerHTML = `
+      <div class="mg-statbar">
+        <div class="mg-stat">Round <strong id="mg-round">1</strong> of <strong>${w.days.length}</strong></div>
+        <div class="mg-stat">Matched <strong id="mg-matched">0</strong> / ${all.length}</div>
+        <div class="mg-stat">Tries <strong id="mg-attempts">0</strong></div>
+        <div class="mg-stat">Accuracy <strong id="mg-accuracy">—</strong></div>
+      </div>
+      <div class="mg-progress-track"><div class="mg-progress-fill" id="mg-progress" style="width:0%"></div></div>
+      <div id="mg-area"></div>
+      <div class="center" style="margin-top:20px;"><button class="btn secondary small" id="mg-restart">Restart game</button></div>`;
+    const stats = () => {
+      el("mg-round").textContent = Math.min(g.roundIdx + 1, g.rounds.length);
+      el("mg-matched").textContent = g.matchedTotal;
+      el("mg-attempts").textContent = g.attempts;
+      el("mg-accuracy").textContent = g.attempts === 0 ? "—" : Math.round(g.correct / g.attempts * 100) + "%";
+      el("mg-progress").style.width = (g.matchedTotal / all.length * 100) + "%";
+    };
+    const next = () => {
+      if (g.roundIdx >= g.rounds.length) {
+        const acc = g.attempts === 0 ? "—" : Math.round(g.correct / g.attempts * 100) + "%";
+        el("mg-area").innerHTML = `<div class="mg-complete"><h3>All ${all.length} roots matched</h3><p class="muted">${g.attempts} tries, ${acc} accuracy.</p></div>`;
+        return;
+      }
+      round(el("mg-area"), `This round: Day ${g.roundIdx + 1} roots`);
+    };
+    const round = makeMatcher(g, "mg", stats, next);
+    const start = () => { g.rounds = buildRounds(); g.roundIdx = 0; g.matchedTotal = 0; g.attempts = 0; g.correct = 0; next(); };
+    el("mg-restart").addEventListener("click", start);
+    start();
+  }
+
+  // --- Pretest: required, ungraded warm-up that unlocks a week ---
+  function startPretest() {
+    const w = currentWeek(), all = allRootsFor(w), g = state.pretest;
+    g.weekIdx = state.currentWeekIdx;
+    showScreen("pretest-screen");
+    el("pretest-week-label").textContent = `${w.label}: match every root to its meaning to open the week.`;
+    el("pretest-body").innerHTML = `
+      <div class="mg-statbar" style="margin-top:14px;">
+        <div class="mg-stat">Round <strong id="pt-round">1</strong> of <strong>${w.days.length}</strong></div>
+        <div class="mg-stat">Matched <strong id="pt-matched">0</strong> / ${all.length}</div>
+        <div class="mg-stat">Tries <strong id="pt-attempts">0</strong></div>
+      </div>
+      <div class="mg-progress-track"><div class="mg-progress-fill" id="pt-progress" style="width:0%"></div></div>
+      <div id="pt-area"></div>`;
+    const stats = () => {
+      el("pt-round").textContent = Math.min(g.roundIdx + 1, g.rounds.length);
+      el("pt-matched").textContent = g.matchedTotal;
+      el("pt-attempts").textContent = g.attempts;
+      el("pt-progress").style.width = (g.matchedTotal / all.length * 100) + "%";
+    };
+    const next = () => {
+      if (g.roundIdx >= g.rounds.length) return renderPretestComplete();
+      round(el("pt-area"), `Round ${g.roundIdx + 1} of ${g.rounds.length}`);
+    };
+    const round = makeMatcher(g, "pt", stats, next);
+    g.rounds = buildRounds(); g.roundIdx = 0; g.matchedTotal = 0; g.attempts = 0; g.correct = 0; g.first = {};
+    next();
+  }
+
+  function exitPretestToGate() { showScreen("intro-screen"); renderIntroGateOrContent(); }
+
+  function renderPretestComplete() {
+    const w = currentWeek(), all = allRootsFor(w), g = state.pretest;
+    const known = Object.keys(g.first || {}).filter(k => g.first[k]).length;
+    const pct = Math.round(known / all.length * 100);
+    // Unlocked in memory right away; the button waits until the Sheet has it, so a quick click
+    // away can't lose the unlock. The first pretest score is the one kept.
+    state.pretestDone[w.id] = true;
+    if (!state.pretestScores[w.id]) state.pretestScores[w.id] = { pct, known, total: all.length, at: new Date().toISOString() };
+    el("pt-area").innerHTML = `
+      <div class="mg-complete">
+        <h3>Pretest complete</h3>
+        <div class="result-score" style="margin:10px 0 6px;">${pct}<small>%</small></div>
+        <p class="muted">You knew ${known} of ${all.length} roots on the first try. Your Final Quiz at the end of the week will show how much you've grown.</p>
+        <p id="pretest-save-status" class="small" style="color:var(--ochre); margin-top:10px;">Saving your progress…</p>
+        <button class="btn" id="pretest-continue-btn" style="margin-top:14px;" disabled>Continue to ${w.label} &rarr;</button>
+      </div>`;
+    el("pretest-continue-btn").addEventListener("click", exitPretestToGate);
+    savePretestCompletion();
+  }
+
+  function savePretestCompletion() {
+    const statusEl = el("pretest-save-status"), continueBtn = el("pretest-continue-btn");
+    if (statusEl) { statusEl.textContent = "Saving your progress…"; statusEl.style.color = "var(--ochre)"; }
+    backendCall("saveData", [buildSyncData()])
+      .then(res => {
+        if (res && res.ok) {
+          if (statusEl) { statusEl.textContent = `Saved. ${currentWeek().label} stays open for you.`; statusEl.style.color = "var(--good)"; }
+          if (continueBtn) continueBtn.disabled = false;
+        } else showSaveRetry(statusEl, continueBtn);
+      })
+      .catch(() => showSaveRetry(statusEl, continueBtn));
+  }
+  function showSaveRetry(statusEl, continueBtn) {
+    if (statusEl) {
+      statusEl.innerHTML = `Couldn't save. Check your connection. <button class="linkish" id="pretest-retry-save">Retry</button>`;
+      statusEl.style.color = "var(--bad)";
+      const r = el("pretest-retry-save"); if (r) r.addEventListener("click", savePretestCompletion);
+    }
+    if (continueBtn) { continueBtn.disabled = false; continueBtn.textContent = "Continue anyway →"; }
+  }
+
+  // ================= Sign-in =================
+  function applyLoadedData(data) {
+    if (!data) return;
+    if (data.SentencesJSON && typeof data.SentencesJSON === "object") {
+      Object.keys(data.SentencesJSON).forEach(weekId => {
+        if (!state.sentences[weekId]) return;
+        const weekSaved = data.SentencesJSON[weekId];
+        if (weekSaved && typeof weekSaved === "object") Object.keys(weekSaved).forEach(rk => { if (weekSaved[rk] !== undefined && weekSaved[rk] !== "") state.sentences[weekId][rk] = weekSaved[rk]; });
+      });
+    }
+    if (data.FlashKnownJSON && typeof data.FlashKnownJSON === "object") Object.keys(data.FlashKnownJSON).forEach(wk => { if (state.flash.known[wk]) state.flash.known[wk] = data.FlashKnownJSON[wk] || {}; });
+    if (data.FlashLearningJSON && typeof data.FlashLearningJSON === "object") Object.keys(data.FlashLearningJSON).forEach(wk => { if (state.flash.learning[wk]) state.flash.learning[wk] = data.FlashLearningJSON[wk] || {}; });
+    if (data.PretestDoneJSON && typeof data.PretestDoneJSON === "object") Object.keys(data.PretestDoneJSON).forEach(wk => { if (wk in state.pretestDone) state.pretestDone[wk] = !!data.PretestDoneJSON[wk]; });
+    if (data.PretestScoreJSON && typeof data.PretestScoreJSON === "object") Object.keys(data.PretestScoreJSON).forEach(wk => { const v = data.PretestScoreJSON[wk]; if (wk in state.pretestDone && v && isFinite(Number(v.pct))) state.pretestScores[wk] = v; });
+  }
+
+  function showSigninError(msg) {
+    el("signin-checking").classList.add("hidden");
+    el("signin-error").textContent = msg;
+    el("signin-error-wrap").classList.remove("hidden");
+  }
+
+  function renderAccount() {
+    el("account").classList.remove("hidden");
+    el("account-label").innerHTML = state.role === "student" && state.firstName
+      ? `<b>${escapeHtml(state.name)}</b> · ${escapeHtml(state.email)}` : `Signed in as <b>${escapeHtml(state.email)}</b>`;
+    const isStaff = state.role === "teacher" || state.role === "admin";
+    el("role-seg").classList.toggle("hidden", !isStaff);
+    el("seg-teacher").classList.toggle("on", state.view === "teacher");
+    el("seg-student").classList.toggle("on", state.view === "student");
+  }
+  function setView(v) {
+    state.view = v;
+    renderAccount();
+    if (v === "teacher") window.RW_Teacher.open(); else goHome();
+  }
+
+  function detectSignIn() {
+    el("signin-checking").classList.remove("hidden");
+    el("signin-error-wrap").classList.add("hidden");
+    backendCall("getRootBootstrap", [])
+      .then(b => {
+        if (!b) { showSigninError("The app sent back an empty reply. Reload the page."); return; }
+        if (!b.ok) { showSigninError(b.error || "We couldn't detect your school Google account."); return; }
+        state.email = b.email; state.name = b.name; state.role = b.role; state.firstName = b.firstName || ""; state.lastName = b.lastName || "";
+        state.classes = b.classes || []; state.openQuizzes = b.openQuizzes || []; state.quizzes = b.quizzes || {}; state.visibleWeeks = b.visibleWeeks || null;
+        if (b.quizRules) state.quizRules = b.quizRules;
+        const res = b.progress;
+        if (res && res.ok && res.found) applyLoadedData(res.data);
+        if (res && res.ok && res.found && res.data._unreadable) showToast("Some of your saved work couldn't be read. Your teacher has a backup copy, so tell them before you rewrite anything.", 10000);
+        state.view = (b.role === "teacher" || b.role === "admin") ? "teacher" : "student";
+        renderAccount();
+        if (state.view === "teacher") { window.RW_Teacher.open(); return; }
+        if (b.needsName) {
+          // Every student gives their first and last name once, before anything else.
+          showScreen("name-screen");
+          renderNameForm(el("name-form-holder"), () => { showToast("Thanks, " + state.firstName + "."); goHome(); });
+          return;
+        }
+        if (res && res.ok && res.found) {
+          const wIdx = parseInt(res.data.CurrentWeek, 10), dIdx = parseInt(res.data.CurrentDay, 10);
+          if (!isNaN(wIdx) && wIdx >= 0 && wIdx < WEEKS.length && !isNaN(dIdx) && dIdx >= 0 && dIdx <= WEEKS[wIdx].days.length) {
+            state.currentWeekIdx = wIdx;
+            if (isWeekVisible(WEEKS[wIdx]) && isWeekUnlocked(WEEKS[wIdx])) { enterAppAt(dIdx); showToast("Welcome back. Picking up where you left off."); return; }
+          }
+        }
+        goHome();
+      })
+      .catch(() => showSigninError("Couldn't reach the save service. Check your connection and try again."));
+  }
+
+  // expose a few helpers to the quiz + teacher sections below
+  window.RW = { WEEKS, state, fmtDue, dueFor, el, escapeHtml, showToast, backendCall, openModal, closeModal, askConfirm, fmtScore, errText, showScreen, triggerDownload, allRootsFor, rootKey, currentWeek, enterWeek, buildIntroRoadmap, goHome };
+
+  // ================= Wire up =================
+  el("signin-retry-btn").addEventListener("click", detectSignIn);
+  el("intro-home-btn").addEventListener("click", goHome);
+  el("app-home-btn").addEventListener("click", goHome);
+  el("app-week-btn").addEventListener("click", () => enterWeek(state.currentWeekIdx));
+  el("download-btn").addEventListener("click", downloadSentences);
+  el("start-pretest-btn").addEventListener("click", startPretest);
+  el("pretest-exit-btn").addEventListener("click", exitPretestToGate);
+  el("quiz-exit-btn").addEventListener("click", () => enterWeek(state.quiz.weekIdx >= 0 ? state.quiz.weekIdx : state.currentWeekIdx));
+  el("seg-teacher").addEventListener("click", () => setView("teacher"));
+  el("seg-student").addEventListener("click", () => setView("student"));
+  el("ver").textContent = APP_VERSION;
+
+  window.RW_start = function () {
+    if (window.google && google.script && google.script.run) detectSignIn();
+    else { el("signin-checking").classList.add("hidden"); el("signin-not-configured").classList.remove("hidden"); }
+  };
+
+  // ================= FINAL QUIZ =================
+  // The questions and answer key live on the server. The page only learns whether a choice was
+  // right after the server checks it, and only sees the right answer once a question is finished.
+  const quizBody = el("quiz-body");
+  const LETTERS = ["A", "B", "C", "D", "E", "F"];
+
+  function openQuiz(weekIdx) {
+    state.currentWeekIdx = weekIdx;
+    state.quiz.weekIdx = weekIdx;
+    state.quiz.attempt = null;
+    state.quiz.info = null;
+    const w = WEEKS[weekIdx];
+    showScreen("quiz-screen");
+    quizBody.innerHTML = `<p class="kicker">${w.label}</p><h2>Final Quiz</h2><p class="muted"><span class="spinner"></span>&nbsp; Opening the quiz…</p>`;
+    backendCall("startWeekQuiz", [{ weekId: w.id }])
+      .then(res => {
+        if (!res) throw new Error("Empty reply from the server. Reload the page.");
+        state.quiz.info = res.attempts || null;
+        if (!res.ok) return renderQuizClosed(w, res.error);
+        if (res.attempt) return setAttempt(res.attempt, true);
+        renderQuizRules(w, res.preview);
+      })
+      .catch(err => renderQuizClosed(w, errText(err)));
+  }
+
+  function renderQuizClosed(w, msg) {
+    quizBody.innerHTML = `
+      <p class="kicker">${w.label}</p><h2>Final Quiz</h2>
+      <div class="note warn" style="margin-top:14px;">${escapeHtml(msg || "This quiz isn't open yet.")}</div>
+      <div class="btn-row" style="margin-top:20px;">
+        <button class="btn secondary" id="qz-back">Back to ${w.label}</button>
+        ${state.classes.length ? "" : `<button class="btn" id="qz-join">Join a class</button>`}
+      </div>`;
+    el("qz-back").addEventListener("click", () => enterWeek(state.quiz.weekIdx));
+    if (el("qz-join")) el("qz-join").addEventListener("click", () => { state._showJoin = true; goHome(); setTimeout(() => { const c = el("join-code"); if (c) c.focus(); }, 300); });
+  }
+
+  function renderQuizRules(w, preview) {
+    const r = state.quizRules;
+    quizBody.innerHTML = `
+      <p class="kicker">${w.label}</p>
+      <h2>Final Quiz</h2>
+      ${preview ? `<div class="note" style="margin:12px 0 0;"><b>Teacher preview.</b> Try it as a student would. Preview attempts don't appear on any roster and you can restart.</div>` : ""}
+      <p class="lede" style="margin-top:14px;">${r.questions} multiple-choice questions on this week's 25 roots. If your first answer is wrong, you get one more try.</p>
+      <ul class="rules">
+        <li><b>1 point</b><span>Right on the first try.</span></li>
+        <li><b>½ point</b><span>Right on the second try.</span></li>
+        <li><b>0 points</b><span>Two misses. The right answer is shown so you can learn it.</span></li>
+      </ul>
+      ${!preview && dueFor(w.id) ? `<p class="small" style="margin:0 0 10px;"><b>Due ${escapeHtml(fmtDue(dueFor(w.id)))}</b></p>` : ""}
+      <div class="note" style="margin-bottom:22px;">${attemptsSentence(state.quiz.info, preview)} It's scored automatically and your teacher sees the result. If you leave partway, you can come back and finish.</div>
+      <div class="btn-row"><button class="btn" id="qz-begin">Begin the quiz</button><button class="btn secondary" id="qz-cancel">Not yet</button></div>`;
+    el("qz-cancel").addEventListener("click", () => enterWeek(state.quiz.weekIdx));
+    el("qz-begin").addEventListener("click", () => {
+      el("qz-begin").disabled = true;
+      el("qz-begin").innerHTML = `<span class="spinner"></span>&nbsp; Starting…`;
+      backendCall("startWeekQuiz", [{ weekId: w.id, begin: true }])
+        .then(res => { if (res && res.attempts) state.quiz.info = res.attempts; if (!res || !res.ok) return renderQuizClosed(w, res && res.error); setAttempt(res.attempt, true); })
+        .catch(err => { showToast(errText(err), 4200); el("qz-begin").disabled = false; el("qz-begin").textContent = "Begin the quiz"; });
+    });
+  }
+
+  // "You get 2 attempts. Your best score counts." etc.
+  function attemptsSentence(info, preview) {
+    if (preview) return "Teacher previews have no limit.";
+    if (!info) return "";
+    if (info.unlimited) return "You can take this quiz as many times as you like. Your best score counts.";
+    if (info.allowed === 1) return "You get one attempt.";
+    return `You get ${info.allowed} attempts${info.used ? ` (${info.left} left)` : ""}. Each one has new questions, and your best score counts.`;
+  }
+  function attemptsLeftText(info) {
+    if (!info) return "";
+    if (info.unlimited) return "Try again as many times as you like";
+    return info.left === 1 ? "1 attempt left" : info.left + " attempts left";
+  }
+
+  // The home tiles and week page show the BEST finished score, plus whether a retake is underway.
+  function summarize(a) {
+    const info = state.quiz.info || {}, prevBest = state.quizzes[a.weekId] && state.quizzes[a.weekId].score;
+    const best = a.status === "submitted" ? Math.max(a.score, info.best == null ? -1 : info.best, prevBest == null ? -1 : prevBest) : (info.best != null ? info.best : prevBest);
+    return { status: a.status, score: best == null || best < 0 ? null : best, max: a.max, answered: a.answered, used: info.used, left: info.left, unlimited: info.unlimited, canStart: info.canStart };
+  }
+
+  function setAttempt(a, fresh) {
+    state.quiz.attempt = a;
+    state.quizzes[a.weekId] = summarize(a);
+    if (fresh) {
+      const firstOpen = a.questions.findIndex(q => q.state === "open");
+      state.quiz.cur = firstOpen >= 0 ? firstOpen : 0;
+    }
+    if (a.status === "submitted" && fresh) return renderQuizResults();
+    renderQuizQuestion();
+  }
+
+  function feedbackFor(q) {
+    if (q.state === "right1") return { cls: "good", text: "Right. 1 point." };
+    if (q.state === "right2") return { cls: "good", text: "Right on the second try. ½ point." };
+    if (q.state === "missed") return { cls: "bad", text: `The answer is “${q.choices[q.correct]}”. No points this time.` };
+    if (q.tries.length === 1) return { cls: "try", text: "Not quite. Try once more for ½ point." };
+    return { cls: "", text: "" };
+  }
+
+  function renderQuizQuestion() {
+    const a = state.quiz.attempt, w = WEEKS[state.quiz.weekIdx], i = state.quiz.cur, q = a.questions[i];
+    const locked = q.state !== "open";
+    const allDone = a.questions.every(x => x.state !== "open");
+    const nextOpen = (() => { for (let k = 1; k <= a.questions.length; k++) { const j = (i + k) % a.questions.length; if (a.questions[j].state === "open") return j; } return -1; })();
+    const fb = feedbackFor(q);
+    const dots = a.questions.map((x, k) => {
+      const cls = x.state !== "open" ? x.state : (x.tries.length ? "tried" : "");
+      return `<button class="qdot ${cls} ${k === i ? "cur" : ""}" data-q="${k}" aria-label="Question ${k + 1}${x.state !== "open" ? " (finished)" : ""}">${k + 1}</button>`;
+    }).join("");
+    const choices = q.choices.map((c, k) => {
+      const tried = q.tries.indexOf(k) >= 0;
+      let cls = "";
+      if (tried && k !== q.correct) cls = "is-wrong";
+      if (locked && k === q.correct) cls = q.state === "missed" ? "is-right is-answer" : "is-right";
+      const dis = locked || tried || state.quiz.busy;
+      return `<button class="choice ${cls}" data-c="${k}" ${dis ? "disabled" : ""}><span class="letter">${LETTERS[k]}</span><span>${escapeHtml(c)}</span></button>`;
+    }).join("");
+
+    quizBody.innerHTML = `
+      <div class="quiz-head">
+        <div><p class="kicker">${w.label}${a.preview ? " · teacher preview" : ""}${state.quiz.info && state.quiz.info.used > 1 ? " · attempt " + state.quiz.info.used + (state.quiz.info.unlimited ? "" : " of " + state.quiz.info.allowed) : ""}</p><h2 style="margin:0;">Final Quiz</h2></div>
+        <span class="score-pill" title="Points so far">${fmtScore(a.score)} / ${a.max}</span>
+      </div>
+      <div class="qdots">${dots}</div>
+      <div class="q-card">
+        <p class="q-count">Question ${i + 1} of ${a.questions.length}</p>
+        <p class="q-lead">${escapeHtml(q.lead)}</p>
+        <p class="q-focus">${escapeHtml(q.focus)}</p>
+        <div class="choices" role="group" aria-label="Answer choices">${choices}</div>
+        <p class="feedback ${fb.cls}" id="qz-feedback" aria-live="polite">${state.quiz.busy ? `<span class="spinner"></span>&nbsp; Checking…` : escapeHtml(fb.text)}</p>
+        <div class="nav-row">
+          <button class="btn secondary" id="qz-prev" ${i === 0 ? "disabled" : ""}>&larr; Previous</button>
+          ${allDone ? `<button class="btn wine" id="qz-results">See your score &rarr;</button>`
+            : locked ? `<button class="btn" id="qz-next">Next question &rarr;</button>`
+            : `<button class="btn secondary" id="qz-skip" ${nextOpen < 0 ? "disabled" : ""}>Skip for now &rarr;</button>`}
+        </div>
+      </div>`;
+
+    quizBody.querySelectorAll(".qdot").forEach(b => b.addEventListener("click", () => { if (state.quiz.busy) return; state.quiz.cur = parseInt(b.dataset.q, 10); renderQuizQuestion(); }));
+    quizBody.querySelectorAll(".choice").forEach(b => b.addEventListener("click", () => submitChoice(parseInt(b.dataset.c, 10))));
+    el("qz-prev").addEventListener("click", () => { if (state.quiz.busy) return; state.quiz.cur = Math.max(0, i - 1); renderQuizQuestion(); });
+    if (el("qz-next")) el("qz-next").addEventListener("click", () => { state.quiz.cur = nextOpen >= 0 ? nextOpen : Math.min(a.questions.length - 1, i + 1); renderQuizQuestion(); });
+    if (el("qz-skip")) el("qz-skip").addEventListener("click", () => { if (nextOpen >= 0) { state.quiz.cur = nextOpen; renderQuizQuestion(); } });
+    if (el("qz-results")) el("qz-results").addEventListener("click", renderQuizResults);
+  }
+
+  function submitChoice(k) {
+    const a = state.quiz.attempt, i = state.quiz.cur, q = a.questions[i];
+    if (state.quiz.busy || q.state !== "open" || q.tries.indexOf(k) >= 0) return;
+    state.quiz.busy = true;
+    renderQuizQuestion();
+    backendCall("answerQuizQuestion", [{ attemptId: a.attemptId, index: i, choice: k }])
+      .then(res => {
+        state.quiz.busy = false;
+        if (!res || !res.ok) throw new Error("The answer didn't reach the server. Try again.");
+        if (res.attempts) state.quiz.info = res.attempts;
+        setAttempt(res.attempt, false);
+      })
+      .catch(err => { state.quiz.busy = false; renderQuizQuestion(); showToast(errText(err), 4500); });
+  }
+
+  // Keyboard: A–D or 1–4 to answer, arrows to move.
+  document.addEventListener("keydown", e => {
+    if (el("quiz-screen").classList.contains("hidden") || !state.quiz.attempt || el("modal-back")) return;
+    if (e.target && /INPUT|TEXTAREA|SELECT/.test(e.target.tagName)) return;
+    const a = state.quiz.attempt, q = a.questions[state.quiz.cur];
+    if (!q) return;
+    const key = e.key.toUpperCase();
+    let idx = LETTERS.indexOf(key); if (idx < 0 && /^[1-6]$/.test(key)) idx = Number(key) - 1;
+    if (idx >= 0 && idx < q.choices.length && a.status !== "submitted") { e.preventDefault(); submitChoice(idx); }
+    else if (e.key === "ArrowRight" && state.quiz.cur < a.questions.length - 1 && !state.quiz.busy) { state.quiz.cur++; renderQuizQuestion(); }
+    else if (e.key === "ArrowLeft" && state.quiz.cur > 0 && !state.quiz.busy) { state.quiz.cur--; renderQuizQuestion(); }
+  });
+
+  function renderQuizResults() {
+    const a = state.quiz.attempt, w = WEEKS[state.quiz.weekIdx];
+    if (a.status !== "submitted") {
+      // Finished on this screen but the record hasn't refreshed yet — reload it once.
+      return openQuiz(state.quiz.weekIdx);
+    }
+    const n = s => a.questions.filter(q => q.state === s).length;
+    const info = state.quiz.info || {};
+    const canRetry = !a.preview && info.canStart;
+    const bestLine = !a.preview && info.used > 1 && info.best != null
+      ? `<p class="small" style="margin:8px 0 0;"><b>Best score: ${fmtScore(info.best)} / ${a.max}</b> · that's the one that counts. ${info.used} attempts so far.</p>` : "";
+    const items = a.questions.map((q, k) => {
+      const yours = q.tries.map(t => q.choices[t]);
+      const pts = q.points === 1 ? `<span class="chip good">1</span>` : q.points === 0.5 ? `<span class="chip warn">½</span>` : `<span class="chip bad">0</span>`;
+      return `<li><span class="rq">${k + 1}.</span>
+        <span><span class="rprompt">${escapeHtml(q.lead)} <b>${escapeHtml(q.focus)}</b></span><br>
+        <span class="rans">${[
+          yours.length ? "You chose " + yours.map(y => "“" + escapeHtml(y) + "”").join(", then ") : "Not answered",
+          q.state === "right1" ? "" : "Answer: <b>" + escapeHtml(q.choices[q.correct]) + "</b>",
+          q.root ? `${escapeHtml(q.root)} means “${escapeHtml(q.meaning)}”` : ""
+        ].filter(Boolean).join(" · ")}</span></span>
+        ${pts}</li>`;
+    }).join("");
+    quizBody.innerHTML = `
+      <div class="center">
+        <p class="kicker">${w.label} · Final Quiz${a.preview ? " · teacher preview" : ""}</p>
+        <div class="result-score">${fmtScore(a.score)} <small>/ ${a.max}</small></div>
+        <div class="breakdown">
+          <span class="chip good">${n("right1")} right first try</span>
+          <span class="chip warn">${n("right2")} right second try</span>
+          <span class="chip bad">${n("missed")} missed</span>
+        </div>
+        ${bestLine}
+        ${(() => { const ps = state.pretestScores[a.weekId]; if (!ps || a.preview) return ""; const qp = Math.round(a.score / a.max * 100), d = qp - ps.pct;
+          return `<p class="small" style="margin:8px 0 0;">Pretest <b>${ps.pct}%</b> &rarr; this quiz <b>${qp}%</b>${d > 0 ? ` <span class="chip good">+${d} points</span>` : d < 0 ? ` <span class="chip warn">${d} points</span>` : ""}</p>`; })()}
+        <p class="muted small">${a.preview ? "Preview only. Nothing was sent to a roster." : "Your teacher can see your score."} This attempt finished ${escapeHtml(a.submittedAt || "")}.${canRetry ? " " + attemptsLeftText(info) + "; each try has new questions." : ""}</p>
+        <div class="btn-row" style="justify-content:center; margin-top:14px;">
+          <button class="btn" id="qr-week">Back to ${w.label}</button>
+          <button class="btn secondary" id="qr-home">All weeks</button>
+          ${canRetry ? `<button class="btn wine" id="qr-again">Try again</button>` : ""}
+          ${a.preview ? `<button class="btn secondary" id="qr-restart">Restart preview</button>` : ""}
+        </div>
+      </div>
+      <hr class="rule">
+      <h3>Review</h3>
+      <ol class="review-list">${items}</ol>`;
+    el("qr-week").addEventListener("click", () => enterWeek(state.quiz.weekIdx));
+    el("qr-home").addEventListener("click", goHome);
+    if (el("qr-again")) el("qr-again").addEventListener("click", () => {
+      const b = el("qr-again"); b.disabled = true; b.innerHTML = `<span class="spinner"></span>&nbsp; Starting…`;
+      backendCall("startWeekQuiz", [{ weekId: w.id, begin: true, again: true }])
+        .then(res => { if (res && res.attempts) state.quiz.info = res.attempts; if (!res || !res.ok) return renderQuizClosed(w, res && res.error); setAttempt(res.attempt, true); window.scrollTo({ top: 0, behavior: "smooth" }); })
+        .catch(err => { showToast(errText(err), 4500); b.disabled = false; b.textContent = "Try again"; });
+    });
+    if (el("qr-restart")) el("qr-restart").addEventListener("click", () => {
+      backendCall("startWeekQuiz", [{ weekId: w.id, begin: true, restart: true }]).then(res => setAttempt(res.attempt, true)).catch(err => showToast(errText(err)));
+    });
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  // ================= TEACHER DASHBOARD =================
+  const T = { home: null, classId: "", tab: "week", weekId: "w1", week: null, busy: false, lastPush: {}, lastPushAll: {} };
+  const tBody = el("t-body");
+  const loading = msg => `<div class="panel muted"><span class="spinner"></span>&nbsp; ${escapeHtml(msg || "Loading…")}</div>`;
+  const cls = () => (T.home && T.home.classes || []).find(c => c.classId === T.classId) || null;
+  const weekById = id => WEEKS.find(w => w.id === id);
+
+  function tOpen() {
+    showScreen("teacher-screen");
+    tLoadHome();
+  }
+  window.RW_Teacher = { open: tOpen };
+
+  function tLoadHome(selectId) {
+    tBody.innerHTML = loading("Loading your classes…");
+    el("t-class-pick").innerHTML = "";
+    backendCall("getTeacherHome", [])
+      .then(h => {
+        T.home = h;
+        const list = h.classes || [];
+        if (selectId) T.classId = selectId;
+        if (!list.some(c => c.classId === T.classId)) T.classId = (list.find(c => c.active) || list[0] || {}).classId || "";
+        tRenderShell();
+      })
+      .catch(err => { tBody.innerHTML = `<div class="panel"><div class="note bad">${escapeHtml(errText(err))}</div></div>`; });
+  }
+
+  function tRenderShell() {
+    const list = T.home.classes || [], c = cls();
+    el("t-title").textContent = c ? c.className + (c.period ? " · Period " + c.period : "") : "Your classes";
+    el("t-class-pick").innerHTML = list.length ? `
+      <label class="small muted" for="t-class-select">Class</label>
+      <select class="input" id="t-class-select">${list.map(k => `<option value="${k.classId}" ${k.classId === T.classId ? "selected" : ""}>${escapeHtml(k.className)}${k.period ? " · P" + escapeHtml(k.period) : ""}${k.active ? "" : " (archived)"} — ${k.students} students</option>`).join("")}</select>
+      <button class="btn secondary small" id="t-new-class">New class</button>` : "";
+    if (list.length) {
+      el("t-class-select").addEventListener("change", e => { T.classId = e.target.value; tRenderShell(); });
+      el("t-new-class").addEventListener("click", tNewClassModal);
+    }
+    if (!list.length) {
+      tBody.innerHTML = `
+        <div class="panel">
+          <h3>Create your first class</h3>
+          <p class="muted">Students join with a code, or you can add them by email. Each class has its own quiz switches and Canvas course.</p>
+          <form class="inline-form" id="first-class" style="margin-top:14px;">
+            <input class="input" id="fc-name" placeholder="Class name, e.g. English 7" required>
+            <input class="input" id="fc-period" placeholder="Period (optional)" style="max-width:180px;">
+            <button class="btn" type="submit">Create class</button>
+          </form>
+        </div>${T.home.teacher.role === "admin" ? `<div id="t-admin-empty"></div>` : ""}`;
+      el("first-class").addEventListener("submit", e => { e.preventDefault(); tCreateClass(el("fc-name").value, el("fc-period").value); });
+      if (el("t-admin-empty")) tRenderAccess(el("t-admin-empty"));
+      return;
+    }
+    const tabs = [["week", "Quiz results"], ["gradebook", "Gradebook"], ["roster", "Class & roster"], ["canvas", "Canvas"]];
+    if (T.home.teacher.role === "admin") tabs.push(["access", "Teacher access"]);
+    if (!tabs.some(t => t[0] === T.tab)) T.tab = "week";
+    tBody.innerHTML = `
+      <div class="tabs" role="tablist">${tabs.map(t => `<button class="tab ${T.tab === t[0] ? "active" : ""}" data-tab="${t[0]}" role="tab">${t[1]}</button>`).join("")}</div>
+      <div id="t-tab"></div>`;
+    tBody.querySelectorAll(".tab").forEach(b => b.addEventListener("click", () => { T.tab = b.dataset.tab; tRenderShell(); }));
+    const holder = el("t-tab");
+    ({ week: tRenderWeek, gradebook: tRenderGradebook, roster: tRenderRoster, canvas: tRenderCanvas, access: tRenderAccess })[T.tab](holder);
+  }
+
+  function tNewClassModal() {
+    const m = openModal(`
+      <div class="modal-head"><h3>New class</h3><button class="x-btn" data-close aria-label="Close">&times;</button></div>
+      <form id="nc-form">
+        <label class="field"><span>Class name</span><input class="input" id="nc-name" placeholder="English 7" required></label>
+        <label class="field"><span>Period (optional)</span><input class="input" id="nc-period"></label>
+        <div class="btn-row" style="justify-content:flex-end;"><button type="button" class="btn secondary" data-close>Cancel</button><button class="btn" type="submit">Create</button></div>
+      </form>`, { small: true });
+    m.querySelector("#nc-form").addEventListener("submit", e => { e.preventDefault(); tCreateClass(el("nc-name").value, el("nc-period").value); closeModal(); });
+  }
+  function tCreateClass(name, period) {
+    if (!String(name || "").trim()) return;
+    backendCall("createRootClass", [{ className: name, period: period }])
+      .then(r => { showToast("Class created. Join code " + r.classInfo.joinCode); T.tab = "roster"; tLoadHome(r.classInfo.classId); })
+      .catch(err => showToast(errText(err), 4500));
+  }
+
+  // ---------- Quiz results (one week) ----------
+  function tRenderWeek(holder) {
+    const c = cls();
+    holder.innerHTML = `
+      <div class="btn-row spread" style="margin:-4px 0 8px;">
+        <span class="muted small">Showing <b>${(c.visibleWeeks || []).length}</b> of 20 weeks to students. Dashed weeks are hidden; a green dot means the quiz is open.</span>
+        <button class="linkish small" id="t-choose-weeks">Choose which weeks students see…</button>
+      </div>
+      <div class="week-pills" id="t-week-pills">${WEEKS.map(w => { const vis = (c.visibleWeeks || []).indexOf(w.id) >= 0; return `<button class="wpill ${w.id === T.weekId ? "on" : ""} ${c.openQuizzes.indexOf(w.id) >= 0 && vis ? "open" : ""} ${vis ? "" : "hid"}" data-w="${w.id}" title="${w.label}${vis ? "" : " — hidden from students"}${c.openQuizzes.indexOf(w.id) >= 0 ? " — quiz open" : ""}">W${w.id.slice(1)}</button>`; }).join("")}</div>
+      <div id="t-week-body">${loading("Loading " + weekById(T.weekId).label + "…")}</div>`;
+    holder.querySelectorAll(".wpill").forEach(b => b.addEventListener("click", () => { T.weekId = b.dataset.w; tRenderWeek(holder); }));
+    el("t-choose-weeks").addEventListener("click", () => tChooseWeeks(holder));
+    const pill = holder.querySelector(".wpill.on"); if (pill) pill.scrollIntoView({ block: "nearest", inline: "center" });
+    const wanted = T.classId + "|" + T.weekId;
+    backendCall("getRootClassWeek", [{ classId: T.classId, weekId: T.weekId }])
+      .then(d => { if (wanted !== T.classId + "|" + T.weekId || !el("t-week-body")) return; T.week = d; tWeekBody(el("t-week-body"), d); })
+      .catch(err => { if (el("t-week-body")) el("t-week-body").innerHTML = `<div class="note bad">${escapeHtml(errText(err))}</div>`; });
+  }
+
+  const ATTEMPT_OPTIONS = [[1, "1 attempt"], [2, "2 attempts"], [3, "3 attempts"], [4, "4 attempts"], [5, "5 attempts"], [0, "Unlimited"]];
+  const allowedText = n => n === 0 ? "unlimited" : String(n);
+
+  // Due dates are stored as one moment in time; the teacher picks a local date and time (11:59 PM by default).
+  function dueParts(sched) {
+    if (!sched || !sched.dueAt) return { date: "", time: "23:59" };
+    const d = new Date(sched.dueAt), p = n => String(n).padStart(2, "0");
+    return { date: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`, time: `${p(d.getHours())}:${p(d.getMinutes())}` };
+  }
+  function dueFromInputs(date, time) {
+    if (!date) return "";
+    const [y, m, dd] = date.split("-").map(Number), [hh, mm] = (time || "23:59").split(":").map(Number);
+    return new Date(y, m - 1, dd, isNaN(hh) ? 23 : hh, isNaN(mm) ? 59 : mm).toISOString();
+  }
+  function canvasStateText(d) {
+    const s = d.schedule || {}, link = d.canvas.assignment, bits = [];
+    bits.push(s.dueAt ? "Due " + fmtDue(s.dueAt) : "No due date");
+    if (!d.canvas.linked) return bits.join(" · ") + ". Shown to students in the app. Link a Canvas course (Canvas tab) to send it to Canvas.";
+    if (link && link.assignmentId) {
+      bits.push(link.published === false ? "in Canvas, unpublished until you open the quiz" : "in Canvas, published");
+      if (link.moduleName || link.moduleId) bits.push("module: " + escapeHtml(link.moduleName || link.moduleId));
+      if (link.htmlUrl) bits.push(`<a href="${escapeHtml(link.htmlUrl)}" target="_blank" rel="noopener">open in Canvas</a>`);
+    } else bits.push("not in Canvas yet. Save to Canvas creates the assignment now, or the first Push does");
+    return bits.join(" · ") + ".";
+  }
+  function pretestCell(p) {
+    if (!p || !p.done) return `<span class="muted">—</span>`;
+    if (p.pct == null) return `<span class="chip good" title="Taken before pretest scores were recorded">Done</span>`;
+    return `<b>${p.pct}%</b>${p.known != null ? `<br><span class="muted small">${p.known} of ${p.total}</span>` : ""}`;
+  }
+  function growthCell(g) {
+    if (g == null) return `<span class="muted">—</span>`;
+    return g > 0 ? `<span class="chip good">+${g}</span>` : g < 0 ? `<span class="chip warn">${g}</span>` : `<span class="chip">0</span>`;
+  }
+  function quizCell(q) {
+    if (q.excluded) return `<span class="chip" title="Left out of the grade. Canvas marks it Excused on the next push.">excluded</span>${q.score != null ? `<br><span class="muted small">${fmtScore(q.score)} / ${q.max} kept</span>` : ""}`;
+    const tries = q.used ? `<br><span class="muted small">${q.pct != null ? q.pct + "% · " : ""}${q.used} of ${allowedText(q.allowed)} used</span>` : "";
+    if (q.score != null) return `<b>${fmtScore(q.score)}</b> <span class="muted small">/ ${q.max}${q.finished > 1 ? " best" : ""}</span>${q.inProgress ? ` <span class="chip warn">retaking</span>` : ""}${tries}`;
+    if (q.inProgress) return `<span class="chip warn">${q.answered}/${q.max} answered</span>${tries}`;
+    if (q.status === "reset") return `<span class="chip">Set aside</span>`;
+    return `<span class="muted">—</span>`;
+  }
+
+  function tWeekBody(box, d) {
+    const s = d.stats, link = d.canvas.assignment, push = T.lastPush[T.classId + "|" + d.week.id];
+    box.innerHTML = `
+      <div class="panel" style="padding:22px 24px;">
+        <div class="week-card">
+          <div>
+            <p class="kicker">${d.week.label}</p>
+            <h3>Final Quiz</h3>
+            <p class="muted small" style="margin:0;">${escapeHtml(d.week.subtitle)} · 12 questions · scored automatically</p>
+            <div class="stats">
+              <div class="stat"><div class="v">${s.submitted}<span class="muted" style="font-size:0.9rem;"> / ${s.enrolled}</span></div><div class="l">finished</div></div>
+              <div class="stat"><div class="v">${s.inProgress}</div><div class="l">in progress</div></div>
+              <div class="stat"><div class="v">${s.pretestAvgPct == null ? "—" : s.pretestAvgPct + "%"}</div><div class="l">pretest average${s.pretestScored ? "" : ""}</div></div>
+              <div class="stat"><div class="v">${s.averagePct == null ? "—" : s.averagePct + "%"}</div><div class="l">quiz average${s.average == null ? "" : " · " + (Math.round(s.average * 10) / 10) + " / " + s.max}</div></div>
+              <div class="stat"><div class="v">${s.growth == null ? "—" : (s.growth > 0 ? "+" : "") + s.growth}</div><div class="l">avg growth (points)</div></div>
+              <div class="stat"><div class="v">${s.pretests}<span class="muted" style="font-size:0.9rem;"> / ${s.enrolled}</span></div><div class="l">pretests done</div></div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:12px; align-items:flex-start;">
+            <label class="switch"><input type="checkbox" id="t-visible" ${d.weekVisible ? "checked" : ""}><span class="track"></span><span id="t-visible-label">${d.weekVisible ? "Week is visible to students" : "Week is hidden from students"}</span></label>
+            <label class="switch"><input type="checkbox" id="t-open" ${d.quizOpen ? "checked" : ""}><span class="track"></span><span id="t-open-label">${d.quizOpen ? "Quiz is open to students" : "Quiz is closed"}</span></label>
+            <div class="inline-form" style="align-items:center; gap:8px;">
+              <label for="t-attempts" class="small" style="font-weight:600;">Attempts</label>
+              <select class="input" id="t-attempts" style="width:auto; min-width:0; flex:0 0 auto; padding:6px 10px;">${ATTEMPT_OPTIONS.map(o => `<option value="${o[0]}" ${o[0] === d.attempts.effective ? "selected" : ""}>${o[1]}</option>`).join("")}</select>
+              <button class="linkish small" id="t-attempts-all" type="button">Use for all weeks</button>
+            </div>
+            <span class="muted small" style="margin-top:-6px;">${d.attempts.effective === 1 ? "One try each." : "Best score counts. Each try gets new questions."}</span>
+            <div class="btn-row">
+              ${d.canvas.linked ? `<button class="btn small" id="t-push">Push scores to Canvas</button>` : `<button class="btn secondary small" id="t-link-canvas">Connect Canvas…</button>`}
+              <button class="btn secondary small" id="t-data-csv" title="Pretest and Final Quiz scores for this week">Class data (CSV)</button>
+              <button class="btn secondary small" id="t-csv" title="Canvas gradebook import file">Canvas CSV</button>
+            </div>
+            <span class="muted small">${d.canvas.linked ? `Canvas: ${escapeHtml(d.canvas.courseName)}${link && link.lastPushAt ? ` · last push ${escapeHtml(link.lastPushAt)}` : " · not pushed yet"}${link && link.htmlUrl ? ` · <a href="${escapeHtml(link.htmlUrl)}" target="_blank" rel="noopener">open in Canvas</a>` : ""}` : "This class isn't linked to a Canvas course yet."}</span>
+          </div>
+        </div>
+        <div class="canvas-week" style="border-top:1px solid var(--rule-soft); margin-top:20px; padding-top:18px;">
+          <p class="kicker" style="margin-bottom:10px;">Due date & Canvas module</p>
+          <div class="inline-form" style="align-items:flex-end;">
+            <label class="field" style="margin:0; flex:0 0 auto;"><span>Due date</span><input class="input" type="date" id="t-due-date" value="${dueParts(d.schedule).date}" style="min-width:160px;"></label>
+            <label class="field" style="margin:0; flex:0 0 auto;"><span>Time</span><input class="input" type="time" id="t-due-time" value="${dueParts(d.schedule).time}" style="min-width:120px;"></label>
+            <label class="field" style="margin:0; flex:1 1 220px;"><span>Module</span>
+              <select class="input" id="t-module" ${d.canvas.linked && d.canvas.connected ? "" : "disabled"}>
+                <option value="">${d.canvas.linked ? (d.canvas.connected ? "Loading modules…" : "Connect Canvas to choose") : "Link Canvas to choose a module"}</option>
+              </select></label>
+            <label class="field" id="t-group-wrap" style="margin:0; flex:1 1 200px;" hidden><span>Assignment group</span>
+              <select class="input" id="t-group"></select></label>
+            <button class="btn small" id="t-canvas-save" style="flex:0 0 auto;">${d.canvas.linked ? "Save to Canvas" : "Save due date"}</button>
+          </div>
+          <p class="muted small" id="t-canvas-state" style="margin:10px 0 0;">${canvasStateText(d)}</p>
+        </div>
+        <div id="t-push-result" class="push-result">${push ? pushSummaryHtml(push) : ""}</div>
+      </div>
+      ${d.rows.length ? `
+      <div class="table-wrap">
+        <table class="grid">
+          <thead><tr><th>Student</th><th class="num">Pretest</th><th class="num">Final Quiz</th><th class="num" title="Final Quiz % minus pretest %">Growth</th><th class="num">Sentences</th><th></th></tr></thead>
+          <tbody>${d.rows.map((r, i) => `
+            <tr>
+              <td class="who"><b>${escapeHtml(r.name)}</b><span>${escapeHtml(r.email)}</span></td>
+              <td class="num">${pretestCell(r.pretest)}</td>
+              <td class="num">${quizCell(r.quiz)}</td>
+              <td class="num">${growthCell(r.growth)}</td>
+              <td class="num">${r.sentencesDone} / ${r.sentencesTotal}</td>
+              <td class="acts"><button class="btn quiet small" data-view="${i}">View</button>${r.quiz.used && r.quiz.allowed !== 0 ? `<button class="btn quiet small" data-retake="${i}">+1 attempt</button>` : ""}</td>
+            </tr>`).join("")}</tbody>
+        </table>
+      </div>` : `<div class="note">No students yet. Share the join code from <b>Class & roster</b>, or add students by email there.</div>`}`;
+
+    el("t-visible").addEventListener("change", e => {
+      const vis = e.target.checked;
+      el("t-visible-label").textContent = "Saving…";
+      backendCall("setRootWeekVisible", [{ classId: T.classId, weekId: d.week.id, visible: vis }])
+        .then(r => { cls().visibleWeeks = r.visibleWeeks; cls().openQuizzes = r.openQuizzes; showToast(vis ? d.week.label + " is visible to students." : d.week.label + " is hidden" + (d.quizOpen ? " and its quiz is closed." : ".")); tRenderWeek(el("t-tab")); })
+        .catch(err => { e.target.checked = !vis; el("t-visible-label").textContent = !vis ? "Week is visible to students" : "Week is hidden from students"; showToast(errText(err), 4500); });
+    });
+    el("t-open").addEventListener("change", e => {
+      const open = e.target.checked;
+      el("t-open-label").textContent = "Saving…";
+      backendCall("setRootQuizOpen", [{ classId: T.classId, weekId: d.week.id, open }])
+        .then(r => { if (r.warning) showToast(r.warning, 7000); else if (r.canvasPublished) setTimeout(() => showToast("The Canvas assignment is now published too."), 1800); if (r.canvasPublished) setTimeout(() => tRenderWeek(el("t-tab")), 300); cls().openQuizzes = r.openQuizzes; if (r.visibleWeeks) { const was = (cls().visibleWeeks || []).indexOf(d.week.id) >= 0; cls().visibleWeeks = r.visibleWeeks; if (!was && open) setTimeout(() => tRenderWeek(el("t-tab")), 250); } el("t-open-label").textContent = open ? "Quiz is open to students" : "Quiz is closed"; const p = document.querySelector(`.wpill[data-w="${d.week.id}"]`); if (p) p.classList.toggle("open", open); showToast(open ? d.week.label + " Final Quiz is open." : d.week.label + " Final Quiz is closed."); })
+        .catch(err => { e.target.checked = !open; el("t-open-label").textContent = !open ? "Quiz is open to students" : "Quiz is closed"; showToast(errText(err), 4500); });
+    });
+    const saveAttempts = allWeeks => {
+      const n = Number(el("t-attempts").value);
+      backendCall("setRootQuizAttempts", [{ classId: T.classId, weekId: d.week.id, attempts: n, allWeeks }])
+        .then(() => { showToast(allWeeks ? `Every week: ${n === 0 ? "unlimited attempts" : n + " attempt" + (n === 1 ? "" : "s")}.` : `${d.week.label}: ${n === 0 ? "unlimited attempts" : n + " attempt" + (n === 1 ? "" : "s")}.`); tRenderWeek(el("t-tab")); })
+        .catch(err => showToast(errText(err), 4500));
+    };
+    el("t-attempts").addEventListener("change", () => saveAttempts(false));
+    el("t-attempts-all").addEventListener("click", () => {
+      const n = Number(el("t-attempts").value);
+      askConfirm("Use this for all 20 weeks?", `Every week's Final Quiz will allow ${n === 0 ? "unlimited attempts" : n + " attempt" + (n === 1 ? "" : "s")}. Extra attempts you gave individual students are kept on top.`, "Apply to all weeks").then(yes => { if (yes) saveAttempts(true); });
+    });
+    // Due date + module
+    if (d.canvas.linked && d.canvas.connected) {
+      const fill = mods => {
+        const sel = el("t-module"); if (!sel) return;
+        const cur = (d.schedule && d.schedule.moduleId) || (d.canvas.assignment && d.canvas.assignment.moduleId) || "";
+        const guess = cur;
+        sel.innerHTML = `<option value="">No module</option>` + mods.map(m => `<option value="${escapeHtml(m.id)}" ${m.id === guess ? "selected" : ""}>${escapeHtml(m.name)}</option>`).join("");
+        sel.disabled = false;
+      };
+      // Assignment group for this week's quiz: preselected with where it is in Canvas now; sent only when changed.
+      backendCall("getRootCanvasGroupChoice", [{ classId: T.classId, weekId: d.week.id }]).then(g => {
+        const wrap = el("t-group-wrap"), sel = el("t-group"); if (!wrap || !sel || !(g.groups || []).length) return;
+        const now = String(g.currentGroupId || ""); sel.dataset.orig = now;
+        sel.innerHTML = (now ? "" : `<option value="">Course default</option>`) + g.groups.map(x => `<option value="${escapeHtml(x.id)}" ${String(x.id) === now ? "selected" : ""}>${escapeHtml(x.name)}</option>`).join("");
+        sel.title = g.linked ? "Pick a group and Save to Canvas moves it there. Pushing scores never changes the group, so you can also move it in Canvas." : "The group it goes into when it's made in Canvas. Pushing scores never moves it back.";
+        wrap.hidden = false;
+      }).catch(() => {});
+      T.modules = T.modules || {};
+      if (T.modules[T.classId]) fill(T.modules[T.classId]);
+      else backendCall("listRootCanvasModules", [{ classId: T.classId }]).then(r => { T.modules[T.classId] = r.modules; fill(r.modules); })
+        .catch(err => { const sel = el("t-module"); if (sel) sel.innerHTML = `<option value="">Couldn't load modules</option>`; showToast(errText(err), 4500); });
+    }
+    el("t-due-date").addEventListener("change", () => { if (el("t-due-date").value && !el("t-due-time").value) el("t-due-time").value = "23:59"; });
+    el("t-canvas-save").addEventListener("click", () => {
+      const btn = el("t-canvas-save"), sel = el("t-module");
+      const dueAt = dueFromInputs(el("t-due-date").value, el("t-due-time").value || "23:59");
+      const moduleId = sel && !sel.disabled ? sel.value : ((d.schedule && d.schedule.moduleId) || "");
+      const moduleName = sel && sel.selectedIndex >= 0 && sel.value ? sel.options[sel.selectedIndex].textContent : "";
+      btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>&nbsp; Saving…`;
+      const gsel = el("t-group"), assignmentGroupId = gsel && gsel.value && gsel.dataset.orig !== undefined && gsel.value !== gsel.dataset.orig ? gsel.value : "";
+      backendCall("saveRootCanvasWeek", [{ classId: T.classId, weekId: d.week.id, dueAt, moduleId, moduleName, assignmentGroupId }])
+        .then(r => {
+          (r.warnings || []).forEach(w => showToast(w, 6000));
+          showToast(r.canvasSynced ? (r.created ? "Assignment created in Canvas." : "Canvas assignment updated.") : (r.note || "Saved."), 4000);
+          tRenderWeek(el("t-tab"));
+        })
+        .catch(err => { showToast(errText(err), 6000); btn.disabled = false; btn.textContent = d.canvas.linked ? "Save to Canvas" : "Save due date"; });
+    });
+    if (el("t-push")) el("t-push").addEventListener("click", () => tPush(d));
+    if (el("t-link-canvas")) el("t-link-canvas").addEventListener("click", () => { T.tab = "canvas"; tRenderShell(); });
+    el("t-data-csv").addEventListener("click", () => {
+      backendCall("exportRootClassDataCsv", [{ classId: T.classId, weekId: d.week.id }]).then(r => triggerDownload(r.csv, r.filename, "text/csv")).catch(err => showToast(errText(err), 4500));
+    });
+    el("t-csv").addEventListener("click", () => {
+      backendCall("exportRootQuizCsv", [{ classId: T.classId, weekId: d.week.id }]).then(r => triggerDownload(r.csv, r.filename, "text/csv")).catch(err => showToast(errText(err), 4500));
+    });
+    box.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => tStudentModal(d.rows[+b.dataset.view], d.week.id)));
+    box.querySelectorAll("[data-retake]").forEach(b => b.addEventListener("click", () => tRetake(d.rows[+b.dataset.retake], d.week.id)));
+  }
+
+  function tChooseWeeks(holder) {
+    const c = cls(), vis = c.visibleWeeks || [];
+    const m = openModal(`
+      <div class="modal-head"><div><p class="kicker">${escapeHtml(c.className)}</p><h3>Which weeks can students see?</h3></div><button class="x-btn" data-close aria-label="Close">&times;</button></div>
+      <p class="muted small" style="margin-top:0;">Hidden weeks disappear from students' home page. Their sentences and scores are kept and come back when you show the week again. Hiding a week also closes its Final Quiz.</p>
+      <div class="btn-row" style="margin:6px 0 12px;"><button class="btn secondary small" id="cw-all" type="button">Show all</button><button class="btn secondary small" id="cw-none" type="button">Hide all</button><button class="btn secondary small" id="cw-upto" type="button">Show weeks 1 to…</button><input class="input" id="cw-n" type="number" min="1" max="20" value="${Math.max(1, vis.length ? Number(vis[vis.length - 1].slice(1)) : 1)}" style="width:80px; height:36px;"></div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fill, minmax(110px, 1fr)); gap:8px;">${WEEKS.map(w => `<label class="chip" style="display:flex; gap:8px; align-items:center; padding:8px 10px; cursor:pointer; font-size:0.86rem;"><input type="checkbox" class="cw-box" value="${w.id}" ${vis.indexOf(w.id) >= 0 ? "checked" : ""}> ${w.label}</label>`).join("")}</div>
+      <div class="btn-row" style="justify-content:flex-end; margin-top:18px;"><button class="btn secondary" data-close type="button">Cancel</button><button class="btn" id="cw-save" type="button">Save</button></div>`);
+    const boxes = () => Array.from(m.querySelectorAll(".cw-box"));
+    m.querySelector("#cw-all").addEventListener("click", () => boxes().forEach(b => b.checked = true));
+    m.querySelector("#cw-none").addEventListener("click", () => boxes().forEach(b => b.checked = false));
+    m.querySelector("#cw-upto").addEventListener("click", () => { const n = Number(m.querySelector("#cw-n").value) || 1; boxes().forEach(b => b.checked = Number(b.value.slice(1)) <= n); });
+    m.querySelector("#cw-save").addEventListener("click", () => {
+      const weeks = boxes().filter(b => b.checked).map(b => b.value);
+      backendCall("setRootVisibleWeeks", [{ classId: T.classId, weeks }])
+        .then(r => { c.visibleWeeks = r.visibleWeeks; c.openQuizzes = r.openQuizzes; closeModal(); showToast(`Students now see ${r.visibleWeeks.length} week${r.visibleWeeks.length === 1 ? "" : "s"}.`); tRenderWeek(holder); })
+        .catch(err => showToast(errText(err), 4500));
+    });
+  }
+
+  function pushSummaryHtml(p) {
+    if (p.error) return `<div class="note bad">${escapeHtml(p.error)}</div>`;
+    const list = (label, names) => names && names.length ? `<li>${label}: ${names.map(escapeHtml).join(", ")}</li>` : "";
+    return `<div class="note ${p.warnings && p.warnings.length ? "warn" : "good"}">
+      <b>Sent ${p.sent} score${p.sent === 1 ? "" : "s"} to Canvas</b>${p.created ? " (assignment created)" : p.adopted ? " (matched an existing assignment)" : ""}${p.via === "lmsHub" ? " through the LMS Hub" : ""}.
+      <ul>${list("Excluded, so marked Excused in Canvas", p.excused)}${list("Excused earlier, now counted again", p.unexcused)}${list("Not taken yet (left blank)", p.notTaken)}${list("Still in progress (left blank)", p.inProgress)}${list("Cleared in Canvas after a retake", p.cleared)}${list("Not found in the Canvas course", p.unmatched)}${(p.warnings || []).map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>`;
+  }
+
+  function tPush(d) {
+    const btn = el("t-push"); btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>&nbsp; Pushing…`;
+    backendCall("pushRootQuizToCanvas", [{ classId: T.classId, weekId: d.week.id }])
+      .then(p => { T.lastPush[T.classId + "|" + d.week.id] = p; showToast("Sent " + p.sent + " score" + (p.sent === 1 ? "" : "s") + " to Canvas."); tRenderWeek(el("t-tab")); })
+      .catch(err => { T.lastPush[T.classId + "|" + d.week.id] = { error: errText(err) }; el("t-push-result").innerHTML = pushSummaryHtml({ error: errText(err) }); btn.disabled = false; btn.textContent = "Push scores to Canvas"; });
+  }
+
+  // 2026-10-18a: "↗ Push all to Canvas" (Gradebook tab). Every week students can see that is already
+  // in Canvas, through the same server code as each week's Push. Never creates an assignment.
+  function pushAllSummaryHtml(p) {
+    if (p.error) return `<div class="note bad">${escapeHtml(p.error)}</div>`;
+    const list = (label, names) => names && names.length ? `<li>${label}: ${names.map(escapeHtml).join(", ")}</li>` : "";
+    const bad = (p.failures && p.failures.length) || (p.notReached && p.notReached.length) || (p.warnings && p.warnings.length);
+    return `<div class="note ${bad ? "warn" : "good"}" style="margin:0 0 12px;">
+      <b>Sent ${p.sent} score${p.sent === 1 ? "" : "s"} to Canvas across ${p.weeks.length} week${p.weeks.length === 1 ? "" : "s"}</b>${p.via === "lmsHub" ? " through the LMS Hub" : ""}.${p.excused ? ` ${p.excused} excluded quiz${p.excused === 1 ? "" : "zes"} marked Excused.` : ""}${p.unexcused ? ` ${p.unexcused} excusal${p.unexcused === 1 ? "" : "s"} lifted.` : ""}${p.notTaken ? ` ${p.notTaken} not taken yet, left blank.` : ""}
+      <ul>${list("Still in progress (left blank)", p.inProgress)}${list("Cleared in Canvas after a retake", p.cleared)}${list("Not found in the Canvas course", p.unmatched)}${list("Not in Canvas yet (use “Push scores to Canvas” on that week once)", p.notInCanvas)}${list("Skipped, hidden from students", p.hidden)}${(p.failures || []).map(f => `<li><b>${escapeHtml(f.label)} didn’t send:</b> ${escapeHtml(f.message)}</li>`).join("")}${p.notReached && p.notReached.length ? `<li><b>Ran out of time before:</b> ${p.notReached.map(escapeHtml).join(", ")}. Press Push all again to finish.</li>` : ""}${(p.warnings || []).map(w => `<li>${escapeHtml(w)}</li>`).join("")}</ul></div>`;
+  }
+  function tPushAll() {
+    const btn = el("gb-push"), cid = T.classId; if (!btn || btn.disabled) return;
+    btn.disabled = true; btn.innerHTML = `<span class="spinner"></span>&nbsp; Pushing every week…`;
+    backendCall("pushRootGradebookToCanvas", [{ classId: cid }])
+      .then(p => { T.lastPushAll[cid] = p; showToast("Sent " + p.sent + " score" + (p.sent === 1 ? "" : "s") + " to Canvas."); })
+      .catch(err => { T.lastPushAll[cid] = { error: errText(err) }; })
+      .then(() => { if (T.classId !== cid) return; const res = el("gb-push-result"); if (res) res.innerHTML = pushAllSummaryHtml(T.lastPushAll[cid]); const b = el("gb-push"); if (b) { b.disabled = false; b.textContent = "↗ Push all to Canvas"; } });
+  }
+
+  /** One more attempt for one student, on top of the class limit. Their best score still counts. */
+  function tRetake(row, weekId, after) {
+    const w = weekById(weekId), q = row.quiz || {};
+    askConfirm("Give " + row.name + " another attempt?", `They'll be able to take the ${escapeHtml(w.label)} Final Quiz once more, with new questions. Their earlier attempts are kept and their <b>best</b> score counts${q.score != null ? " (now " + fmtScore(q.score) + "/" + (q.max || 12) + ")" : ""}. To drop an attempt instead, open View and choose “Don't count”.`, "Give another attempt")
+      .then(yes => {
+        if (!yes) { if (after) after(); return; }
+        backendCall("grantRootQuizAttempt", [{ classId: T.classId, weekId, studentEmail: row.email }])
+          .then(r => { showToast(`${row.name} now has ${r.allowed} attempt${r.allowed === 1 ? "" : "s"} for ${w.label}.`); if (after) after(); else { closeModal(); tRenderShell(); } })
+          .catch(err => showToast(errText(err), 4500));
+      });
+  }
+
+  function tStudentModal(row, weekId) {
+    // When the modal closes after changes, refresh the table behind it.
+    if (!tStudentModal._watch) {
+      tStudentModal._watch = new MutationObserver(() => { if (!el("modal-back") && T.dirty) { T.dirty = false; if (T.tab === "week" || T.tab === "gradebook") tRenderShell(); } });
+      tStudentModal._watch.observe(el("modal-root"), { childList: true });
+    }
+    const w = weekById(weekId);
+    openModal(`<div class="modal-head"><div><p class="kicker">${w.label}</p><h3>${escapeHtml(row.name)}</h3></div><button class="x-btn" data-close aria-label="Close">&times;</button></div>${loading()}`);
+    backendCall("getRootStudentWeek", [{ classId: T.classId, weekId, studentEmail: row.email }])
+      .then(d => {
+        if (!el("modal-back")) return;
+        const pts = q => q.state === "right1" ? `<span class="chip good">1</span>` : q.state === "right2" ? `<span class="chip warn">½</span>` : q.state === "missed" ? `<span class="chip bad">0</span>` : `<span class="chip">open</span>`;
+        const review = a => `<ol class="review-list">${a.questions.map((q, k) => `<li><span class="rq">${k + 1}.</span><span><span class="rprompt">${escapeHtml(q.lead)} <b>${escapeHtml(q.focus)}</b></span><br>
+            <span class="rans">${q.tries.length ? "Chose " + q.tries.map(t => "“" + escapeHtml(q.choices[t]) + "”").join(", then ") : "Not answered"} · Answer: <b>${escapeHtml(q.choices[q.correct])}</b></span></span>${pts(q)}</li>`).join("")}</ol>`;
+        const attemptHtml = (a, open) => `
+          <details class="attempt" ${open ? "open" : ""} style="border-top:1px solid var(--rule-soft); padding:12px 0;">
+            <summary style="cursor:pointer; display:flex; gap:10px; align-items:center; flex-wrap:wrap; list-style:none;">
+              <b>Attempt ${a.number}</b>
+              <span>${a.status === "in_progress" ? "in progress, " + a.answered + " of " + a.max + " answered" : a.submittedAt ? fmtScore(a.score) + " / " + a.max : "unfinished"}</span>
+              ${a.best ? `<span class="chip good">best · counts</span>` : ""}${!a.counted ? `<span class="chip">not counted</span>` : ""}
+              <span class="muted small">started ${escapeHtml(a.startedAt)}</span>
+              <span style="margin-left:auto;">${a.counted ? `<button class="btn quiet small" data-uncount="${escapeHtml(a.attemptId)}">Don't count</button>` : a.submittedAt ? `<button class="btn quiet small" data-count="${escapeHtml(a.attemptId)}">Count again</button>` : ""}</span>
+            </summary>
+            ${review(a)}
+          </details>`;
+        const quizHtml = !d.attempts.length ? `<p class="muted">No Final Quiz attempt yet.</p>`
+          : `<p><b>${d.best != null ? "Best score " + fmtScore(d.best) + " / 12" : "No finished attempt yet"}</b> <span class="muted small">· ${d.used} of ${allowedText(d.allowed)} attempt${d.allowed === 1 ? "" : "s"} used${d.bonus ? ` (includes ${d.bonus} extra you gave)` : ""}</span></p>` +
+            d.attempts.map((a, k) => attemptHtml(a, k === 0)).join("");
+        el("modal-root").querySelector(".modal").innerHTML = `
+          <div class="modal-head"><div><p class="kicker">${w.label} · ${escapeHtml(d.student.email)}</p><h3>${escapeHtml(d.student.name)}</h3></div><button class="x-btn" data-close aria-label="Close">&times;</button></div>
+          <p class="small muted">Pretest: ${!d.pretest.done ? "not done" : d.pretest.pct == null ? "done (taken before scores were recorded)" : `<b>${d.pretest.pct}%</b> (${d.pretest.known} of ${d.pretest.total} roots right on the first try)`}${d.pretest.pct != null && d.best != null ? ` · Final Quiz best ${Math.round(d.best / 12 * 100)}% · growth ${(Math.round(d.best / 12 * 100) - d.pretest.pct > 0 ? "+" : "") + (Math.round(d.best / 12 * 100) - d.pretest.pct)} points` : ""}.</p>
+          <h3 style="margin-top:18px;">Final Quiz</h3>${quizHtml}
+          <div style="margin:12px 0 4px;">
+            <label class="switch"><input type="checkbox" id="sm-exclude" ${d.excluded ? "checked" : ""}><span class="track"></span><span>Exclude from grade</span></label>
+            <p class="muted small" style="margin:6px 0 0;">${d.excluded ? "This week's Final Quiz doesn't count for " + escapeHtml(d.student.name) + ". Canvas marks it Excused on the next push. Their attempts are kept; turn this off to count it again." : "Leaves this week's Final Quiz out of their grade. Canvas marks it Excused on the next push. Their attempts are kept."}</p>
+          </div>
+          <div class="btn-row" style="margin:10px 0 10px;">
+            ${d.allowed !== 0 ? `<button class="btn secondary small" id="sm-retake">Give another attempt</button>` : ""}
+            ${d.bonus ? `<button class="btn quiet small" id="sm-unbonus">Take back an extra attempt</button>` : ""}
+          </div>
+          <h3 style="margin-top:22px;">Sentences</h3>
+          ${d.days.map(day => `<p class="section-label" style="margin-top:14px;">Day ${day.day}</p><ul class="sent-list">${day.roots.map(r => `<li><b>${escapeHtml(r.display)}</b><span class="muted small">“${escapeHtml(r.meaning)}”</span><br>${r.sentence.trim() ? escapeHtml(r.sentence) : `<span class="empty">Not written yet</span>`}</li>`).join("")}</ul>`).join("")}`;
+        const refresh = () => { tStudentModal(row, weekId); T.dirty = true; };
+        const setCounted = (id, counted) => backendCall("setRootQuizAttemptCounted", [{ classId: T.classId, weekId, studentEmail: d.student.email, attemptId: id, counted }])
+          .then(() => { showToast(counted ? "Attempt counts again." : "Attempt set aside. It no longer counts."); refresh(); }).catch(err => showToast(errText(err), 4500));
+        el("modal-root").querySelectorAll("[data-uncount]").forEach(b => b.addEventListener("click", e => { e.preventDefault(); setCounted(b.dataset.uncount, false); }));
+        el("modal-root").querySelectorAll("[data-count]").forEach(b => b.addEventListener("click", e => { e.preventDefault(); setCounted(b.dataset.count, true); }));
+        el("sm-exclude").addEventListener("change", e => {
+          const on = e.target.checked; e.target.disabled = true;
+          backendCall("setRootQuizExcluded", [{ classId: T.classId, weekId, studentEmail: d.student.email, excluded: on }])
+            .then(() => { showToast(on ? d.student.name + "'s " + w.label + " quiz is left out of the grade." : d.student.name + "'s " + w.label + " quiz counts again."); refresh(); })
+            .catch(err => { e.target.checked = !on; e.target.disabled = false; showToast(errText(err), 4500); });
+        });
+        if (el("sm-retake")) el("sm-retake").addEventListener("click", () => tRetake({ name: d.student.name, email: d.student.email, quiz: { score: d.best, max: 12 } }, weekId, () => { T.dirty = true; tStudentModal(row, weekId); }));
+        if (el("sm-unbonus")) el("sm-unbonus").addEventListener("click", () => backendCall("grantRootQuizAttempt", [{ classId: T.classId, weekId, studentEmail: d.student.email, remove: true }]).then(() => { showToast("Extra attempt taken back."); refresh(); }).catch(err => showToast(errText(err), 4500)));
+        el("modal-root").querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeModal));
+      })
+      .catch(err => { const m = el("modal-root").querySelector(".modal"); if (m) m.insertAdjacentHTML("beforeend", `<div class="note bad">${escapeHtml(errText(err))}</div>`); });
+  }
+
+  // ---------- Gradebook (all weeks) ----------
+  function tRenderGradebook(holder) {
+    holder.innerHTML = loading("Loading the gradebook…");
+    backendCall("getRootGradebook", [{ classId: T.classId }])
+      .then(g => {
+        if (!g.rows.length) { holder.innerHTML = `<div class="note">No students yet.</div>`; return; }
+        const quiz = c => c.status === "submitted" ? `<b>${fmtScore(c.score)}</b>${c.tries > 1 ? `<sup class="muted" title="best of ${c.tries}">×${c.tries}</sup>` : ""}${c.inProgress ? `<sup class="muted" title="retake in progress">*</sup>` : ""}` : c.status === "in_progress" ? `<span class="chip warn">${c.answered}/12</span>` : c.status === "reset" ? `<span class="chip">set aside</span>` : `<span class="muted">·</span>`;
+        const pre = c => c.pretest != null ? `<span class="muted small" title="Pretest">${c.pretest}%</span>` : c.pretestDone ? `<span class="muted small" title="Pretest done">done</span>` : `<span class="muted small">·</span>`;
+        const cell = c => !c ? `<span class="muted">·</span>` : `${pre(c)}<br>${c.excluded ? `<span class="chip" title="Left out of the grade">ex</span>` : quiz(c)}`;
+        holder.innerHTML = `
+          <div class="btn-row spread" style="margin:0 0 12px;">
+            <p class="muted small" style="margin:0; max-width:70ch;">Each cell: <b>pretest %</b> on top, <b>best Final Quiz score</b> out of ${g.max} below. ×2 means best of 2 attempts, * means a retake is in progress, a dot means not taken, <b>ex</b> means left out of the grade (Excused in Canvas). Click a cell to see that student's week.</p>
+            <div class="btn-row" style="margin:0;"><button class="btn small" id="gb-push" title="Send the Final Quiz scores for every week students can see that is already in Canvas">↗ Push all to Canvas</button>
+            <button class="btn secondary small" id="gb-csv">Download class data (CSV)</button></div>
+          </div>
+          <div id="gb-push-result">${T.lastPushAll[T.classId] ? pushAllSummaryHtml(T.lastPushAll[T.classId]) : ""}</div>
+          <div class="table-wrap">
+            <table class="grid gb">
+              <thead><tr><th>Student</th>${g.weeks.map(w => `<th title="${w.label}">W${w.id.slice(1)}${w.open ? `<br><span class="chip good" style="font-size:0.62rem; padding:1px 6px;">open</span>` : ""}</th>`).join("")}</tr></thead>
+              <tbody>${g.rows.map((r, i) => `<tr><td class="who"><b>${escapeHtml(r.name)}</b></td>${g.weeks.map(w => `<td>${r.cells[w.id] ? `<button class="cellbtn" data-r="${i}" data-w="${w.id}">${cell(r.cells[w.id])}</button>` : cell(null)}</td>`).join("")}</tr>`).join("")}</tbody>
+            </table>
+          </div>`;
+        el("gb-push").addEventListener("click", tPushAll);
+        el("gb-csv").addEventListener("click", () => backendCall("exportRootClassDataCsv", [{ classId: T.classId }]).then(r => triggerDownload(r.csv, r.filename, "text/csv")).catch(err => showToast(errText(err), 4500)));
+        holder.querySelectorAll(".cellbtn").forEach(b => b.addEventListener("click", () => { const r = g.rows[+b.dataset.r]; tStudentModal({ name: r.name, email: r.email }, b.dataset.w); }));
+      })
+      .catch(err => { holder.innerHTML = `<div class="note bad">${escapeHtml(errText(err))}</div>`; });
+  }
+
+  // ---------- Class & roster ----------
+  function tRenderRoster(holder) {
+    const c = cls();
+    holder.innerHTML = `
+      <div class="two-col">
+        <div class="panel">
+          <p class="kicker">Join code</p>
+          <div class="join-code">${escapeHtml(c.joinCode)}</div>
+          <p class="muted small">Students open the app, sign in with their school account, and type this code on the home page.</p>
+          <hr class="rule">
+          <form id="cls-form">
+            <label class="field"><span>Class name</span><input class="input" id="cls-name" value="${escapeHtml(c.className)}"></label>
+            <label class="field"><span>Period</span><input class="input" id="cls-period" value="${escapeHtml(c.period)}"></label>
+            <div class="btn-row spread"><button class="btn small" type="submit">Save</button>
+              <button class="btn ${c.active ? "danger" : "secondary"} small" type="button" id="cls-archive">${c.active ? "Archive class" : "Restore class"}</button></div>
+          </form>
+        </div>
+        <div class="panel">
+          <p class="kicker">Add students</p>
+          <p class="muted small" style="margin-top:0;">Paste school email addresses, separated by commas, spaces or new lines.</p>
+          <textarea class="input" id="add-emails" rows="5" placeholder="first.last@yourschool.org"></textarea>
+          <div class="btn-row" style="margin-top:10px;"><button class="btn small" id="add-btn">Add to class</button></div>
+        </div>
+      </div>
+      <div id="roster-list">${loading("Loading roster…")}</div>`;
+    el("cls-form").addEventListener("submit", e => {
+      e.preventDefault();
+      backendCall("updateRootClass", [{ classId: T.classId, className: el("cls-name").value, period: el("cls-period").value }])
+        .then(() => { showToast("Saved."); tLoadHome(T.classId); }).catch(err => showToast(errText(err), 4500));
+    });
+    el("cls-archive").addEventListener("click", () => {
+      const goingOff = c.active;
+      (goingOff ? askConfirm("Archive this class?", "Students can no longer join it or take quizzes through it. Their work and scores are kept, and you can restore the class later.", "Archive", true) : Promise.resolve(true))
+        .then(yes => { if (!yes) return; return backendCall("updateRootClass", [{ classId: T.classId, active: !goingOff }]).then(() => { showToast(goingOff ? "Class archived." : "Class restored."); tLoadHome(T.classId); }); })
+        .catch(err => showToast(errText(err), 4500));
+    });
+    el("add-btn").addEventListener("click", () => {
+      const v = el("add-emails").value; if (!v.trim()) return;
+      el("add-btn").disabled = true;
+      backendCall("addRootStudents", [{ classId: T.classId, emails: v }])
+        .then(r => { showToast(`Added ${r.added}${r.skipped ? ` (${r.skipped} already in the class)` : ""}.`); el("add-emails").value = ""; loadRoster(); c.students += r.added; const o = document.querySelector(`#t-class-select option[value="${c.classId}"]`); if (o) o.textContent = o.textContent.replace(/— \d+ students$/, "— " + c.students + " students"); })
+        .catch(err => showToast(errText(err), 4500)).then(() => { if (el("add-btn")) el("add-btn").disabled = false; });
+    });
+    loadRoster();
+  }
+  function loadRoster() {
+    backendCall("getRootRoster", [{ classId: T.classId }])
+      .then(r => {
+        const box = el("roster-list"); if (!box) return;
+        box.innerHTML = r.students.length ? `
+          <div class="table-wrap"><table class="grid">
+            <thead><tr><th>Student (${r.students.length})</th><th>Email</th><th></th></tr></thead>
+            <tbody>${r.students.map((s, i) => `<tr><td><b>${escapeHtml(s.name)}</b>${!s.named ? `<br><span class="chip warn" title="They type it the first time they sign in">hasn't signed in to enter their name</span>` : s.renamed ? `<br><span class="muted small">You renamed them. They typed: ${escapeHtml(s.firstName + " " + s.lastName)}</span>` : ""}</td><td class="muted">${escapeHtml(s.email)}</td>
+              <td class="acts">${s.renamed ? `<button class="btn quiet small" data-own="${i}">Use their name</button>` : ""}<button class="btn quiet small" data-rename="${i}">Rename</button><button class="btn quiet small" data-remove="${i}">Remove</button></td></tr>`).join("")}</tbody>
+          </table></div>` : `<div class="note">No students yet.</div>`;
+        box.querySelectorAll("[data-remove]").forEach(b => b.addEventListener("click", () => {
+          const s = r.students[+b.dataset.remove];
+          askConfirm("Remove " + s.name + "?", "They leave this class roster. Their sentences and quiz attempts are kept, and they can rejoin with the code.", "Remove", true)
+            .then(yes => { if (yes) backendCall("removeRootStudent", [{ classId: T.classId, studentEmail: s.email, studentName: s.name }]).then(() => { showToast("Removed."); loadRoster(); }).catch(err => showToast(errText(err), 4500)); });
+        }));
+        box.querySelectorAll("[data-own]").forEach(b => b.addEventListener("click", () => {
+          const s = r.students[+b.dataset.own];
+          backendCall("renameRootStudent", [{ classId: T.classId, studentEmail: s.email, clear: true }]).then(() => { showToast("Using the name " + s.firstName + " typed."); loadRoster(); }).catch(err => showToast(errText(err), 4500));
+        }));
+        box.querySelectorAll("[data-rename]").forEach(b => b.addEventListener("click", () => {
+          const s = r.students[+b.dataset.rename];
+          const m = openModal(`<div class="modal-head"><h3>Rename student</h3><button class="x-btn" data-close aria-label="Close">&times;</button></div>
+            <form id="rn-form"><label class="field"><span>Name shown to you (${escapeHtml(s.email)})</span><input class="input" id="rn-name" value="${escapeHtml(s.name)}"></label>
+            <div class="btn-row" style="justify-content:flex-end;"><button type="button" class="btn secondary" data-close>Cancel</button><button class="btn" type="submit">Save</button></div></form>`, { small: true });
+          m.querySelector("#rn-form").addEventListener("submit", e => { e.preventDefault(); backendCall("renameRootStudent", [{ classId: T.classId, studentEmail: s.email, name: el("rn-name").value }]).then(() => { closeModal(); loadRoster(); }).catch(err => showToast(errText(err), 4500)); });
+        }));
+      })
+      .catch(err => { const box = el("roster-list"); if (box) box.innerHTML = `<div class="note bad">${escapeHtml(errText(err))}</div>`; });
+  }
+
+  // ---------- Canvas ----------
+  function tRenderCanvas(holder) {
+    const c = cls(), cv = T.home.canvas || {};
+    holder.innerHTML = `
+      ${T.home.hubEnabled ? `<div class="note" style="margin-bottom:18px;">Pushes go through the <b>LMS Hub</b> (LMS_HUB_ENABLED is on). You still connect Canvas here so the app can list your courses.</div>` : ""}
+      <div class="two-col">
+        <div class="panel">
+          <p class="kicker">Step 1 · Your Canvas account</p>
+          <h3>${cv.connected ? "Connected" : "Connect Canvas"}</h3>
+          <p class="muted small">${cv.connected ? "Signed in to " + escapeHtml(cv.baseUrl) + ". Your token is stored privately for your account only." : "In Canvas: Account → Settings → New Access Token. Paste it here. It's stored for your account only, separate from other teachers."}</p>
+          <form id="cv-form">
+            <label class="field"><span>Canvas address</span><input class="input" id="cv-url" value="${escapeHtml(cv.baseUrl || "")}" placeholder="https://yourschool.instructure.com"></label>
+            <label class="field"><span>Access token${cv.connected ? " (leave blank to keep the current one)" : ""}</span><input class="input" id="cv-token" type="password" autocomplete="off"></label>
+            <div class="btn-row"><button class="btn small" type="submit" id="cv-save">${cv.connected ? "Update" : "Connect"}</button>
+              ${cv.connected ? `<button class="btn secondary small" type="button" id="cv-check">Test connection</button><button class="btn danger small" type="button" id="cv-clear">Disconnect</button>` : ""}</div>
+            <p class="small" id="cv-msg" style="margin:10px 0 0;"></p>
+          </form>
+        </div>
+        <div class="panel">
+          <p class="kicker">Step 2 · Link this class</p>
+          <h3>${c.canvas.courseId ? escapeHtml(c.canvas.courseName) : "Choose a course"}</h3>
+          <p class="muted small">${c.canvas.courseId ? "Each week's quiz becomes a 12-point assignment named “Root Word Study - Week N - Final Quiz”" + (c.canvas.assignmentGroupName ? " in “" + escapeHtml(c.canvas.assignmentGroupName) + "”" : "") + ". It's created the first time you push that week." : "Pick the Canvas course for " + escapeHtml(c.className) + ". Two sections can share one course; they share the assignment."}</p>
+          <div id="cv-link">${cv.connected ? `<button class="btn secondary small" id="cv-load-courses">${c.canvas.courseId ? "Change course" : "Show my courses"}</button>` : `<p class="muted small">Connect Canvas first.</p>`}
+          ${c.canvas.courseId ? `<button class="btn danger small" id="cv-unlink" style="margin-left:6px;">Unlink</button>` : ""}</div>
+        </div>
+      </div>`;
+    const msg = (t, bad) => { const m = el("cv-msg"); m.textContent = t; m.style.color = bad ? "var(--bad)" : "var(--good)"; };
+    el("cv-form").addEventListener("submit", e => {
+      e.preventDefault(); el("cv-save").disabled = true; msg("Checking with Canvas…");
+      backendCall("saveRootCanvasConnection", [{ baseUrl: el("cv-url").value, token: el("cv-token").value }])
+        .then(r => { T.home.canvas = r.canvas; showToast("Canvas connected" + (r.canvas.name ? " as " + r.canvas.name : "") + "."); tRenderCanvas(holder); })
+        .catch(err => { msg(errText(err), true); el("cv-save").disabled = false; });
+    });
+    if (el("cv-check")) el("cv-check").addEventListener("click", () => {
+      msg("Checking…");
+      backendCall("checkRootCanvasConnection", []).then(r => r.canvas.valid ? msg("Working. Signed in as " + r.canvas.name + ".") : msg(r.canvas.message || "Not working.", true)).catch(err => msg(errText(err), true));
+    });
+    if (el("cv-clear")) el("cv-clear").addEventListener("click", () => {
+      askConfirm("Disconnect Canvas?", "Your saved token is deleted. Class links stay, so you can reconnect later.", "Disconnect", true)
+        .then(yes => { if (yes) backendCall("clearRootCanvasConnection", []).then(r => { T.home.canvas = r.canvas; tRenderCanvas(holder); }); });
+    });
+    if (el("cv-unlink")) el("cv-unlink").addEventListener("click", () => {
+      askConfirm("Unlink this class from Canvas?", "Nothing is deleted in Canvas. The app forgets which assignments it made, so link the same course again before pushing.", "Unlink", true)
+        .then(yes => { if (yes) backendCall("unlinkRootCanvasCourse", [{ classId: T.classId }]).then(() => { showToast("Unlinked."); tLoadHome(T.classId); }); });
+    });
+    if (el("cv-load-courses")) el("cv-load-courses").addEventListener("click", () => {
+      el("cv-link").innerHTML = loading("Asking Canvas for your courses…");
+      backendCall("listRootCanvasCourses", [])
+        .then(r => {
+          el("cv-link").innerHTML = `
+            <label class="field"><span>Course</span><select class="input" id="cv-course"><option value="">Choose…</option>${r.courses.map(k => `<option value="${k.id}" ${k.id === c.canvas.courseId ? "selected" : ""}>${escapeHtml(k.name)}${k.term ? " · " + escapeHtml(k.term) : ""}</option>`).join("")}</select></label>
+            <label class="field"><span>Assignment group (optional)</span><select class="input" id="cv-group" disabled><option value="">Canvas default</option></select></label>
+            <button class="btn small" id="cv-link-btn" disabled>Link course</button>`;
+          const loadGroups = () => {
+            const id = el("cv-course").value; el("cv-link-btn").disabled = !id; el("cv-group").disabled = true;
+            if (!id) return;
+            backendCall("listRootCanvasAssignmentGroups", [{ courseId: id }]).then(g => {
+              el("cv-group").innerHTML = `<option value="">Canvas default</option>` + g.groups.map(x => `<option value="${x.id}" ${x.id === c.canvas.assignmentGroupId ? "selected" : ""}>${escapeHtml(x.name)}</option>`).join("");
+              el("cv-group").disabled = false;
+            }).catch(err => showToast(errText(err), 4500));
+          };
+          el("cv-course").addEventListener("change", loadGroups);
+          if (el("cv-course").value) loadGroups();
+          el("cv-link-btn").addEventListener("click", () => {
+            el("cv-link-btn").disabled = true;
+            backendCall("linkRootCanvasCourse", [{ classId: T.classId, courseId: el("cv-course").value, assignmentGroupId: el("cv-group").value }])
+              .then(() => { showToast("Linked to Canvas."); tLoadHome(T.classId); })
+              .catch(err => { showToast(errText(err), 4500); el("cv-link-btn").disabled = false; });
+          });
+        })
+        .catch(err => { el("cv-link").innerHTML = `<div class="note bad">${escapeHtml(errText(err))}</div>`; });
+    });
+  }
+
+  // ---------- Teacher access (admin) ----------
+  function tRenderAccess(holder) {
+    holder.innerHTML = loading("Loading access list…");
+    backendCall("adminListRootAccess", [])
+      .then(r => {
+        holder.innerHTML = `
+          <div class="panel">
+            <p class="kicker">Teacher access</p>
+            <p class="muted small" style="margin-top:0;">Teachers create and manage their own classes. Admins can see every class and change this list. Everyone else who signs in is a student.</p>
+            <form class="inline-form" id="acc-form" style="margin:14px 0 20px;">
+              <input class="input" id="acc-email" placeholder="teacher@yourschool.org" required>
+              <input class="input" id="acc-name" placeholder="Name (optional)">
+              <select class="input" id="acc-role" style="max-width:150px;"><option value="teacher">Teacher</option><option value="admin">Admin</option></select>
+              <button class="btn small" type="submit">Add or update</button>
+            </form>
+            <div class="table-wrap"><table class="grid">
+              <thead><tr><th>Name</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr></thead>
+              <tbody>${r.access.map((u, i) => `<tr><td><b>${escapeHtml(u.name)}</b></td><td class="muted">${escapeHtml(u.email)}</td><td>${escapeHtml(u.role)}</td>
+                <td>${u.status === "active" ? `<span class="chip good">active</span>` : `<span class="chip">inactive</span>`}</td>
+                <td class="acts">${u.email === state.email ? `<span class="muted small">you</span>` : `<button class="btn quiet small" data-toggle="${i}">${u.status === "active" ? "Deactivate" : "Reactivate"}</button>`}</td></tr>`).join("")}</tbody>
+            </table></div>
+          </div>`;
+        el("acc-form").addEventListener("submit", e => {
+          e.preventDefault();
+          backendCall("adminSetRootAccess", [{ email: el("acc-email").value, name: el("acc-name").value, role: el("acc-role").value, status: "active" }])
+            .then(() => { showToast("Saved."); tRenderAccess(holder); }).catch(err => showToast(errText(err), 4500));
+        });
+        holder.querySelectorAll("[data-toggle]").forEach(b => b.addEventListener("click", () => {
+          const u = r.access[+b.dataset.toggle];
+          backendCall("adminSetRootAccess", [{ email: u.email, name: u.name, role: u.role, status: u.status === "active" ? "inactive" : "active" }])
+            .then(() => tRenderAccess(holder)).catch(err => showToast(errText(err), 4500));
+        }));
+      })
+      .catch(err => { holder.innerHTML = `<div class="note bad">${escapeHtml(errText(err))}</div>`; });
+  }
+
+  window.RW_start();
+})();
+</script>
+</body>
+</html>

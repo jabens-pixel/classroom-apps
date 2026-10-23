@@ -1,0 +1,616 @@
+<!-- ======================================================================
+     Literature Circles — Pictures in the Reader's Journal (2026-10-20d)
+     Rides along after BackendClient (LC_INCLUDE_WITH in Code.js).
+
+     Students add pictures to their journal three ways: upload a file (a saved
+     internet picture, or a photo of a paper drawing), paste a copied picture
+     into the journal, or draw one in the app. The picture goes INTO the writing,
+     below the line the cursor is on. Each picture has a caption and, unless it
+     is a drawing, a "Where it's from" line (optional, with a reminder), edited
+     in a small box. ↑ / ↓ move a picture a line up or down; ✕ (or backspacing
+     over it) removes it; Ctrl+Z brings it back.
+
+     How it is stored: the picture file is shrunk in the browser (max 1600 px)
+     and saved in the teacher's Drive by saveJournalImage. The writing holds only
+     an empty marker, <div data-jp="file id">, where the picture sits; the
+     caption / source / kind live in data.journalImages (same order as the
+     markers). Both save the usual way (draft, stale check, backups). The marker
+     has no text, so word counts, the checklist, highlights and paste stats
+     ignore pictures. On screen the marker is drawn through a shadow root, which
+     is never saved and never counted as writing.
+
+     Safety: a picture is dropped from journalImages only when its marker is
+     removed while the student is editing; when the page opens, any picture in
+     the list that has no marker (older saves, an older tab) is put back at the
+     end of the journal. A picture that hasn't reached Drive yet is kept on this
+     device and can be retried. Teachers see the pictures in place on the
+     marking screen. A teacher viewing a real student can't add, move or remove.
+     ====================================================================== -->
+<style id="lcJpStyles">
+.lc-jp{margin:14px 0 4px;padding:12px 16px;border:1.5px dashed #8C8C88;background:#FAFAF8}
+.lc-jp.is-drop{border-color:#111;background:#F2FBC9}
+.lc-jp-head strong{display:block;font-size:17px}
+.lc-jp-head span{display:block;margin-top:2px;font-size:13.5px;color:#454545}
+.lc-jp-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 10px;margin-top:10px}
+.lc-jp-actions button{width:auto;margin:0}
+.lc-jp-hint{font-size:13px;color:#555}
+.lc-jp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px;margin-top:12px}
+.lc-jp-card{margin:0;padding:10px;background:#fff;border:1px solid #D6D6D0;display:flex;flex-direction:column;gap:6px}
+.lc-jp-img{display:flex;align-items:center;justify-content:center;min-height:120px;max-height:240px;background:#EEEEEA;overflow:hidden}
+.lc-jp-img img{display:block;max-width:100%;max-height:240px;object-fit:contain;cursor:zoom-in}
+.lc-jp-img .lc-jp-wait{font-size:13px;color:#555;padding:20px;text-align:center}
+.lc-jp-kind{font-size:12px;color:#555}
+.lc-jp-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.lc-jp-row button{width:auto;margin:0;padding:4px 10px!important;min-height:0!important;font-size:13px!important}
+.lc-jp-err{color:#B0281F;font-size:13px}
+.lc-jp-view{position:fixed;inset:0;z-index:1400;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:24px;cursor:zoom-out}
+.lc-jp-view img{max-width:100%;max-height:100%;background:#fff}
+/* a picture inside the writing (the look itself is in the shadow root) */
+#journalText .lc-jp-in{display:block;margin:12px 0}
+#journalText .lc-jp-in:focus{outline:none}
+/* caption box */
+.lc-jp-ed{position:fixed;inset:0;z-index:1400;background:rgba(10,8,6,.6);display:flex;align-items:center;justify-content:center;padding:16px}
+.lc-jp-edbox{background:#fff;width:min(560px,100%);max-height:100%;overflow:auto;display:flex;flex-direction:column;gap:8px;padding:16px 18px}
+.lc-jp-edbox strong{font-size:18px}
+.lc-jp-edbox .lc-jp-thumb{display:flex;justify-content:center;background:#EEEEEA}
+.lc-jp-edbox .lc-jp-thumb img{max-width:100%;max-height:200px;display:block}
+.lc-jp-edbox label{margin:4px 0 0;font-size:13.5px}
+.lc-jp-edbox input{width:100%;margin:0;padding:8px 10px;font-size:15px}
+.lc-jp-warn{margin:0;font-size:12.5px;color:#7A4300}
+.lc-jp-edfoot{display:flex;justify-content:flex-end;gap:8px;margin-top:4px}
+.lc-jp-edfoot button{width:auto;margin:0}
+/* drawing pad */
+.lc-jp-pad{position:fixed;inset:0;z-index:1400;background:rgba(10,8,6,.78);display:flex;align-items:center;justify-content:center;padding:16px}
+.lc-jp-padbox{background:#fff;width:min(1040px,100%);max-height:100%;display:flex;flex-direction:column;gap:10px;padding:14px}
+.lc-jp-padtop{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.lc-jp-padtop strong{font-size:18px}
+.lc-jp-tools{display:flex;flex-wrap:wrap;align-items:center;gap:6px}
+.lc-jp-tools button{width:auto;margin:0;min-height:34px!important;padding:4px 10px!important;font-size:13.5px!important}
+.lc-jp-tools button[aria-pressed="true"]{outline:3px solid #E9FE5F;outline-offset:1px}
+.lc-jp-sw{width:30px!important;min-width:30px;height:30px;padding:0!important;border:2px solid #fff!important;box-shadow:0 0 0 1px #888}
+.lc-jp-canvas{width:100%;aspect-ratio:10/7;max-height:calc(100vh - 190px);background:#fff;border:1.5px solid #111;touch-action:none;cursor:crosshair}
+.lc-jp-padfoot{display:flex;justify-content:flex-end;gap:8px}
+.lc-jp-padfoot button{width:auto;margin:0}
+/* teacher view */
+.lch .lc-jp-t{margin-top:10px}
+.lch .lc-jp-t h5{margin:0 0 6px}
+.lch .lc-jp-t figcaption,.lch .lc-jp-fig figcaption{font-size:13.5px;color:#111}
+.lch .lc-jp-t figcaption small,.lch .lc-jp-fig figcaption small{display:block;color:#555;margin-top:2px;word-break:break-word}
+.lch .lc-jp-fig{display:inline-flex;flex-direction:column;gap:6px;max-width:min(100%,460px);margin:10px 0;padding:8px;background:#fff;border:1px solid #D6D6D0}
+.lch .lc-jp-fig .lc-jp-img{max-height:300px}
+.lch .lc-jp-fig .lc-jp-img img{max-height:300px}
+</style>
+<script>
+window.__MB = window.__MB || {};
+window.__MB.JournalPictures = 'loading';
+(function () {
+  'use strict';
+  var W = window;
+  if (W.LC_JPICS) { W.__MB.JournalPictures = 'ok'; return; }
+  if (typeof W.render !== 'function' || typeof W.callServer !== 'function') { W.__MB.JournalPictures = 'error: Index.html did not load first'; return; }
+  var JP = W.LC_JPICS = { cache: {}, loading: {}, pending: [], gone: {}, range: null, maxImages: 8, maxSide: 1600 };
+  var ID_RE = /^[A-Za-z0-9_-]{6,128}$/;
+
+  function me() { return String((W.state && W.state.email) || '').toLowerCase(); }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function $(id) { return document.getElementById(id); }
+  function each(list, fn) { Array.prototype.forEach.call(list || [], fn); }
+  function isPreview() {
+    var b = (W.platform && W.platform.bootstrap) || {};
+    return (b.role === 'teacher' || b.role === 'admin') && !!me() && me() !== String(b.email || '').toLowerCase() && !/@demo\.litcircles\.local$/i.test(me());
+  }
+  /** The week whose journal workspace is on screen, or 0. */
+  function journalWeek() {
+    try {
+      if (!W.platform || W.platform.mode !== 'student' || !W.state || W.state.view !== 'week_strategies') return 0;
+      var wk = Number(W.state.week) || 0; if (!wk || W.prepFlowStage(wk) !== 'workspace') return 0;
+      if (W.prepDraftForWeek(wk).prepType !== 'journal' || !$('journalText')) return 0;
+      return wk;
+    } catch (e) { return 0; }
+  }
+  function list(wk) { var d = W.prepDraftForWeek(wk); d.data = d.data || {}; if (!Array.isArray(d.data.journalImages)) d.data.journalImages = []; return d.data.journalImages; }
+  function changed(wk) { if (!isPreview() && typeof W.scheduleFocusedAutosave === 'function') W.scheduleFocusedAutosave(wk); }
+  function toast(msg, bad) { try { var t = document.createElement('div'); t.className = 'msg ' + (bad ? 'error' : 'info'); t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1500;max-width:520px'; t.textContent = msg; document.body.appendChild(t); setTimeout(function () { t.remove(); }, bad ? 7000 : 3500); } catch (e) {} }
+  function sourceLine(p, who) {
+    if (p.kind === 'drawing') return '✎ ' + (who === 'teacher' ? 'Student’s drawing' : 'My drawing');
+    return String(p.source || '').trim() ? 'From: ' + p.source : '';
+  }
+  /** Any picture this page knows about (all weeks, plus ones removed this visit). */
+  function findPic(id) {
+    var dr = W.draft || {}, hit = null;
+    Object.keys(dr).forEach(function (k) { var L = dr[k] && dr[k].data && dr[k].data.journalImages; if (!hit && Array.isArray(L)) L.forEach(function (p) { if (!hit && p && p.id === id) hit = p; }); });
+    return hit || JP.gone[id] || null;
+  }
+
+  // ------------------------------------------------------------------ pictures from the server
+  function srcFor(id, done) {
+    if (JP.cache[id]) return done(JP.cache[id]);
+    (JP.loading[id] = JP.loading[id] || []).push(done);
+    if (JP.loading[id].length > 1) return;
+    W.callServer('getJournalImage', [id], function (r) {
+      var url = r && r.data ? 'data:' + (r.mime || 'image/jpeg') + ';base64,' + r.data : '';
+      if (url) JP.cache[id] = url;
+      var cbs = JP.loading[id] || []; delete JP.loading[id]; cbs.forEach(function (cb) { cb(url); });
+    }, function () { var cbs = JP.loading[id] || []; delete JP.loading[id]; cbs.forEach(function (cb) { cb(''); }); }, { quiet: true });
+  }
+  function fillImages(root) {
+    each((root || document).querySelectorAll('[data-jp-img]:not([data-jp-done])'), function (box) {
+      box.setAttribute('data-jp-done', '1');
+      var id = box.getAttribute('data-jp-img');
+      srcFor(id, function (url) {
+        if (!url) { box.innerHTML = '<span class="lc-jp-wait">Couldn’t load this picture. Reload the page to try again.</span>'; return; }
+        box.innerHTML = '<img alt="' + esc(box.getAttribute('data-jp-alt') || 'Journal picture') + '" src="' + url + '">';
+      });
+    });
+  }
+  function zoom(src) { var v = document.createElement('div'); v.className = 'lc-jp-view'; v.innerHTML = '<img alt="" src="' + src + '">'; v.addEventListener('click', function () { v.remove(); }); document.body.appendChild(v); }
+  document.addEventListener('click', function (e) {
+    var img = e.target && e.target.closest && e.target.closest('.lc-jp-img img'); if (img) zoom(img.src);
+  });
+
+  // ------------------------------------------------------------------ pictures inside the writing
+  function isMarker(n) { return !!(n && n.nodeType === 1 && n.hasAttribute('data-jp')); }
+  function isBlock(n) { return !!(n && n.nodeType === 1 && (n.tagName === 'DIV' || n.tagName === 'P')); }
+  function topLevel(node, ed) { while (node && node.parentNode !== ed) node = node.parentNode; return node; }
+  /** The editor's lines: a block element, or a run of inline nodes up to and including a <br>. */
+  function units(ed) {
+    var out = [], run = null;
+    each(ed.childNodes, function (n) {
+      if (isBlock(n)) { if (run) { out.push(run); run = null; } out.push([n, n]); return; }
+      if (!run) run = [n, n]; else run[1] = n;
+      if (n.nodeName === 'BR') { out.push(run); run = null; }
+    });
+    if (run) out.push(run);
+    return out;
+  }
+  function unitVisible(u) {
+    for (var n = u[0]; n; n = n.nextSibling) {
+      if (isMarker(n) || (n.nodeType === 1 && n.querySelector && n.querySelector('[data-jp]'))) return true;
+      if (String(n.textContent || '').replace(/​/g, '').trim()) return true;
+      if (n === u[1]) break;
+    }
+    return false;
+  }
+  function blankLine() { var d = document.createElement('div'); d.appendChild(document.createElement('br')); d.__jpBlank = true; return d; }
+  /** The empty line the page added under a picture goes with it when it moves (if still empty). */
+  function takeBlank(m) { var n = m.nextSibling; if (n && n.__jpBlank && !String(n.textContent || '').replace(/\u200b/g, '').trim() && !n.querySelector('[data-jp],img')) n.remove(); }
+  /** Always leave a line to type on below a picture. */
+  function lineAfter(m) { var n = m.nextSibling; while (n && n.nodeType === 3 && !n.nodeValue.trim()) n = n.nextSibling; if (!n || isMarker(n)) m.parentNode.insertBefore(blankLine(), m.nextSibling); }
+  /** A picture that ended up inside a line (Enter, a highlight) goes back between lines. */
+  function hoist(ed) {
+    each(ed.querySelectorAll('[data-jp]'), function (m) {
+      if (m.parentNode === ed) return;
+      var t = topLevel(m, ed); if (!t) return;
+      var before = true;
+      for (var n = t.firstChild; n && n !== m; n = n.nextSibling) if (!(n.contains && n.contains(m)) && String(n.textContent || '').trim()) { before = false; break; }
+      ed.insertBefore(m, before ? t : t.nextSibling);
+    });
+  }
+  function makeMarker(id) { var m = document.createElement('div'); m.setAttribute('data-jp', id); return m; }
+  /** Put a picture below the line the cursor is on (or at the end). */
+  function insertMarker(ed, id) {
+    var m = makeMarker(id), r = JP.range && JP.range.ed === ed && ed.contains(JP.range.r.startContainer) ? JP.range.r : null, after = null, atStart = false;
+    if (r) {
+      var c = r.startContainer;
+      if (c === ed) { if (r.startOffset > 0) after = ed.childNodes[r.startOffset - 1]; else atStart = true; }
+      else after = topLevel(c, ed);
+      if (after && !isBlock(after)) { while (after.nodeName !== 'BR' && after.nextSibling && !isBlock(after.nextSibling)) after = after.nextSibling; }
+    }
+    if (after) ed.insertBefore(m, after.nextSibling);
+    else if (atStart) ed.insertBefore(m, ed.firstChild);
+    else { var last = ed.lastChild; while (last && last.nodeType === 3 && !last.nodeValue.trim()) last = last.previousSibling; if (last && isBlock(last) && !unitVisible([last, last]) && last.previousSibling) ed.insertBefore(m, last); else ed.appendChild(m); }
+    lineAfter(m);
+    JP.range = null;
+    return m;
+  }
+  function move(ed, m, dir) {
+    hoist(ed);
+    var us = units(ed), i = -1;
+    us.forEach(function (u, k) { if (u[0] === m) i = k; });
+    if (i < 0) return false;
+    for (var j = i + dir; j >= 0 && j < us.length; j += dir) {
+      if (!unitVisible(us[j])) continue;
+      takeBlank(m);
+      if (dir < 0) ed.insertBefore(m, us[j][0]); else ed.insertBefore(m, us[j][1].nextSibling);
+      lineAfter(m);
+      return true;
+    }
+    return false;
+  }
+
+  var CARD_CSS = ':host{display:block;margin:12px 0;user-select:none;-webkit-user-select:none}' +
+    '.f{display:inline-flex;flex-direction:column;gap:6px;max-width:min(100%,560px);margin:0;padding:8px;background:#fff;border:1px solid #CFCFC8;box-shadow:0 1px 0 rgba(0,0,0,.04);font-size:15px;line-height:1.4;color:#111}' +
+    '.im{display:flex;align-items:center;justify-content:center;min-height:110px;min-width:200px;background:#EEEEEA}' +
+    '.im img{display:block;max-width:100%;max-height:340px;cursor:zoom-in}' +
+    '.wait{font-size:13px;color:#555;padding:18px;text-align:center}' +
+    '.cap{cursor:pointer}.cap.empty{color:#7A4300;font-style:italic}' +
+    '.src{font-size:13px;color:#555;word-break:break-word;cursor:pointer}.src.warn{color:#7A4300}' +
+    '.tools{display:flex;flex-wrap:wrap;gap:6px;margin-top:2px}' +
+    'button{font:inherit;font-size:13px;line-height:1.2;padding:4px 10px;border:1.5px solid #111;background:#fff;color:#111;cursor:pointer;border-radius:0}' +
+    'button:hover{background:#E9FE5F}button:disabled{opacity:.35;cursor:default;background:#fff}' +
+    'button.x{margin-left:auto;border-color:#B0281F;color:#B0281F}';
+  /** Draw (or redraw) one picture inside the writing. */
+  function paint(m) {
+    var id = m.getAttribute('data-jp'), p = findPic(id) || { id: id, caption: '', source: '', kind: 'upload' }, ro = isPreview();
+    var root = m.shadowRoot;
+    if (!root) { try { root = m.attachShadow({ mode: 'open' }); } catch (e) { return; } wire(root, m); }
+    var src = sourceLine(p), url = JP.cache[id];
+    root.innerHTML = '<style>' + CARD_CSS + '</style><figure class="f">' +
+      '<div class="im">' + (url ? '<img alt="' + esc(p.caption || 'Journal picture') + '" src="' + url + '">' : '<span class="wait">Loading picture…</span>') + '</div>' +
+      '<div class="cap' + (p.caption ? '' : ' empty') + '" data-a="edit">' + (p.caption ? esc(p.caption) : (ro ? 'No caption' : 'Add a caption: what it shows and why you added it')) + '</div>' +
+      (src ? '<div class="src" data-a="edit">' + esc(src) + '</div>' : (p.kind === 'drawing' ? '' : '<div class="src warn" data-a="edit">' + (ro ? 'Source not given' : 'Add where this picture came from (a website name or link).') + '</div>')) +
+      (ro ? '' : '<div class="tools"><button type="button" data-a="up" title="Move the picture up a line">↑ Up</button>' +
+        '<button type="button" data-a="down" title="Move the picture down a line">↓ Down</button>' +
+        '<button type="button" data-a="edit">✎ Caption' + (p.kind === 'drawing' ? '' : ' &amp; source') + '</button>' +
+        '<button type="button" class="x" data-a="remove" title="Remove this picture">✕ Remove</button></div>') +
+      '</figure>';
+    if (!url) srcFor(id, function (u) { if (u && m.shadowRoot) paint(m); else if (!u && m.shadowRoot) { var w = m.shadowRoot.querySelector('.wait'); if (w) w.textContent = 'Couldn’t load this picture. Reload the page to try again.'; } });
+  }
+  function wire(root, m) {
+    // keep the student's place in the writing: buttons don't take the cursor
+    root.addEventListener('mousedown', function (e) { if (e.target.closest && e.target.closest('button,[data-a]')) e.preventDefault(); });
+    root.addEventListener('click', function (e) {
+      var img = e.target.closest && e.target.closest('img'); if (img) { zoom(img.src); return; }
+      var b = e.target.closest && e.target.closest('[data-a]'); if (!b || b.disabled) return;
+      var wk = journalWeek(), ed = $('journalText'); if (!wk || !ed || !ed.contains(m) || isPreview()) return;
+      var a = b.getAttribute('data-a');
+      if (a === 'up' || a === 'down') { if (move(ed, m, a === 'up' ? -1 : 1)) { changed(wk); try { m.scrollIntoView({ block: 'nearest' }); } catch (err) {} } else toast(a === 'up' ? 'The picture is already at the top.' : 'The picture is already at the bottom.'); }
+      else if (a === 'edit') openCaption(wk, m.getAttribute('data-jp'));
+      else if (a === 'remove') removePic(ed, m, wk);
+    });
+  }
+  // ---- removing: ✕, or Backspace at the start of the line below (Delete at the end of the line above).
+  // Chrome won't delete an uneditable block on its own, so the page does it, and keeps one step of undo.
+  function notice(msg, label, fn) {
+    var old = document.querySelector('.lc-jp-undo'); if (old) old.remove();
+    var t = document.createElement('div'); t.className = 'msg info lc-jp-undo'; t.setAttribute('role', 'status');
+    t.style.cssText = 'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:1500;max-width:520px;display:flex;gap:12px;align-items:center';
+    t.innerHTML = '<span>' + esc(msg) + '</span><button type="button" class="secondary" style="width:auto;margin:0;padding:4px 12px;min-height:0">' + esc(label) + '</button>';
+    t.querySelector('button').addEventListener('mousedown', function (e) { e.preventDefault(); });
+    t.querySelector('button').addEventListener('click', function () { t.remove(); fn(); });
+    document.body.appendChild(t); setTimeout(function () { if (t.parentNode) t.remove(); }, 9000);
+  }
+  function removePic(ed, m, wk) {
+    JP.undo = { ed: ed, id: m.getAttribute('data-jp'), next: m.nextSibling, prev: m.previousSibling };
+    m.remove(); sync(ed, wk); changed(wk);
+    notice('Picture removed.', 'Put it back', putBack);
+  }
+  function putBack() {
+    var u = JP.undo, ed = $('journalText'), wk = journalWeek(); JP.undo = null;
+    var x = document.querySelector('.lc-jp-undo'); if (x) x.remove();
+    if (!u || u.ed !== ed || !wk || ed.querySelector('[data-jp="' + u.id + '"]')) return;
+    var m = makeMarker(u.id);
+    if (u.next && u.next.parentNode === ed) ed.insertBefore(m, u.next);
+    else if (u.prev && u.prev.parentNode === ed) ed.insertBefore(m, u.prev.nextSibling);
+    else ed.appendChild(m);
+    lineAfter(m); sync(ed, wk); changed(wk);
+  }
+  function blankText(n) { return !!n && n.nodeType === 3 && !n.nodeValue.replace(/​/g, '').trim(); }
+  function sib(n, dir) { n = dir < 0 ? n.previousSibling : n.nextSibling; while (blankText(n)) n = dir < 0 ? n.previousSibling : n.nextSibling; return n; }
+  /** The line (first and last top-level node) the caret is in. */
+  function lineOf(ed, top) {
+    if (isBlock(top) || isMarker(top)) return [top, top];
+    var a = top, z = top;
+    while (a.previousSibling && !isBlock(a.previousSibling) && a.previousSibling.nodeName !== 'BR') a = a.previousSibling;
+    while (z.nodeName !== 'BR' && z.nextSibling && !isBlock(z.nextSibling)) z = z.nextSibling;
+    return [a, z];
+  }
+  function emptyBetween(r) { return !r.toString().replace(/[\s​]/g, ''); }
+  document.addEventListener('keydown', function (e) {
+    var ed = $('journalText'); if (!ed || !ed.__jpObs || !e.target || !(e.target === ed || ed.contains(e.target))) return;
+    var wk = journalWeek(); if (!wk || isPreview()) return;
+    if ((e.ctrlKey || e.metaKey) && !e.shiftKey && (e.key === 'z' || e.key === 'Z') && JP.undo && JP.undo.ed === ed) { e.preventDefault(); e.stopPropagation(); putBack(); return; }
+    if (e.key !== 'Backspace' && e.key !== 'Delete') return;
+    var s = W.getSelection(); if (!s || !s.rangeCount || !s.isCollapsed) return;
+    var r = s.getRangeAt(0), c = r.startContainer, m = null; if (!ed.contains(c)) return;
+    if (c === ed) {
+      var before = ed.childNodes[r.startOffset - 1], after = ed.childNodes[r.startOffset];
+      while (blankText(before)) before = before.previousSibling; while (blankText(after)) after = after.nextSibling;
+      m = e.key === 'Backspace' ? (isMarker(before) ? before : null) : (isMarker(after) ? after : null);
+      if (!m) { var t0 = e.key === 'Backspace' ? after : before; if (t0) { var ln0 = lineOf(ed, t0), n0 = e.key === 'Backspace' ? sib(ln0[0], -1) : sib(ln0[1], 1); if (isMarker(n0) && (e.key === 'Backspace' ? t0 === ln0[0] : t0 === ln0[1])) m = n0; } }
+    } else {
+      var ln = lineOf(ed, topLevel(c, ed)), q = document.createRange();
+      if (e.key === 'Backspace') { q.setStartBefore(ln[0]); q.setEnd(c, r.startOffset); if (emptyBetween(q)) { var pv = sib(ln[0], -1); if (isMarker(pv)) m = pv; } }
+      else { q.setStart(c, r.startOffset); q.setEndAfter(ln[1]); if (emptyBetween(q)) { var nx = sib(ln[1], 1); if (isMarker(nx)) m = nx; } }
+    }
+    if (!m) return;
+    e.preventDefault(); e.stopPropagation();
+    removePic(ed, m, wk);
+  }, true);
+  // typing after a removal: the browser's own undo takes over again
+  document.addEventListener('input', function (e) { var ed = $('journalText'); if (JP.undo && ed && e.target && (e.target === ed || ed.contains(e.target))) JP.undo = null; }, true);
+
+  /** Something in the writing changed: draw new pictures, and keep journalImages matching the markers. */
+  function sync(ed, wk) {
+    if (ed !== $('journalText') || journalWeek() !== wk) return;
+    var ids = [], seen = {};
+    each(ed.querySelectorAll('[data-jp]'), function (m) {
+      var id = m.getAttribute('data-jp');
+      if (!ID_RE.test(id || '')) { m.removeAttribute('data-jp'); return; }
+      if (seen[id]) { m.remove(); return; } // a copy (e.g. drag) — one place per picture
+      seen[id] = 1; ids.push(id);
+    });
+    var pics = list(wk), by = {};
+    pics.forEach(function (p) { if (p && p.id) by[p.id] = p; });
+    var next = ids.map(function (id) { return by[id] || JP.gone[id] || { id: id, kind: 'upload', caption: '', source: '' }; });
+    var same = next.length === pics.length && next.every(function (p, i) { return p === pics[i]; });
+    if (!same) {
+      pics.forEach(function (p) { if (p && p.id && !seen[p.id]) JP.gone[p.id] = p; });
+      pics.length = 0; next.forEach(function (p) { pics.push(p); delete JP.gone[p.id]; });
+      changed(wk);
+    }
+    each(ed.querySelectorAll('[data-jp]'), function (m) {
+      if (m.getAttribute('contenteditable') !== 'false') m.setAttribute('contenteditable', 'false');
+      if (!m.classList.contains('lc-jp-in')) m.classList.add('lc-jp-in');
+      if (!m.shadowRoot) paint(m);
+    });
+    if (!same) refreshPanel(wk);
+  }
+  /** After each render: pictures in the list but not in the writing go at the end; then watch the editor. */
+  function mountEditor(wk) {
+    var ed = $('journalText'); if (!ed) return;
+    if (ed.__jpObs && ed.__jpWk === wk) return;
+    ed.__jpWk = wk;
+    var have = {}, added = 0;
+    each(ed.querySelectorAll('[data-jp]'), function (m) { have[m.getAttribute('data-jp')] = 1; });
+    list(wk).forEach(function (p) { if (p && p.id && ID_RE.test(p.id) && !have[p.id]) { var m = makeMarker(p.id); ed.appendChild(m); lineAfter(m); have[p.id] = 1; added++; } });
+    sync(ed, wk);
+    if (added) changed(wk);
+    try { var mo = new MutationObserver(function () { sync(ed, wk); }); mo.observe(ed, { childList: true, subtree: true }); ed.__jpObs = mo; } catch (e) {}
+  }
+  // where the cursor was in the journal (buttons and dialogs take the focus away)
+  document.addEventListener('selectionchange', function () {
+    var ed = $('journalText'), s = W.getSelection && W.getSelection(); if (!ed || !s || !s.rangeCount) return;
+    var r = s.getRangeAt(0); if (ed.contains(r.startContainer)) JP.range = { ed: ed, r: r.cloneRange() };
+  });
+
+  // ------------------------------------------------------------------ caption & source box
+  function openCaption(wk, id) {
+    var p = null; list(wk).forEach(function (x) { if (x.id === id) p = x; }); if (!p) return;
+    var old = document.querySelector('.lc-jp-ed'); if (old) old.remove();
+    var drawn = p.kind === 'drawing', wrap = document.createElement('div');
+    wrap.className = 'lc-jp-ed'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Picture caption');
+    wrap.innerHTML = '<div class="lc-jp-edbox"><strong>' + (drawn ? 'Your drawing' : 'Your picture') + '</strong>' +
+      (JP.cache[id] ? '<div class="lc-jp-thumb"><img alt="" src="' + JP.cache[id] + '"></div>' : '') +
+      '<label for="lcJpCap">What it shows — and why you added it</label><input type="text" id="lcJpCap" class="lc-jp-cap" maxlength="300" value="' + esc(p.caption || '') + '">' +
+      (drawn ? '' : '<label for="lcJpSrc">Where it’s from</label><input type="text" id="lcJpSrc" class="lc-jp-src" data-paste-ok="1" maxlength="500" placeholder="Website name or link" value="' + esc(p.source || '') + '">' +
+        '<p class="lc-jp-warn"' + (String(p.source || '').trim() ? ' hidden' : '') + '>Add where this picture came from (a website name or link).</p>') +
+      '<div class="lc-jp-edfoot"><button type="button" data-ja="done">Done</button></div></div>';
+    document.body.appendChild(wrap);
+    function repaint() { var ed = $('journalText'); if (!ed) return; each(ed.querySelectorAll('[data-jp]'), function (m) { if (m.getAttribute('data-jp') === id) paint(m); }); }
+    function close() { wrap.remove(); document.removeEventListener('keydown', onKey, true); }
+    function onKey(e) { if (e.key === 'Escape' || (e.key === 'Enter' && e.target && e.target.tagName === 'INPUT')) { e.preventDefault(); e.stopPropagation(); close(); } }
+    document.addEventListener('keydown', onKey, true);
+    wrap.addEventListener('input', function (e) {
+      var el = e.target; if (!el || isPreview()) return;
+      if (el.id === 'lcJpCap') p.caption = el.value.slice(0, 300);
+      else if (el.id === 'lcJpSrc') { p.source = el.value.slice(0, 500); var w = wrap.querySelector('.lc-jp-warn'); if (w) w.hidden = !!el.value.trim(); }
+      else return;
+      repaint(); changed(wk);
+    });
+    wrap.addEventListener('click', function (e) { if (e.target === wrap || (e.target.closest && e.target.closest('[data-ja="done"]'))) close(); });
+    var f = wrap.querySelector('#lcJpCap'); if (f) setTimeout(function () { try { f.focus(); } catch (e) {} }, 0);
+  }
+  JP.openCaption = openCaption;
+
+  // ------------------------------------------------------------------ the buttons under the journal
+  function pendingHtml(q) {
+    return '<figure class="lc-jp-card"><div class="lc-jp-img">' + (q.preview ? '<img alt="" src="' + q.preview + '">' : '') + '</div>' +
+      (q.error ? '<p class="lc-jp-err">Not saved yet: ' + esc(q.error) + '</p><div class="lc-jp-row"><button type="button" data-jp="retry" data-jp-q="' + q.key + '">Try again</button><button type="button" class="secondary" data-jp="discard" data-jp-q="' + q.key + '">Discard</button></div>'
+        : '<p class="lc-jp-kind">Saving picture…</p>') + '</figure>';
+  }
+  function panelHtml(wk) {
+    var pics = list(wk), q = JP.pending.filter(function (x) { return x.email === me() && x.wk === wk; }), full = pics.length + q.length >= JP.maxImages;
+    return '<div class="lc-jp-head"><strong>Pictures</strong><span>Add a picture from the internet or one you drew. It goes into your journal below the line your cursor is on. Say what it shows and why it matters to your reading.</span></div>' +
+      (isPreview() ? '<p class="lc-jp-hint">Teacher view · pictures can’t be added, moved or removed here.</p>' :
+        '<div class="lc-jp-actions"><button type="button" class="secondary" data-jp="upload"' + (full ? ' disabled' : '') + '>⬆ Upload a picture</button><button type="button" class="secondary" data-jp="draw"' + (full ? ' disabled' : '') + '>✎ Draw a picture</button>' +
+        '<span class="lc-jp-hint">' + (full ? 'That’s the most pictures one journal can hold (' + JP.maxImages + ').' : 'or copy a picture and paste it into your journal · a photo of a paper drawing works too') + '</span>' +
+        '<input type="file" id="lcJpFile" accept="image/*" hidden></div>') +
+      (q.length ? '<div class="lc-jp-grid">' + q.map(pendingHtml).join('') + '</div>' : '');
+  }
+  function refreshPanel(wk) { var p = $('lcJpPanel'); if (p && Number(p.getAttribute('data-wk')) === wk) p.innerHTML = panelHtml(wk); }
+  function mount() {
+    var wk = journalWeek(), old = $('lcJpPanel');
+    if (!wk) { if (old) old.remove(); return; }
+    var ed = $('journalText'), host = ed.closest('.focused-strategy-form') || ed.parentNode;
+    var panel = old;
+    if (!panel || !host.contains(panel)) { if (panel) panel.remove(); panel = document.createElement('div'); panel.id = 'lcJpPanel'; panel.className = 'lc-jp'; host.appendChild(panel); }
+    panel.setAttribute('data-wk', wk);
+    mountEditor(wk);
+    panel.innerHTML = panelHtml(wk);
+  }
+  JP.refresh = mount;
+  var _render = W.render;
+  W.render = function () { var out = _render.apply(this, arguments); try { mount(); } catch (e) {} return out; };
+
+  document.addEventListener('mousedown', function (e) { if (e.target && e.target.closest && e.target.closest('#lcJpPanel button')) e.preventDefault(); });
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('[data-jp]'); if (!b || !b.closest('#lcJpPanel')) return;
+    var wk = journalWeek(); if (!wk || isPreview()) return;
+    var a = b.getAttribute('data-jp');
+    if (a === 'upload') { var f = $('lcJpFile'); if (f) { f.value = ''; f.click(); } }
+    else if (a === 'draw') openPad(wk);
+    else if (a === 'retry') { var q = JP.pending.filter(function (x) { return x.key === b.getAttribute('data-jp-q'); })[0]; if (q) send(q); }
+    else if (a === 'discard') { if (!W.confirm('Discard this picture? It hasn’t been saved.')) return; dropPending(b.getAttribute('data-jp-q')); refreshPanel(wk); }
+  });
+  document.addEventListener('change', function (e) {
+    if (!e.target || e.target.id !== 'lcJpFile') return;
+    var wk = journalWeek(), f = e.target.files && e.target.files[0]; if (!wk || !f) return;
+    addFile(wk, f, 'upload');
+  });
+
+  // ------------------------------------------------------------------ paste / drop a picture
+  function imageFrom(dt) {
+    if (!dt) return null;
+    var items = dt.items ? Array.prototype.slice.call(dt.items) : [];
+    for (var i = 0; i < items.length; i++) if (items[i].kind === 'file' && /^image\//.test(items[i].type)) { var f = items[i].getAsFile(); if (f) return f; }
+    var files = dt.files ? Array.prototype.slice.call(dt.files) : [];
+    for (var j = 0; j < files.length; j++) if (/^image\//.test(files[j].type)) return files[j];
+    return null;
+  }
+  function inJournal(t) { var el = t && (t.nodeType === 1 ? t : t.parentElement); return !!(el && el.closest && (el.closest('#journalText') || el.closest('#lcJpPanel'))); }
+  // window capture runs before the page's own paste guards (which keep text plain)
+  W.addEventListener('paste', function (e) {
+    var wk = journalWeek(); if (!wk || !inJournal(e.target)) return;
+    var f = imageFrom(e.clipboardData); if (!f) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (isPreview()) return;
+    addFile(wk, f, 'paste');
+  }, true);
+  W.addEventListener('dragover', function (e) {
+    var wk = journalWeek(); if (!wk || !inJournal(e.target)) return;
+    var types = e.dataTransfer && e.dataTransfer.types ? Array.prototype.slice.call(e.dataTransfer.types) : [];
+    if (types.indexOf('Files') < 0) return;
+    e.preventDefault(); var p = $('lcJpPanel'); if (p) p.classList.add('is-drop');
+  }, true);
+  W.addEventListener('dragleave', function () { var p = $('lcJpPanel'); if (p) p.classList.remove('is-drop'); }, true);
+  W.addEventListener('drop', function (e) {
+    var p = $('lcJpPanel'); if (p) p.classList.remove('is-drop');
+    var wk = journalWeek(); if (!wk || !inJournal(e.target)) return;
+    var f = imageFrom(e.dataTransfer); if (!f) return;
+    e.preventDefault(); e.stopImmediatePropagation();
+    if (isPreview()) return;
+    try { var ed = $('journalText'), r = document.caretRangeFromPoint ? document.caretRangeFromPoint(e.clientX, e.clientY) : null; if (ed && r && ed.contains(r.startContainer)) JP.range = { ed: ed, r: r }; } catch (err) {}
+    addFile(wk, f, 'upload');
+  }, true);
+
+  // ------------------------------------------------------------------ shrink, then save to Drive
+  function shrink(file, done) {
+    if (file.size > 25 * 1024 * 1024) return done(null, 'That file is too big (over 25 MB).');
+    var url = URL.createObjectURL(file), img = new Image();
+    img.onload = function () {
+      try {
+        var s = Math.min(1, JP.maxSide / Math.max(img.naturalWidth || 1, img.naturalHeight || 1));
+        var c = document.createElement('canvas'); c.width = Math.max(1, Math.round(img.naturalWidth * s)); c.height = Math.max(1, Math.round(img.naturalHeight * s));
+        var g = c.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+        URL.revokeObjectURL(url);
+        done(c.toDataURL('image/jpeg', 0.86));
+      } catch (e) { URL.revokeObjectURL(url); done(null, 'That picture couldn’t be read.'); }
+    };
+    img.onerror = function () { URL.revokeObjectURL(url); done(null, 'That file isn’t a picture this browser can open (try a JPG or PNG).'); };
+    img.src = url;
+  }
+  function addFile(wk, file, kind) {
+    if (list(wk).length + JP.pending.filter(function (x) { return x.email === me() && x.wk === wk; }).length >= JP.maxImages) { toast('That’s the most pictures one journal can hold (' + JP.maxImages + ').', true); return; }
+    shrink(file, function (dataUrl, err) {
+      if (!dataUrl) { toast(err || 'That picture couldn’t be added.', true); return; }
+      queue(wk, dataUrl, kind);
+    });
+  }
+  var LS = 'lc_jp_pending_';
+  function keepLocal() { try { var mine = JP.pending.filter(function (x) { return x.email === me(); }).map(function (x) { return { key: x.key, email: x.email, wk: x.wk, kind: x.kind, preview: x.preview }; }); if (mine.length) W.localStorage.setItem(LS + me(), JSON.stringify(mine)); else W.localStorage.removeItem(LS + me()); } catch (e) {} }
+  function dropPending(key) { JP.pending = JP.pending.filter(function (x) { return x.key !== key; }); keepLocal(); }
+  function queue(wk, dataUrl, kind) {
+    var q = { key: 'q' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), email: me(), wk: wk, kind: kind, preview: dataUrl, error: '' };
+    JP.pending.push(q); keepLocal(); refreshPanel(wk); send(q);
+  }
+  function send(q) {
+    q.error = ''; refreshPanel(q.wk);
+    var m = /^data:([^;]+);base64,(.*)$/.exec(q.preview || ''); if (!m) { q.error = 'the picture is damaged'; refreshPanel(q.wk); return; }
+    W.callServer('saveJournalImage', [W.state.email, q.wk, m[2], m[1], q.kind], function (r) {
+      if (!r || !r.id) { q.error = 'no answer from the server'; refreshPanel(q.wk); return; }
+      if (q.email !== me()) return;
+      JP.cache[r.id] = q.preview;
+      list(q.wk).push({ id: r.id, kind: q.kind, caption: '', source: q.kind === 'drawing' ? 'My drawing' : '', addedAt: new Date().toISOString() });
+      dropPending(q.key);
+      var ed = $('journalText');
+      if (journalWeek() === q.wk && ed && ed.__jpObs) { insertMarker(ed, r.id); sync(ed, q.wk); }
+      changed(q.wk); refreshPanel(q.wk);
+      if (journalWeek() === q.wk) openCaption(q.wk, r.id);
+    }, function (msg) { q.error = String(msg || 'it couldn’t be saved'); refreshPanel(q.wk); }, { quiet: true });
+  }
+  // pictures that never reached Drive on an earlier visit are offered again
+  function restorePending() {
+    var raw = null; try { raw = JSON.parse(W.localStorage.getItem(LS + me()) || 'null'); } catch (e) { raw = null; }
+    (raw || []).forEach(function (x) { if (x && x.preview && !JP.pending.some(function (y) { return y.key === x.key; })) JP.pending.push({ key: x.key, email: x.email, wk: Number(x.wk), kind: x.kind, preview: x.preview, error: 'not sent before you left — press Try again' }); });
+  }
+  var _apply = W.applyLoadedStudentState;
+  if (typeof _apply === 'function') W.applyLoadedStudentState = function () { var out = _apply.apply(this, arguments); try { if (!isPreview()) restorePending(); } catch (e) {} return out; };
+  W.addEventListener('beforeunload', function (e) {
+    if (!JP.pending.some(function (x) { return x.email === me(); })) return;
+    e.preventDefault(); e.returnValue = 'A picture is still saving.'; return e.returnValue;
+  });
+
+  // ------------------------------------------------------------------ the drawing pad
+  var COLORS = ['#111111', '#B0281F', '#1F5FB0', '#1D7A3A', '#E07B00', '#7A3DB0', '#7A4E2A', '#F2C200'];
+  function openPad(wk) {
+    var wrap = document.createElement('div'); wrap.className = 'lc-jp-pad'; wrap.setAttribute('role', 'dialog'); wrap.setAttribute('aria-label', 'Draw a picture');
+    wrap.innerHTML = '<div class="lc-jp-padbox"><div class="lc-jp-padtop"><strong>Draw a picture</strong><div class="lc-jp-tools">' +
+      COLORS.map(function (c, i) { return '<button type="button" class="lc-jp-sw" data-pc="' + c + '" aria-label="Colour ' + (i + 1) + '" aria-pressed="' + (i === 0) + '" style="background:' + c + '!important"></button>'; }).join('') +
+      '<button type="button" class="secondary" data-pt="thin" aria-pressed="false">Thin</button><button type="button" class="secondary" data-pt="med" aria-pressed="true">Medium</button><button type="button" class="secondary" data-pt="thick" aria-pressed="false">Thick</button>' +
+      '<button type="button" class="secondary" data-pt="eraser" aria-pressed="false">Eraser</button><button type="button" class="secondary" data-pa="undo">↶ Undo</button><button type="button" class="secondary" data-pa="clear">Clear</button></div></div>' +
+      '<canvas class="lc-jp-canvas" width="1400" height="980"></canvas>' +
+      '<div class="lc-jp-padfoot"><button type="button" class="secondary" data-pa="cancel">Cancel</button><button type="button" data-pa="add">Add to my journal</button></div></div>';
+    document.body.appendChild(wrap);
+    var cv = wrap.querySelector('canvas'), g = cv.getContext('2d'), color = COLORS[0], size = 6, eraser = false, drawing = false, last = null, undo = [], dirty = false;
+    g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); g.lineCap = 'round'; g.lineJoin = 'round';
+    function pos(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; }
+    function snap() { try { undo.push(g.getImageData(0, 0, cv.width, cv.height)); if (undo.length > 25) undo.shift(); } catch (e) {} }
+    cv.addEventListener('pointerdown', function (e) { e.preventDefault(); cv.setPointerCapture(e.pointerId); snap(); drawing = true; last = pos(e); dot(last, e); });
+    cv.addEventListener('pointermove', function (e) { if (!drawing) return; var p = pos(e); line(last, p, e); last = p; });
+    ['pointerup', 'pointercancel', 'pointerleave'].forEach(function (ev) { cv.addEventListener(ev, function () { drawing = false; last = null; }); });
+    function width(e) { var pr = e && e.pressure && e.pointerType === 'pen' ? 0.4 + e.pressure : 1; return (eraser ? size * 4 : size) * pr; }
+    function dot(p, e) { g.beginPath(); g.fillStyle = eraser ? '#fff' : color; g.arc(p.x, p.y, width(e) / 2, 0, Math.PI * 2); g.fill(); dirty = true; }
+    function line(a, b, e) { g.beginPath(); g.strokeStyle = eraser ? '#fff' : color; g.lineWidth = width(e); g.moveTo(a.x, a.y); g.lineTo(b.x, b.y); g.stroke(); dirty = true; }
+    function press(sel, el) { Array.prototype.forEach.call(wrap.querySelectorAll(sel), function (x) { x.setAttribute('aria-pressed', String(x === el)); }); }
+    function close() { wrap.remove(); document.removeEventListener('keydown', onKey, true); }
+    function onKey(e) { if (e.key === 'Escape') { e.stopPropagation(); if (!dirty || W.confirm('Close the drawing without adding it?')) close(); } if ((e.ctrlKey || e.metaKey) && e.key === 'z') { e.preventDefault(); doUndo(); } }
+    function doUndo() { var s = undo.pop(); if (s) g.putImageData(s, 0, 0); }
+    document.addEventListener('keydown', onKey, true);
+    wrap.addEventListener('click', function (e) {
+      var b = e.target.closest('button'); if (!b) return;
+      if (b.hasAttribute('data-pc')) { color = b.getAttribute('data-pc'); eraser = false; press('[data-pc]', b); var er = wrap.querySelector('[data-pt="eraser"]'); er.setAttribute('aria-pressed', 'false'); return; }
+      var t = b.getAttribute('data-pt');
+      if (t === 'eraser') { eraser = b.getAttribute('aria-pressed') !== 'true'; b.setAttribute('aria-pressed', String(eraser)); return; }
+      if (t) { size = t === 'thin' ? 3 : t === 'thick' ? 14 : 6; press('[data-pt="thin"],[data-pt="med"],[data-pt="thick"]', b); return; }
+      var a = b.getAttribute('data-pa');
+      if (a === 'undo') doUndo();
+      else if (a === 'clear') { snap(); g.fillStyle = '#fff'; g.fillRect(0, 0, cv.width, cv.height); }
+      else if (a === 'cancel') { if (!dirty || W.confirm('Close the drawing without adding it?')) close(); }
+      else if (a === 'add') {
+        if (!dirty) { toast('Draw something first.', true); return; }
+        var out = document.createElement('canvas'), s = Math.min(1, JP.maxSide / cv.width); out.width = Math.round(cv.width * s); out.height = Math.round(cv.height * s);
+        out.getContext('2d').drawImage(cv, 0, 0, out.width, out.height);
+        close(); queue(wk, out.toDataURL('image/png'), 'drawing');
+      }
+    });
+  }
+
+  // ------------------------------------------------------------------ PDF / AI text: say where a picture is
+  var _strip = W.stripHtmlToText;
+  if (typeof _strip === 'function') W.stripHtmlToText = function (html) {
+    if (typeof html === 'string' && html.indexOf('data-jp') >= 0) html = html.replace(/<div\b[^>]*\bdata-jp="([A-Za-z0-9_-]{6,128})"[^>]*>\s*<\/div>/g, function (_, id) {
+      var p = findPic(id) || {}, s = sourceLine(p);
+      return '<div>\n[Picture' + (p.caption ? ': ' + esc(p.caption) : '') + (s ? ' — ' + esc(s) : '') + ']\n</div>';
+    });
+    return _strip.call(this, html);
+  };
+
+  // ------------------------------------------------------------------ teacher view (marking screen)
+  function figureHtml(p, cls) {
+    var s = sourceLine(p, 'teacher');
+    return '<figure class="' + cls + '"><div class="lc-jp-img" data-jp-img="' + esc(p.id) + '" data-jp-alt="' + esc(p.caption || 'Journal picture') + '"><span class="lc-jp-wait">Loading picture…</span></div>' +
+      '<figcaption>' + (p.caption ? esc(p.caption) : '<em>No caption</em>') + '<small>' + (s ? esc(s) : 'Source not given') + '</small></figcaption></figure>';
+  }
+  /** The journal's HTML with each picture drawn where the student put it. placed[id] = true for each. */
+  W.lcJournalInlineHtml = function (html, pics, placed) {
+    var by = {}; (Array.isArray(pics) ? pics : []).forEach(function (p) { if (p && p.id) by[p.id] = p; });
+    var out = String(html || '').replace(/<div data-jp="([A-Za-z0-9_-]{6,128})"><\/div>/g, function (_, id) {
+      if (placed) placed[id] = true;
+      return figureHtml(by[id] || { id: id }, 'lc-jp-fig');
+    });
+    if (out !== html) setTimeout(function () { fillImages(document); }, 0);
+    return out;
+  };
+  /** Read-only gallery for pictures that aren't placed in the writing. */
+  W.lcJournalPicturesHtml = function (pics) {
+    if (!Array.isArray(pics) || !pics.length) return '';
+    setTimeout(function () { fillImages(document); }, 0);
+    return '<div class="lch-sec lc-jp-t"><h5>Pictures (' + pics.length + ')</h5><div class="lc-jp-grid">' + pics.map(function (p) { return figureHtml(p, 'lc-jp-card'); }).join('') + '</div></div>';
+  };
+  // marking rows are repainted in place: fill any new picture placeholders
+  try { new MutationObserver(function () { if (document.querySelector('[data-jp-img]:not([data-jp-done])')) fillImages(document); }).observe(document.body || document.documentElement, { childList: true, subtree: true }); } catch (e) {}
+
+  W.__MB.JournalPictures = 'ok';
+})();
+</script>

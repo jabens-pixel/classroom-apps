@@ -1,0 +1,1802 @@
+<script>
+window.__MB = window.__MB || {}; __MB.AppLogic = 'started';
+// Three body paragraphs are required; anything past that is the student's own
+// addition and is optional everywhere -- progress, completion, assembly.
+const REQUIRED_BODIES = 3;
+const MAX_BODIES = 8;
+
+// ---------------------------------------------------------------------------
+// ESSAY GRADING
+//
+// Each step of the essay is graded on its own: the thesis is a completion mark,
+// the four written steps each get one 1-7 rubric score, and the finished essay
+// is scored on the four-criterion rubric the students already self-assess
+// against (RUBRIC in GatsbyData).
+//
+// The rubrics live HERE rather than beside DOK_RUBRIC in GatsbyData because
+// content files are re-pasted more often than logic files, and every re-paste
+// is a chance to truncate one. Anything likely to be reworded belongs here.
+// Sibling <script> tags share one global scope, so BackendClient sees these.
+//
+// Format matches DOK_RUBRIC: index 0 unused, "Name. Sentence..." so the marking
+// screen can split the band name off the descriptor.
+// ---------------------------------------------------------------------------
+const ESSAY_STEP_KEYS = ["thesis", "discussion", "body", "intro", "conclusion"];
+const ESSAY_STEP_LABELS = {
+  thesis: "Thesis",
+  discussion: "Thesis Discussion",
+  body: "Body Paragraphs",
+  intro: "Introduction",
+  conclusion: "Conclusion",
+};
+const ESSAY_RUBRIC_MAX = 7;
+// The thesis is a completion mark, not a rubric score: it is worth one point and
+// the only question is whether they drafted one.
+const ESSAY_THESIS_POINTS = 1;
+
+const BODY_RUBRIC = [
+  null,
+  "Incomplete. Fewer than three paragraphs are drafted, or what is there is too short to show an argument.",
+  "Minimal. Three paragraphs exist, but they retell what happens in the novel rather than argue a point, and the text is barely quoted.",
+  "Developing. Each paragraph makes a point, but the points repeat one another or drift away from the thesis, and quotations are dropped in without explanation.",
+  "Adequate. Each paragraph makes a distinct point supported by a quotation, but the explanation is thin and the link back to the thesis is left for the reader to make.",
+  "Proficient. Every paragraph opens with a clear topic sentence, supports it with well-chosen evidence, explains how that evidence proves the point, and returns to the thesis.",
+  "Strong. Every paragraph proves a different reason from the thesis, the evidence is precise, and the analysis reads the language of the quotation rather than only its content.",
+  "Exemplary. The paragraphs build a cumulative argument: each proves a distinct reason, the evidence is chosen for its exact wording, the analysis goes well beyond a surface reading, and the order of the paragraphs is itself doing work.",
+];
+
+const DISCUSSION_RUBRIC = [
+  null,
+  "Incomplete. Nothing was posted to the discussion.",
+  "Minimal. A thesis was posted, but it is a statement of fact or a summary rather than an arguable claim.",
+  "Developing. The posted thesis makes a claim, but it is broad or vague and does not say why the theme matters.",
+  "Adequate. The posted thesis is arguable and on topic, but it could apply to almost any novel and gives no sense of how the essay will proceed.",
+  "Proficient. The posted thesis is specific and arguable, names the position it will defend, and is clear enough for a classmate to respond to.",
+  "Strong. The posted thesis is specific, arguable, and explains why the question matters to the novel, and the student engaged with what classmates posted.",
+  "Exemplary. The posted thesis is precise and genuinely contestable, explains why the theme is central, and the student's responses to classmates sharpened someone's thinking, including their own.",
+];
+
+const INTRO_RUBRIC = [
+  null,
+  "Incomplete. The introduction is missing or is a single sentence.",
+  "Minimal. The introduction announces the assignment rather than the argument, and the thesis is missing from the end.",
+  "Developing. The introduction names the novel and the theme, but it opens on a generalisation about life or literature and the thesis is buried rather than final.",
+  "Adequate. The introduction establishes the novel and the issue and ends with the thesis, but the opening does little to make the reader care about the question.",
+  "Proficient. The introduction establishes the novel and the issue clearly, narrows from context to claim, and ends on the saved thesis.",
+  "Strong. The introduction opens on something specific to The Great Gatsby, frames the question the essay will answer, and arrives at the thesis as a conclusion rather than an announcement.",
+  "Exemplary. The introduction makes the question feel worth asking, frames it in the novel's own terms, and lands on a thesis the reader now wants to see defended.",
+];
+
+const CONCLUSION_RUBRIC = [
+  null,
+  "Incomplete. The conclusion is missing or is a single sentence.",
+  "Minimal. The conclusion restates the thesis in the same words and stops.",
+  "Developing. The conclusion repeats the introduction, listing what the essay said without adding anything to it.",
+  "Adequate. The conclusion returns to the thesis and gathers the body paragraphs, but ends on a general statement that could close any essay.",
+  "Proficient. The conclusion returns to the thesis in new words, synthesises what the body paragraphs proved, and ends on why Fitzgerald's point matters.",
+  "Strong. The conclusion shows what the argument adds up to rather than listing it again, and its final idea reaches past the essay without leaving the novel behind.",
+  "Exemplary. The conclusion reframes the thesis in light of everything proved, and closes on an insight about the novel that the reader could not have had before reading the essay.",
+];
+
+const ESSAY_STEP_RUBRICS = {
+  discussion: DISCUSSION_RUBRIC,
+  body: BODY_RUBRIC,
+  intro: INTRO_RUBRIC,
+  conclusion: CONCLUSION_RUBRIC,
+};
+
+// The four-criterion rubric (RUBRIC in GatsbyData) is written best-first with five
+// levels. These are the points each level is worth, matching the band headings
+// the students already see ("7 to >6 pts", "6 to >5 pts", ...).
+const ESSAY_CRITERIA = ["Meaning", "Style", "Form", "Conventions"];
+const ESSAY_CRITERION_POINTS = [7, 6, 5, 4, 1];
+const ESSAY_CRITERION_MAX = 7;
+const ESSAY_BAND_LABELS = ["Exceeds", "Strong", "Developing", "Limited", "Beginning"];
+
+// One line per essay tile on the Teacher Dashboard: what the student did, not
+// what the teacher is looking for (that is ESSAY_GRADE_NOTES, on the marking
+// screen itself).
+const ESSAY_TILE_BLURB = {
+  thesis: "Their arguable claim",
+  discussion: "What they posted to the class board",
+  body: "Three paragraphs plus any counterargument",
+  intro: "Context narrowing to the thesis",
+  conclusion: "What the argument adds up to",
+  final: "The assembled essay, all four criteria",
+};
+
+// What the teacher is being asked to judge on each marking screen. Written for
+// the grader, not the student -- they are two different readers.
+const ESSAY_GRADE_NOTES = {
+  thesis:
+    "Is there a thesis? This is a completion mark, not a judgement — the app ticks anyone who drafted one, and you override it where you disagree. The quality of the claim is judged in the steps that follow.",
+  discussion:
+    "What they posted to the class discussion, and whether the claim is arguable, specific, and clear enough for a classmate to respond to.",
+  body:
+    "All of their body paragraphs on one screen, plus the optional counterargument. One score for the set: does each paragraph prove a distinct reason with evidence that is explained and tied back to the thesis?",
+  intro:
+    "Does the introduction establish the novel and the issue, narrow towards the argument, and end on the saved thesis?",
+  conclusion:
+    "Does the conclusion do more than restate — does it show what the argument adds up to, and end on why it matters?",
+  final:
+    "The whole essay, scored on Meaning, Style, Form and Conventions. Read it once and score all four.",
+};
+let state = JSON.parse(
+  (function () {
+    try {
+      return localStorage.getItem("gatsbyState");
+    } catch (e) {
+      return null;
+    }
+  })() || "null",
+) || {
+  role: "student",
+  view: "home",
+  releasedActs: [1],
+  releasedScenes: {},
+  answers: {},
+  dok: {},
+  evidence: [],
+  teacherResources: true,
+  className: "English - The Great Gatsby",
+};
+state = state && typeof state === "object" ? state : {};
+state.role = state.role || "student";
+state.view = state.view || "home";
+state.releasedActs = Array.isArray(state.releasedActs) ? state.releasedActs : [1];
+state.releasedScenes = state.releasedScenes || {};
+state.answers = state.answers || {};
+state.dok = state.dok || {};
+state.dokMeta = state.dokMeta || {};
+state.supportOpen = state.supportOpen === true;
+state.navAct = Number.isFinite(Number(state.navAct)) ? Number(state.navAct) : 1;
+syncNavAct_();   // coming back to a saved chapter opens its place in the sidebar
+state.evidence = Array.isArray(state.evidence) ? state.evidence : [];
+state.teacherResources = state.teacherResources !== false;
+state.className = state.className || "English - The Great Gatsby";
+state.essay = state.essay && typeof state.essay === "object" ? state.essay : {};
+state.essay.step = state.essay.step || "thesis";
+state.essay.theme = state.essay.theme || "";
+state.essay.thesis = state.essay.thesis || "";
+state.essay.discussion = Array.isArray(state.essay.discussion) ? state.essay.discussion : [];
+state.essay.bodies = Array.isArray(state.essay.bodies) ? state.essay.bodies : ["", "", ""];
+while (state.essay.bodies.length < REQUIRED_BODIES) state.essay.bodies.push("");
+state.essay.rebuttal = typeof state.essay.rebuttal === "string" ? state.essay.rebuttal : "";
+// The three separate body steps became one, and the counterargument then moved
+// inside that step. Anyone mid-essay when either shipped has "body2" or
+// "rebuttal" saved as their current step, which would otherwise render nothing.
+if (/^body\d$/.test(String(state.essay.step || "")) || state.essay.step === "rebuttal") state.essay.step = "body";
+state.essay.intro = state.essay.intro || "";
+state.essay.conclusion = state.essay.conclusion || "";
+state.essay.selfEval = state.essay.selfEval || {};
+state.essay.selfComments = state.essay.selfComments || {};
+for (const c of ["Meaning", "Style", "Form", "Conventions"]) {
+  let v = state.essay.selfEval[c];
+  if (v !== undefined && v !== "" && Number(v) > 4) {
+    let n = Number(v);
+    state.essay.selfEval[c] = n >= 7 ? "0" : n >= 6 ? "1" : n >= 5 ? "2" : n >= 2 ? "3" : "4";
+  }
+}
+state.activityResponses = state.activityResponses || {};
+
+function save() {
+  try {
+    localStorage.setItem("gatsbyState", JSON.stringify(state));
+  } catch (e) {
+    console.warn("Local save skipped (storage unavailable):", e);
+  }
+}
+
+/* ---- The browser Back button ----------------------------------------------
+   The app never changes page, so Back used to jump the student clean out of
+   the app -- one stray swipe and they were on whatever was open before.
+   Every move between pages goes through render(), so that is the one place
+   history is written from: each new place pushes an entry, a redraw of the
+   same place does not. Back pops the entry and puts the app back where it was.
+
+   The URL is deliberately left alone (the third argument stays null): this runs
+   inside the Apps Script sandbox iframe, where rewriting it is refused. If
+   history is unavailable at all, __navOk goes false and the app behaves exactly
+   as it did before. */
+let __navKeyNow = null; // the place the top history entry stands for
+let __navRestoring = false; // true only while Back/Forward is driving render()
+let __navOk = true;
+
+function navKey_() {
+  let v = String(state.view || "home");
+  if (v === "essay") v += "/" + String((state.essay && state.essay.step) || "thesis");
+  return v;
+}
+function navApply_(key) {
+  let parts = String(key || "home").split("/");
+  if (parts[0] === "essay" && parts[1]) {
+    state.essay = state.essay || {};
+    state.essay.step = parts[1];
+  }
+  state.view = parts[0];
+}
+function navSync_() {
+  if (!__navOk || __navRestoring) return;
+  let key = navKey_();
+  if (key === __navKeyNow) return;
+  try {
+    if (__navKeyNow === null) history.replaceState({ mbNav: key }, "");
+    else history.pushState({ mbNav: key }, "");
+    __navKeyNow = key;
+  } catch (e) {
+    __navOk = false;
+  }
+}
+window.addEventListener("popstate", function (e) {
+  if (!__navOk) return;
+  let key = e.state && e.state.mbNav;
+  if (!key) return; // somebody else's history entry
+  __navRestoring = true;
+  __navKeyNow = key;
+  try {
+    navApply_(key);
+    save();
+    render();
+  } finally {
+    __navRestoring = false;
+  }
+});
+
+function esc(s) {
+  return (s || "").replace(
+    new RegExp("[&<>\"']", "g"),
+    (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[m],
+  );
+}
+
+function eqLabel(e) {
+  let i = EQ.findIndex((x) => x.id === e.id);
+  return `EQ${i + 1} — ${e.label}`;
+}
+
+function eqShortLabel(e) {
+  let i = EQ.findIndex((x) => x.id === e.id);
+  return `EQ${i + 1} · ${e.label}`;
+}
+
+// Normalizes a saved multiple-choice answer (a legacy plain index, a picks
+// array, or nothing yet) into attempt/scoring info. Students get up to two
+// tries: full credit on the first try, half credit on the second, and the
+// correct answer is revealed once both tries are used.
+function answerInfo(key, raw) {
+  let qa = QUESTIONS[key];
+  if (!qa) return null;
+  let correctIdx = qa[2];
+  let picks = Array.isArray(raw) ? raw : raw !== undefined && raw !== null ? [raw] : [];
+  let attempts = picks.length;
+  let correct = picks.includes(correctIdx);
+  let score = attempts === 0 ? null : correct ? (picks[0] === correctIdx ? 1 : 0.5) : attempts >= 2 ? 0 : null;
+  let locked = correct || attempts >= 2;
+  return { picks, attempts, correctIdx, correct, score, locked };
+}
+
+function released(key) {
+  let a = +key.split(".")[0];
+  return state.role !== "student" || state.releasedActs.includes(a) || state.releasedScenes[key];
+}
+
+// Reading order of every chapter key ("1.1".."9.1" -- the ".1" is a fixed
+// suffix, not a real sub-chapter; see the note above CHAPTERS in
+// GatsbyData.html for why keys keep this shape), used to build the Back/Next
+// buttons at the end of each chapter.
+const SCENE_ORDER = Object.keys(CHAPTERS).sort((a, b) => {
+  let [a1, a2] = a.split(".").map(Number);
+  let [b1, b2] = b.split(".").map(Number);
+  return a1 - b1 || a2 - b2;
+});
+
+function scenePager(key) {
+  let idx = SCENE_ORDER.indexOf(key);
+  let prevKey = idx > 0 ? SCENE_ORDER[idx - 1] : null;
+  let nextKey = idx >= 0 && idx < SCENE_ORDER.length - 1 ? SCENE_ORDER[idx + 1] : null;
+
+  let backHtml = prevKey
+    ? `<button class="btn scene-pager-btn" data-view="scene:${prevKey}">← Back: Chapter ${CHAPTERS[prevKey].act}</button>`
+    : `<button class="btn scene-pager-btn" data-view="home">← Back to Overview</button>`;
+
+  let nextHtml;
+  if (!nextKey) {
+    nextHtml = `<button class="btn primary scene-pager-btn" data-view="evidence">Continue to Evidence Bank →</button>`;
+  } else if (released(nextKey)) {
+    nextHtml = `<button class="btn primary scene-pager-btn" data-view="scene:${nextKey}">Next: Chapter ${CHAPTERS[nextKey].act} →</button>`;
+  } else {
+    nextHtml = `<button class="btn scene-pager-btn locked" disabled>🔒 Next: Chapter ${CHAPTERS[nextKey].act} (not yet released)</button>`;
+  }
+
+  return `<div class="scene-pager">${backHtml}${nextHtml}</div>`;
+}
+
+// Kept only so state.navAct round-trips harmlessly for anyone who saved state
+// under the old accordion sidebar; the sidebar itself no longer folds by Act
+// (nine flat chapter cards read better than a nine-item accordion that only
+// ever reveals one row each). See sidebar() below.
+function openNavAct() {
+  let saved = Number(state.navAct);
+  return saved >= 0 && saved <= 9 ? saved : 1;
+}
+function syncNavAct_(view) {
+  let v = String(view || state.view || "");
+  if (!v.startsWith("scene:")) return;
+  let sc = CHAPTERS[v.split(":")[1]];
+  if (sc) state.navAct = sc.act;
+}
+
+// One card per chapter, each with its own colour and a short original title
+// (Fitzgerald did not title his chapters -- these are ours, for navigation),
+// so the left column reads as the shape of the novel rather than a list of
+// identical folders.
+const ACT_CARDS = [
+  ["Chapter 1", "Nick Arrives in West Egg", "#1b4332"],
+  ["Chapter 2", "The Valley of Ashes", "#7c6a46"],
+  ["Chapter 3", "Gatsby's Party", "#0f3057"],
+  ["Chapter 4", "Gatsby's Story", "#6b2d3c"],
+  ["Chapter 5", "The Reunion", "#3d3b52"],
+  ["Chapter 6", "Gatsby's Past Revealed", "#8a5a00"],
+  ["Chapter 7", "Confrontation in the City", "#264653"],
+  ["Chapter 8", "The Night Before", "#4a2545"],
+  ["Chapter 9", "After Gatsby", "#1a1a2e"],
+];
+
+// The Acts became cards, which left Overview / Evidence Bank / Final Essay
+// looking like leftovers beside them. Same card, one accent colour, so the
+// whole left column reads as one thing.
+function navCard_(view, eyebrow, name, note, colour) {
+  const active = String(state.view || "") === view;
+  return `<button class="navbtn nav-card ${active ? "active" : ""}" data-view="${view}" style="--act:${colour}">
+      <span class="nav-act-body">
+        <span class="nav-act-eyebrow">${eyebrow}</span>
+        <span class="nav-act-name">${name}</span>
+        <span class="nav-act-note">${note}</span>
+      </span>
+      <span class="nav-act-caret nav-card-go" aria-hidden="true">→</span>
+    </button>`;
+}
+
+function sidebar() {
+  let h =
+    '<div class="nav-title">Unit</div>' +
+    navCard_("home", "Start here", "Overview", "The essential questions", "#3f5c4e");
+  h += '<div class="nav-title">Chapters</div>';
+  for (let a = 1; a <= 9; a++) {
+    let key = a + ".1";
+    let card = ACT_CARDS[a - 1];
+    let isReleased = released(key);
+    h += navCard_("scene:" + key, card[0], card[1], isReleased ? "" : "locked", card[2]);
+  }
+  h +=
+    '<div class="nav-title">Writing</div>' +
+    navCard_("evidence", "Collect", "Evidence Bank", "Your saved quotations", "#7a5a42") +
+    navCard_("essay", "Create", "Final Essay", "Seven stages, 28 points", "#0f3057");
+  if (state.role !== "student")
+    h +=
+      '<div class="nav-title">Management</div>' +
+      navCard_("manage", "Review", "Teacher Dashboard", "Marking, grades and Canvas", "#2e4057");
+  if (state.role === "admin")
+    h += navCard_("admin", "Manage", "Admin", "Accounts and access", "#4a4a70");
+  if (typeof SIDEBAR_IMG !== "undefined")
+    h += `<figure class="sidebar-art"><img src="${SIDEBAR_IMG}" alt="Art Deco gold linework on dark green"><figcaption>“So we beat on”</figcaption></figure>`;
+  document.getElementById("sidebar").innerHTML = h;
+  document.querySelectorAll(".navbtn").forEach(
+    (b) =>
+      (b.onclick = () => {
+        let v = b.dataset.view;
+        if (v.startsWith("scene:") && !released(v.split(":")[1]))
+          return alert("This chapter has not been released yet.");
+        syncNavAct_(v);
+        state.view = v;
+        save();
+        render();
+      }),
+  );
+}
+
+function home() {
+  let vids = (ACTIVITIES.PRE || []).map(resourceCard).join("");
+  let heroBg =
+    typeof HERO_IMG !== "undefined"
+      ? ` style="background-image:linear-gradient(135deg,rgba(10,10,12,.92),rgba(15,48,87,.86)),url('${HERO_IMG}')"`
+      : "";
+  let bannerBg =
+    typeof BANNER_IMG !== "undefined"
+      ? ` style="background-image:linear-gradient(120deg,rgba(8,8,9,.86),rgba(15,48,87,.72)),url('${BANNER_IMG}')"`
+      : "";
+  return `<section class="hero"${heroBg}><div class="pill">Interactive unit</div><h1>The Great Gatsby</h1><p>Read the novel, answer comprehension checks, collect evidence, and build an argument about what Fitzgerald’s story reveals about the American Dream, wealth, and illusion.</p><div class="chips"><span class="chip">9 chapters</span><span class="chip">Text evidence notebook</span><span class="chip">DOK chapter responses</span><span class="chip">Reading support glossary</span></div></section>${myGradesCard()}<div class="card"><strong>Learning Targets & Standards</strong><p>See the Common Core reading, writing, discussion, and language standards addressed across this unit.</p><button class="btn primary standards-btn openStandards">View Common Core Standards</button></div><div class="theme-banner"${bannerBg}><h2>The Essential Questions</h2><p>Use the three highlight colors throughout the novel. Every highlighted passage should include a note explaining how the passage helps answer its essential question.</p></div><div class="grid3">${EQ.map((e, i) => `<div class="eq"><strong>${eqLabel(e)}</strong>${e.q}</div>`).join("")}</div><div class="card"><h2>Before Chapter 1: Build Context</h2><p>Complete these resources before beginning the novel.</p>${vids}</div>`;
+}
+
+function myGradesCard() {
+  let backend = typeof window !== "undefined" ? window.GATSBY_BACKEND : null;
+  if (!backend || !backend.enabled || state.role !== "student") return "";
+  let gs = backend.gradeSummary;
+  if (!gs || !gs.acts) return "";
+  let allChapters = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  let graded = allChapters.filter((a) => gs.acts[a] && gs.acts[a].possible > 0);
+  if (!graded.length) return "";
+  let cells = allChapters
+    .map((act) => {
+      let a = gs.acts[act];
+      if (!a || !a.possible) return `<div class="grade-pill ungraded">Chapter ${act}<br>Not yet graded</div>`;
+      return `<div class="grade-pill">Chapter ${act}<br><strong>${a.earned}/${a.possible}</strong><div class="grade-comment">Multiple choice ${a.mcEarned}/${a.mcPossible} · Written ${a.dokEarned}/${a.dokPossible}</div></div>`;
+    })
+    .join("");
+  return `<div class="card"><h2>Your Grades</h2><p class="toolbar-note">Each chapter combines your auto-scored multiple choice with your teacher's 1-7 score for each written (DOK) response. Your teacher may choose to leave a question out of your grade.</p><div class="grade-pill-row">${cells}</div></div>`;
+}
+
+function resourceCard(r) {
+  let [type, title, target] = r;
+  let isUrl = new RegExp("^https?://", "i").test(target || "");
+  let action = isUrl
+    ? `<a target="_blank" rel="noopener" href="${esc(target)}">Open resource ↗</a>`
+    : `<p>${esc(target || "")}</p><button class="btn openActivity" data-activity="${esc(title)}">Open activity</button>`;
+  return `<div class="activity card"><div class="icon">${type === "Video" ? "▶" : type === "Activity" ? "✦" : "↗"}</div><div><div class="pill">${esc(type)}</div><h3>${esc(title)}</h3>${action}</div></div>`;
+}
+
+function scene(key) {
+  let c = CHAPTERS[key],
+    qa = QUESTIONS[key],
+    info = answerInfo(key, state.answers[key]);
+  let optsHtml = qa[1]
+    .map((o, i) => {
+      let picked = info.picks.includes(i);
+      let isCorrectOpt = i === info.correctIdx;
+      let cls = "opt";
+      let disabled = "";
+      if (info.locked && isCorrectOpt) cls += " correct";
+      else if (picked && !isCorrectOpt) cls += " wrong";
+      if (info.locked || picked) disabled = "disabled";
+      return `<button class="${cls}" data-answer="${i}" ${disabled}>${String.fromCharCode(65 + i)}. ${esc(o)}</button>`;
+    })
+    .join("");
+  let statusHtml = "";
+  if (info.locked) {
+    if (info.score === 1)
+      statusHtml = `<div class="quiz-status good">✓ Correct on the first try — 1 point.</div>`;
+    else if (info.score === 0.5)
+      statusHtml = `<div class="quiz-status good">✓ Correct on the second try — ½ point.</div>`;
+    else
+      statusHtml = `<div class="quiz-status warn">The correct answer is highlighted above — 0 points. Review the text before moving on.</div>`;
+  } else if (info.attempts === 1) {
+    statusHtml = `<div class="quiz-status warn">Not quite — you have one more try.</div>`;
+  }
+  let qbox = `<div class="question"><strong>Comprehension Check</strong><p>${esc(qa[0])}</p><div class="opts">${optsHtml}</div>${statusHtml}</div>`;
+  let res = (ACTIVITIES[key] || []).map(resourceCard).join("");
+  let support = READING_SUPPORT[key];
+  let supportHtml = support
+    ? `<div class="reading-support-panel${state.supportOpen ? "" : " hide"}" id="readingSupportPanel"><h3>Reading Support</h3>${(support.vocab || [])
+        .map((v) => `<div class="support-term"><strong>${esc(v.term)}</strong> — ${esc(v.def)}</div>`)
+        .join("")}${(support.context || []).map((p) => `<p class="support-context">${esc(p)}</p>`).join("")}</div>`
+    : "";
+  return `<div class="sectionhead"><div><div class="pill">Chapter ${c.act}</div><h2>${esc(c.title || "Chapter " + c.act)}</h2></div></div><div class="reader-tools"><button id="supportBtn" class="btn supportbtn${state.supportOpen ? " active" : ""}">✎ Reading Support</button>${EQ.map((e, i) => `<button class="btn hilite" data-eq="${e.id}" style="border-bottom:5px solid ${e.color}">${eqShortLabel(e)}</button>`).join("")}<span class="toolbar-note">Select words in the text, then choose a highlight color.</span></div>${supportHtml}<div class="reader" id="reader"><div class="textpane" id="originalPane">${chapterReaderHtml_(key, c, qbox)}</div></div><div class="question dok"><strong>End-of-Chapter DOK Response</strong><p>${esc(qa[3])}</p><textarea id="dok" placeholder="Make a claim and use specific evidence from the chapter...">${esc(state.dok[key] || "")}</textarea><p class="dok-note">Write this answer in your own words. Text you paste in is recorded and shown to your teacher.</p></div>${state.teacherResources && res ? `<h3>Extension / Teacher Resource</h3>${res}` : ""}${scenePager(key)}`;
+}
+
+// The novel's own text is never stored in this app -- the teacher pastes each
+// chapter directly into Index.html's storyTextStore before sharing the app
+// with a class (see READ_ME_FIRST.txt). These helpers are how the reader gets
+// that text back out at runtime: read the DOM section the teacher filled in,
+// split it into paragraphs, and assemble the reading view around it. If a
+// chapter's section is still empty, the reader says so plainly instead of
+// showing blank space.
+function chapterParagraphs_(act) {
+  let sec = document.querySelector('.storyTextChapter[data-chapter="' + act + '"]');
+  if (!sec) return [];
+  let blocks = Array.from(sec.querySelectorAll("p"));
+  if (blocks.length) return blocks.map((p) => p.textContent.trim()).filter(Boolean);
+  let raw = (sec.textContent || "").trim();
+  if (!raw) return [];
+  return raw
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean);
+}
+function chapterFullText_(act) {
+  return chapterParagraphs_(act).join("\n\n");
+}
+
+// Numbers every paragraph in the left margin (a novel has no authoritative
+// line-numbered edition the way a play script does, so paragraphs -- not
+// lines -- are the unit a student cites: "Chapter 3, paragraph 12"). The
+// comprehension check always lands after the last paragraph: with no story
+// text stored in this file, there is nothing for it to anchor to mid-chapter.
+function chapterReaderHtml_(key, c, qbox) {
+  let paras = chapterParagraphs_(c.act);
+  if (!paras.length) {
+    return `<div class="reader-empty"><p>The text for this chapter has not been added yet. Your teacher pastes each chapter directly into the app before it is shared with the class.</p></div><div class="pair-qbox">${qbox}</div>`;
+  }
+  let full = injectHighlights(esc(paras.join("\n\n")), c.act);
+  let body = full
+    .split("\n\n")
+    .map((p, i) => `<p class="reader-para"><span class="lineno" aria-hidden="true">${i + 1}</span>${p}</p>`)
+    .join("");
+  return body + `<div class="pair-qbox">${qbox}</div>`;
+}
+
+
+function evidence() {
+  let list = state.evidence || [];
+  return `<div class="sectionhead"><h2>Evidence Bank</h2></div><p>Your highlights are organized here so you can trace the argument you have been building across the novel.</p><div class="grid3">${EQ.map((e) => `<div class="eq"><strong>${eqLabel(e)}</strong><span class="score">${list.filter((x) => x.eq === e.id).length}</span><div>saved pieces of evidence</div></div>`).join("")}</div><div class="card">${
+    list.length
+      ? list
+          .map((x) => {
+            let e = EQ.find((z) => z.id === x.eq);
+            return `<div class="evidence"><div><span class="swatch" style="background:${e.color}"></span><strong>${eqLabel(e)}</strong><br><small>Chapter ${x.act}</small></div><div><blockquote>“${esc(x.quote)}”</blockquote><p>${esc(x.note)}</p><button class="btn removeEv" data-id="${x.id}">Remove</button></div></div>`;
+          })
+          .join("")
+      : "<p>No evidence saved yet. Highlight a passage while reading to begin your notebook.</p>"
+  }</div>`;
+}
+
+// The seven stages, in order. One list, used by the journey strip, the Next
+// button and anything else that needs to know what comes after what.
+// [id, name, what you do there, the colour that stage carries, its icon]
+// Each stage has an identity -- a colour and a mark -- so the path reads as
+// seven different pieces of work rather than seven identical dots.
+const ESSAY_JOURNEY = [
+  ["thesis", "Thesis", "Plant your claim", "#26405c", "flag"],
+  ["discussion", "Discussion", "Test it on the class", "#5f7a63", "talk"],
+  ["body", "Body Paragraphs", "Prove it, three times", "#9a7b3f", "pillars"],
+  ["intro", "Introduction", "Lead the reader in", "#6b4257", "door"],
+  ["conclusion", "Conclusion", "Land the point", "#3f6b6b", "target"],
+  ["assemble", "Put It Together", "Read it as one essay", "#7a5a42", "pages"],
+  ["self", "Self-Evaluation", "Judge your own work", "#4a4a70", "glass"],
+];
+
+// Drawn inline rather than loaded, so they scale, take the stage's colour, and
+// cannot be the thing that fails to load.
+const JOURNEY_ICONS = {
+  flag: '<path d="M6 3v18" /><path d="M6 4h11l-2.2 3.5L17 11H6z" />',
+  talk: '<path d="M3 5h12v8H8l-5 4z" /><path d="M17 9h4v8l-3-2.5h-5" />',
+  pillars: '<path d="M3 4h18" /><path d="M3 20h18" /><path d="M6 4v16M12 4v16M18 4v16" />',
+  door: '<path d="M5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16" /><path d="M3 21h18" /><circle cx="15" cy="12" r="1.1" />',
+  target: '<circle cx="12" cy="12" r="8.5" /><circle cx="12" cy="12" r="4.5" /><circle cx="12" cy="12" r="1" />',
+  pages: '<path d="M7 3h7l4 4v11a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z" /><path d="M14 3v4h4" /><path d="M8.5 12h7M8.5 16h5" />',
+  glass: '<circle cx="10.5" cy="10.5" r="6.5" /><path d="M15.5 15.5 21 21" /><path d="M8 10.5h5" />',
+};
+function journeyIcon_(name) {
+  return `<svg viewBox="0 0 24 24" class="journey-icon" aria-hidden="true" focusable="false">${JOURNEY_ICONS[name] || JOURNEY_ICONS.flag}</svg>`;
+}
+function essayStepIndex(id) {
+  let i = ESSAY_JOURNEY.findIndex((s) => s[0] === id);
+  return i < 0 ? 0 : i;
+}
+function essayStepLabel(id) {
+  let s = ESSAY_JOURNEY[essayStepIndex(id)];
+  return s ? s[1] : id;
+}
+
+// The steps drawn as a path: seven medallions, each with its own colour and
+// mark, joined by a line that fills in behind you. A row of identical pills
+// told a student nothing about what the stages were or how far along they had
+// got; this does both without them reading a word.
+/* ---- How far the essay is open -------------------------------------------
+   The reading is released Act by Act; the writing used to be open all at once,
+   so a student could be drafting a conclusion in week one. `releasedEssayThrough`
+   is the id of the LAST stage a student may open. An unset or unrecognised value
+   means the whole essay is open, so a class that existed before this setting
+   carries on exactly as it did. Teachers, as with scenes, always see everything. */
+function essayReleasedThrough() {
+  let i = ESSAY_JOURNEY.findIndex((s) => s[0] === state.releasedEssayThrough);
+  return i < 0 ? ESSAY_JOURNEY.length - 1 : i;
+}
+function essayStepReleased(id) {
+  if (state.role !== "student") return true;
+  return essayStepIndex(id) <= essayReleasedThrough();
+}
+// Where a student should be standing: their own stage, unless it has been
+// closed behind them, in which case the last one still open.
+function essayOpenStep(id) {
+  return essayStepReleased(id) ? id : ESSAY_JOURNEY[essayReleasedThrough()][0];
+}
+// The six GRADING keys are not one-to-one with the seven journey stages:
+// "final" is the grade for the whole assembled essay, which a student can only
+// reach once the last stage is open. Everything else maps to itself.
+function essayGradeKeyStage_(key) {
+  return key === "final" ? ESSAY_JOURNEY[ESSAY_JOURNEY.length - 1][0] : key;
+}
+function essayGradeKeyReleased_(key) {
+  return essayStepIndex(essayGradeKeyStage_(key)) <= essayReleasedThrough();
+}
+
+function essayNav(active) {
+  let lastDone = -1;
+  ESSAY_JOURNEY.forEach(([id], i) => {
+    if (essayStepDone(id)) lastDone = i;
+  });
+  let activeIdx = essayStepIndex(active);
+  let stops = ESSAY_JOURNEY.map(([id, label, blurb, color, icon], i) => {
+    let done = essayStepDone(id);
+    let isActive = active === id;
+    let locked = !essayStepReleased(id);
+    // The segment to the LEFT of this stop is lit when the stop before it is
+    // finished, so the path fills in one leg at a time.
+    let legLit = i > 0 && essayStepDone(ESSAY_JOURNEY[i - 1][0]);
+    return `<li class="journey-stop ${done ? "is-done" : ""} ${isActive ? "is-active" : ""} ${legLit ? "leg-lit" : ""} ${locked ? "is-locked" : ""}" style="--stage:${color}">
+      <button class="stepbtn ${isActive ? "active" : ""} ${done ? "done" : ""} ${locked ? "locked" : ""}" data-estep="${id}"
+        title="${locked ? esc(label) + " — not open yet" : esc(label) + " — " + esc(blurb)}" aria-current="${isActive ? "step" : "false"}">
+        <span class="journey-node">${journeyIcon_(icon)}${locked ? '<span class="journey-lock" aria-hidden="true">\uD83D\uDD12</span>' : done ? '<span class="journey-tick" aria-hidden="true">\u2713</span>' : ""}</span>
+        <span class="journey-label"><span class="journey-index">${i + 1}.</span> ${esc(label)}</span>
+        <span class="journey-blurb">${locked ? "Not open yet" : esc(blurb)}</span>
+      </button>
+    </li>`;
+  }).join("");
+  return `<nav class="essay-journey" aria-label="Essay steps">
+    <div class="journey-head">
+      <div><span class="journey-eyebrow">Your path</span><h3 class="journey-title">Read it. Argue it. Make it yours.</h3></div>
+      <span class="journey-count">Step ${activeIdx + 1} of ${ESSAY_JOURNEY.length}</span>
+    </div>
+    <ol class="essay-steps">${stops}</ol>
+  </nav>`;
+}
+
+// The essay question, given the room it deserves. It is the thing every one of
+// the seven stages is in service of, and it used to sit in the same plain box
+// as everything else. Once a student has a thesis, their own answer is shown
+// underneath it -- the question is the assignment, the thesis is what they are
+// making of it.
+function essayHero() {
+  let thesis = String((state.essay || {}).thesis || "").trim();
+  return `<section class="essay-hero">
+    <span class="hero-eyebrow">Your essay question</span>
+    <h2 class="hero-question">Is the American Dream <span class="hero-em">alive</span>, <span class="hero-em">dead</span>, or <span class="hero-em">corrupted</span> in <em>The Great Gatsby</em>?</h2>
+    ${
+      thesis
+        ? `<div class="hero-answer"><span class="hero-answer-label">Your answer so far</span><p>${esc(thesis)}</p></div>`
+        : `<div class="hero-answer is-empty"><p>You answer it with a thesis \u2014 one arguable sentence. That is stage one.</p></div>`
+    }
+    <div class="hero-meta"><span>28 points</span><span>Meaning</span><span>Style</span><span>Form</span><span>Conventions</span></div>
+  </section>`;
+}
+
+// The button at the foot of every stage. Work already autosaves on every
+// keystroke, so this is not what makes it safe -- it is the "I am finished with
+// this part" signal, and the thing that carries you to the next stage without
+// going back up to the map. It never blocks: an unfinished stage can still move
+// on, it just says what is missing first.
+function essayNextBar(active) {
+  let i = essayStepIndex(active);
+  let done = essayStepDone(active);
+  let prev = i > 0 ? ESSAY_JOURNEY[i - 1] : null;
+  let next = i < ESSAY_JOURNEY.length - 1 ? ESSAY_JOURNEY[i + 1] : null;
+  let back = prev
+    ? `<button class="btn essayBackBtn" data-estep="${prev[0]}">\u2190 Back to ${esc(prev[1])}</button>`
+    : `<span></span>`;
+  let note = done
+    ? `<span class="journey-next-note done">\u2713 ${esc(essayStepLabel(active))} is done.</span>`
+    : `<span class="journey-next-note">${esc(ESSAY_INCOMPLETE_NOTE[active] || "This stage isn't finished yet — you can come back to it.")}</span>`;
+  let nextLocked = next && !essayStepReleased(next[0]);
+  let forward = next
+    ? nextLocked
+      ? `<span class="journey-waiting">${esc(next[1])} is not open yet \u2014 your teacher will release it.</span>`
+      : `<button class="btn ${done ? "primary" : ""} essayNextBtn" data-estep="${next[0]}">${done ? "Save &amp; continue" : "Continue"} to ${esc(next[1])} \u2192</button>`
+    : done
+      ? `<span class="journey-finished">\u2713 That is the whole essay. Every stage is done.</span>`
+      : `<span></span>`;
+  return `<div class="journey-next">${back}${note}${forward}</div>`;
+}
+
+// What is still missing, said plainly, so "Continue" is never a dead end and
+// never a mystery.
+const ESSAY_INCOMPLETE_NOTE = {
+  thesis: "Draft a thesis before you move on — everything after this is built on it.",
+  discussion: "You haven't posted your thesis to the class discussion yet.",
+  body: "You still have body paragraphs to draft.",
+  intro: "Your introduction isn't drafted yet.",
+  conclusion: "Your conclusion isn't drafted yet.",
+  assemble: "Your essay isn't complete yet — go back to whichever stage is missing.",
+  self: "You haven't chosen a level for all four criteria yet.",
+};
+
+function essayStepDone(id) {
+  let e = state.essay;
+  if (id === "thesis") return !!e.thesis.trim();
+  if (id === "discussion") return e.discussion.length > 0;
+  // The three required paragraphs are one step now. Extra paragraphs beyond the
+  // third are a bonus and never hold the step back.
+  if (id === "body") return e.bodies.slice(0, REQUIRED_BODIES).every((x) => String(x || "").trim());
+  if (id === "intro") return !!e.intro.trim();
+  if (id === "conclusion") return !!e.conclusion.trim();
+  if (id === "assemble")
+    return (
+      e.intro.trim() &&
+      e.bodies.slice(0, REQUIRED_BODIES).every((x) => String(x || "").trim()) &&
+      e.conclusion.trim()
+    );
+  if (id === "self")
+    return ["Meaning", "Style", "Form", "Conventions"].every(
+      (c) => e.selfEval[c] !== undefined && e.selfEval[c] !== "",
+    );
+  return false;
+}
+
+function evidenceCounts() {
+  return EQ.map((q) => ({
+    id: q.id,
+    label: eqLabel(q),
+    count: state.evidence.filter((x) => x.eq === q.id).length,
+  }));
+}
+
+function sentenceList(text) {
+  return (text.trim().match(new RegExp("[^.!?]+[.!?]+|[^.!?]+$", "g")) || []).map((x) => x.trim()).filter(Boolean);
+}
+
+function coach(text, type) {
+  let sent = sentenceList(text),
+    words = text.trim().split(new RegExp("\\s+")).filter(Boolean).length,
+    quote = new RegExp("[“”\"]").test(text),
+    explain =
+      new RegExp("\\b(shows|reveals|demonstrates|suggests|illustrates|because|therefore|this means|this matters|indicates)\\b", "i").test(
+        text,
+      ),
+    transition =
+      new RegExp("\\b(furthermore|however|therefore|ultimately|additionally|because|as a result|thus|in contrast)\\b", "i").test(
+        text,
+      );
+  let checks = [];
+  if (type === "thesis") {
+    // A thesis is a CLAIM, not a paragraph. It used to be checked against the
+    // body-paragraph list, which asked a single sentence of argument for a
+    // quotation, an act and scene, and a concluding sentence. The quotation and
+    // the line reference belong in the body paragraphs, beside the evidence
+    // they support; the thesis is the claim those paragraphs go on to prove.
+    const THEME_WORDS = {
+      alive: "alive|still possible|worth pursuing|still real|attainable|hope|genuine|authentic|not (dead|lost)",
+      dead: "dead|illusion|never (real|possible)|impossible|unattainable|fantasy|false|doomed|out of reach",
+      corrupted: "corrupt|twisted|distort|reduced to|materialis|money|wealth and status|debased|hollow",
+    };
+    let themeRe = new RegExp(
+      state.essay.theme && THEME_WORDS[state.essay.theme]
+        ? THEME_WORDS[state.essay.theme]
+        : Object.keys(THEME_WORDS)
+            .map((k) => THEME_WORDS[k])
+            .join("|"),
+      "i",
+    );
+    // "central idea", "mainly", "rather than" -- the words a thesis uses to
+    // take a side, including the ones in the model sentence on this page.
+    let stance = new RegExp(
+      "\\b(central|centrally|mainly|primarily|chiefly|most|more than|rather than|above all|not merely|not simply|not just|instead of|driven by)\\b",
+      "i",
+    ).test(text);
+    let reasons = new RegExp("\\b(because|since|through)\\b", "i").test(text);
+    let insight = new RegExp(
+      "\\b(ultimately|show|shows|showing|reveal|reveals|revealing|suggest|suggests|demonstrate|demonstrates|illustrate|illustrates|argues|indicates|means that|matters)\\b",
+      "i",
+    ).test(text);
+    let citesText =
+      quote || new RegExp("\\bChapter\\s*\\d|\\bparagraph\\s*\\d", "i").test(text);
+    checks = [
+      [
+        "Answers the question",
+        themeRe.test(text),
+        "Name the position you are arguing — the American Dream is alive, dead, or corrupted in this novel.",
+      ],
+      [
+        "Takes a position",
+        stance,
+        "Say which reading is the central one. A thesis a classmate could not disagree with is not yet a thesis.",
+      ],
+      [
+        "Previews your reasons",
+        reasons,
+        "Signal the reasoning your body paragraphs will prove — “because…”, “through…”.",
+      ],
+      [
+        "Says why it matters",
+        insight,
+        "Finish with the larger idea Fitzgerald develops, not just the claim itself.",
+      ],
+      [
+        "One or two sentences",
+        words >= 15 && sent.length >= 1 && sent.length <= 2,
+        "A thesis is one sentence, two at most. Say it once, clearly.",
+      ],
+      [
+        // An empty box has no quotation in it, but it has not earned a tick
+        // for that either.
+        "A claim, not evidence",
+        words > 0 && !citesText,
+        "Save the quotation and the act and line for your body paragraphs, where the evidence goes. The thesis makes the claim they prove.",
+      ],
+    ];
+  } else if (type === "body") {
+    checks = [
+      [
+        "Topic sentence",
+        sent.length > 0 && sent[0].split(new RegExp("\\s+")).length >= 7,
+        "Begin with a clear claim that connects this paragraph to your thesis.",
+      ],
+      [
+        "Text evidence",
+        quote || new RegExp("\\bChapter\\s*\\d", "i").test(text),
+        "Include a specific quotation or clearly identified evidence from the novel.",
+      ],
+      [
+        "Explanation / analysis",
+        explain,
+        "Explain how the evidence proves your topic sentence; use analytical language such as “reveals,” “shows,” or “because.”",
+      ],
+      [
+        "Concluding sentence",
+        sent.length >= 4,
+        "End the paragraph by connecting the paragraph’s idea back to the larger thesis.",
+      ],
+    ];
+  } else if (type === "intro") {
+    checks = [
+      ["Opening/context", sent.length >= 2, "Give the reader enough context before the thesis."],
+      [
+        "Thesis is last",
+        !!state.essay.thesis &&
+          sent.length &&
+          sent[sent.length - 1].replace(new RegExp("[.!?]+$"), "").trim() ===
+            state.essay.thesis.replace(new RegExp("[.!?]+$"), "").trim(),
+        "Place your saved thesis statement as the final sentence of the introduction.",
+      ],
+      [
+        "Focused length",
+        words >= 60,
+        "Develop the introduction enough to establish context and direction.",
+      ],
+    ];
+  } else {
+    checks = [
+      [
+        "Restates central idea",
+        sent.length && new RegExp("Gatsby|American Dream|dream|alive|dead|corrupt|illusion|wealth|class", "i").test(text),
+        "Return to your central argument without simply copying the thesis.",
+      ],
+      [
+        "Synthesizes ideas",
+        sent.length >= 3 && explain,
+        "Explain what the combined evidence shows about the novel as a whole.",
+      ],
+      [
+        "Final significance",
+        sent.length >= 4,
+        "End with a “so what?” insight about Fitzgerald’s larger message.",
+      ],
+      [
+        "No new quotation",
+        !quote,
+        "A conclusion usually synthesizes rather than introducing a brand-new quotation.",
+      ],
+    ];
+  }
+  let good = checks.filter((x) => x[1]).length;
+  return `<div class="coach"><h4>Writing Coach · ${good}/${checks.length} checks</h4>${checks.map(([n, ok, tip]) => `<div class="check ${ok ? "good" : "warn"}"><strong>${ok ? "✓" : "△"} ${n}</strong>${ok ? "" : ` — ${tip}`}</div>`).join("")}<small>This feedback is a built-in writing check, not a grade. Your teacher’s judgment and the rubric remain the final standard.</small></div>`;
+}
+
+function thesisGuide() {
+  let counts = evidenceCounts(),
+    max = Math.max(...counts.map((x) => x.count)),
+    suggested = counts
+      .filter((x) => x.count === max)
+      .map((x) => x.label)
+      .join(" / ");
+  let ev = state.evidence;
+  let chosen = ESSAY_POSITIONS.find((p) => p.id === state.essay.theme);
+  return `<div class="card"><h3>Step 1 · Thesis Creation</h3><p>Build your thesis in order. Your evidence should drive the claim—not the other way around.</p><div class="thesis-flow"><section class="thesis-stage"><h3><span class="stage-num">1</span>Review the evidence you collected</h3><p>Start by noticing which essential question has the strongest evidence base. This is background for your thinking — your position in the next step is a separate decision about the American Dream itself.</p><div class="grid3">${counts.map((x) => `<div class="eq"><strong>${x.label}</strong><div class="score">${x.count}</div><div>pieces of evidence</div></div>`).join("")}</div><div class="thesis-preview"><strong>Evidence check:</strong> ${max ? `You currently have the most evidence for <em>${esc(suggested)}</em>. This is a starting point, not a requirement. Choose the position you can argue most convincingly.` : "You do not have saved evidence yet. Return to the Evidence Bank or continue reading before finalizing your thesis."}</div></section><section class="thesis-stage"><h3><span class="stage-num">2</span>Choose the position you will argue</h3><div class="theme-list">${ESSAY_POSITIONS.map((p) => `<label class="theme-card"><input type="radio" name="theme" class="themePick" value="${p.id}" ${state.essay.theme === p.id ? "checked" : ""}><span><strong>${esc(p.label)}</strong><br>${esc(p.blurb)}</span></label>`).join("")}</div>${chosen ? `<div class="selected-evidence"><h4>Your saved evidence</h4>${ev.length ? ev.map((x) => `<div class="evidence-choice"><strong>Chapter ${x.act}</strong><br>“${esc(x.quote)}”<br><small>${esc(x.note)}</small></div>`).join("") : "<p>You have not saved any evidence yet. Any of it may support your position — pick the pieces that fit.</p>"}</div>` : ""}</section><section class="thesis-stage"><h3><span class="stage-num">3</span>Plan what your thesis must do</h3><p>A strong literary-analysis thesis:</p><ul><li><strong>Answers the final question directly.</strong></li><li><strong>Makes an arguable claim</strong> rather than stating a fact.</li><li><strong>Previews the reasoning</strong> your body paragraphs will prove.</li><li><strong>Explains the larger idea</strong> Fitzgerald develops through this position.</li></ul><div class="thesis-preview"><strong>Thesis pattern:</strong><br>In <em>The Great Gatsby</em>, Fitzgerald presents the American Dream as <strong>[alive / dead / corrupted]</strong> because <strong>[reason 1]</strong>, <strong>[reason 2]</strong>, and <strong>[reason 3]</strong>, ultimately showing that <strong>[larger insight]</strong>.</div></section><section class="thesis-stage"><h3><span class="stage-num">4</span>Write and revise your thesis</h3><textarea id="thesisBox" class="writingbox short" placeholder="Write one complete thesis statement...">${esc(state.essay.thesis)}</textarea><div id="thesisCoach">${coach(state.essay.thesis, "thesis")}</div><p class="toolbar-note">When your thesis makes a clear claim and matches your evidence, continue to the Thesis Discussion.</p></section></div></div>`;
+}
+
+function discussion() {
+  return `<div class="card"><h3>Step 2 · Thesis Discussion</h3><p>Post your thesis for classmates to read. Before revising, respond to peer feedback by asking: Is my claim arguable? Is it specific? Does it explain <em>why</em> this theme is central?</p><div class="thesis-preview">${state.essay.thesis ? esc(state.essay.thesis) : "Complete your thesis first."}</div><button class="btn primary" id="postThesis" ${state.essay.thesis ? "" : "disabled"}>Post Thesis to Discussion</button><p class="toolbar-note">In this prototype, discussion posts are saved on this device. When the class backend is connected, these posts can be shared across the class.</p>${state.essay.discussion.length ? state.essay.discussion.map((p, i) => `<div class="discussion-post"><strong>Student Thesis</strong><p>${esc(p.text)}</p><small>Posted ${esc(p.date)}</small></div>`).join("") : "<p>No thesis has been posted yet.</p>"}</div>`;
+}
+
+function refreshBodyProgress_() {
+  let el = document.querySelector(".body-progress");
+  if (!el) return;
+  let bodies = state.essay.bodies;
+  let done = bodies.slice(0, REQUIRED_BODIES).filter((x) => String(x || "").trim()).length;
+  let extras = bodies.length - REQUIRED_BODIES;
+  el.innerHTML =
+    `<strong>${done} of ${REQUIRED_BODIES} required paragraphs drafted.</strong>` +
+    (extras > 0 ? ` You have also added ${extras} extra paragraph${extras === 1 ? "" : "s"}.` : "");
+  document.querySelectorAll(".body-para").forEach((sec, idx) => {
+    let filled = !!String(bodies[idx] || "").trim();
+    sec.classList.toggle("is-filled", filled);
+    if (idx < REQUIRED_BODIES) {
+      let chip = sec.querySelector(".mini-chip");
+      if (chip) {
+        chip.textContent = filled ? "Drafted" : "Required";
+        chip.className = "mini-chip " + (filled ? "body-chip-done" : "body-chip-todo");
+      }
+    }
+  });
+  // The step button in the nav should tick over as soon as the third is done.
+  let navBtn = document.querySelector('.stepbtn[data-estep="body"]');
+  if (navBtn) navBtn.classList.toggle("done", essayStepDone("body"));
+}
+
+function bodyEvidenceHtml_() {
+  let ev = state.evidence;
+  return `<details class="body-evidence"><summary><strong>Your saved evidence (${ev.length})</strong></summary>${
+    ev
+      .map(
+        (x) =>
+          `<div class="evidence-choice"><strong>Chapter ${x.act}</strong> · “${esc(x.quote)}”<br><small>${esc(x.note)}</small></div>`,
+      )
+      .join("") || "<p>No evidence saved yet.</p>"
+  }</details>`;
+}
+
+// All the body paragraphs on one screen. Three are required; the rest are the
+// student's own. Keeping them together makes the shape of the argument visible
+// -- you can see paragraph two repeating paragraph one, which you cannot when
+// each lives on its own page.
+function bodiesStep() {
+  let bodies = state.essay.bodies;
+  let doneCount = bodies.slice(0, REQUIRED_BODIES).filter((x) => String(x || "").trim()).length;
+  let extras = bodies.length - REQUIRED_BODIES;
+  let blocks = bodies
+    .map((text, idx) => {
+      let required = idx < REQUIRED_BODIES;
+      let filled = !!String(text || "").trim();
+      return `<section class="body-para ${filled ? "is-filled" : ""}">
+        <div class="body-para-head">
+          <h4>Body Paragraph ${idx + 1} ${
+            required
+              ? `<span class="mini-chip ${filled ? "body-chip-done" : "body-chip-todo"}">${filled ? "Drafted" : "Required"}</span>`
+              : `<span class="mini-chip body-chip-extra">Extra</span>`
+          }</h4>
+          ${
+            !required
+              ? `<button type="button" class="btn removeBodyBtn" data-body="${idx}" title="Remove this extra paragraph">Remove</button>`
+              : ""
+          }
+        </div>
+        <textarea class="writingbox bodyBox" data-body="${idx}" placeholder="${
+          required
+            ? `Body Paragraph ${idx + 1}: topic sentence, evidence, explanation, concluding sentence...`
+            : "An extra paragraph — another reason, a second piece of evidence, or a complication worth exploring..."
+        }">${esc(text)}</textarea>
+        <div id="bodyCoach${idx}">${coach(text, "body")}</div>
+      </section>`;
+    })
+    .join("");
+  return `<div class="card"><h3>Step 3 · Body Paragraphs</h3>
+    <p>Each paragraph does one job: <strong>Topic Sentence → Evidence → Explanation → Concluding Sentence</strong>. Every paragraph should prove one reason from your thesis — if two paragraphs are making the same point, combine them and find a new reason.</p>
+    <div class="thesis-preview"><strong>Your thesis:</strong> ${esc(state.essay.thesis || "Draft your thesis first.")}</div>
+    ${bodyEvidenceHtml_()}
+    <p class="body-progress"><strong>${doneCount} of ${REQUIRED_BODIES} required paragraphs drafted.</strong>${
+      extras > 0 ? ` You have also added ${extras} extra paragraph${extras === 1 ? "" : "s"}.` : ""
+    }</p>
+    ${blocks}
+    <div class="body-add-row">
+      <button class="btn" id="addBodyBtn" ${bodies.length >= MAX_BODIES ? "disabled" : ""}>+ Add another paragraph</button>
+      <span class="toolbar-note">${
+        bodies.length >= MAX_BODIES
+          ? `That's ${MAX_BODIES} paragraphs — plenty for this essay.`
+          : "Three is the requirement, not a limit. Add a fourth or fifth if your argument needs more room."
+      }</span>
+    </div>
+    ${rebuttalSection()}</div>`;
+}
+
+// A counterargument paragraph is the single fastest way to make an argument read
+// as considered rather than one-sided, so the tutorial lives here rather than in
+// a handout, with a worked example (about the novel, but paraphrased rather than
+// quoted -- the app never stores or ships the book's own text) to measure an
+// attempt against. It
+// sits at the end of the body paragraphs because that is where it belongs in the
+// essay, and because you cannot fairly concede to an opponent until you know
+// what your own argument actually is. The tutorial is collapsed by default so it
+// never pushes the paragraph boxes off the screen.
+function rebuttalSection() {
+  let text = state.essay.rebuttal || "";
+  let filled = !!String(text).trim();
+  return `<section class="body-para rebuttal-para ${filled ? "is-filled" : ""}">
+    <div class="body-para-head">
+      <h4>Counterargument <span class="mini-chip ${filled ? "body-chip-done" : "body-chip-extra"}">${filled ? "Drafted" : "Optional"}</span></h4>
+    </div>
+    <p>One more paragraph, if you want it: name the strongest objection to your thesis and explain why your reading still holds. It does not weaken your essay — it shows you read the novel from more than one angle, which is what makes an argument convincing.</p>
+
+    <details class="rebuttal-guide" ${filled ? "" : "open"}>
+      <summary><strong>How to write one</strong> — four moves, a worked example, and three ways it goes wrong</summary>
+
+      <h4>The four moves</h4>
+      <ol class="rebuttal-moves">
+        <li><strong>Name the other side fairly.</strong> State the opposing reading in its <em>strongest</em> form. If it sounds silly, you have picked the wrong objection — nobody is persuaded by watching you beat a weak argument.<br><em>A reader might argue that…</em></li>
+        <li><strong>Give it real evidence.</strong> Quote the line that genuinely supports that other reading. Using the novel against yourself is what makes this paragraph credible.</li>
+        <li><strong>Concede what is true.</strong> Admit the part that is right. This costs you nothing and buys the reader's trust.<br><em>It is true that… / This reading is not wrong about…</em></li>
+        <li><strong>Turn back to your claim.</strong> Explain why your reading accounts for more of the novel than theirs does. End on your side — this is the whole point of the paragraph.<br><em>However… / But this overlooks… / What this reading cannot explain is…</em></li>
+      </ol>
+
+      <h4>A worked example</h4>
+      <div class="rebuttal-example">
+        <p><span class="rb-move rb-1">A reader might argue that Gatsby is undone by other people's choices — Daisy's marriage, Myrtle's death, Wilson's grief — rather than by anything he chooses himself:</span> <span class="rb-move rb-2">quote the moment in the novel where one of those other characters makes the choice that sets the ending in motion.</span> <span class="rb-move rb-3">It is true that Gatsby does not cause any of those events directly — he is standing outside, waiting, when the worst of it happens.</span> <span class="rb-move rb-4">But Gatsby spent years building an entire fortune and a new identity around reclaiming a past Daisy never promised to give back, and he is the one who chooses to keep waiting under her window that night. The people around him supply the ending; the ambition that put him in its path is entirely his own.</span></p>
+        <p class="rebuttal-key"><span class="rb-key rb-1">1 Name it</span> <span class="rb-key rb-2">2 Evidence</span> <span class="rb-key rb-3">3 Concede</span> <span class="rb-key rb-4">4 Turn back</span></p>
+      </div>
+
+      <h4>Three ways this goes wrong</h4>
+      <ul class="rebuttal-warn">
+        <li><strong>The straw man.</strong> Picking an objection so weak nobody holds it. Argue against the version your smartest classmate would defend.</li>
+        <li><strong>The surrender.</strong> Conceding so much that your thesis quietly disappears. Concede a detail, not your claim.</li>
+        <li><strong>The stall.</strong> Ending the paragraph on the other side's point. The last sentence must be yours.</li>
+      </ul>
+    </details>
+
+    <textarea id="rebuttalBox" class="writingbox" placeholder="A reader might argue that…">${esc(text)}</textarea>
+    <div id="rebuttalCoach">${coach(text, "body")}</div>
+    <p class="toolbar-note">Optional. Leave it blank and your essay is still complete. If you write one, it goes in after your last body paragraph and before the conclusion.</p>
+  </section>`;
+}
+
+function introStep() {
+  let sent = sentenceList(state.essay.intro),
+    thesis = state.essay.thesis;
+  let preview = "";
+  if (state.essay.intro) {
+    let last = sent.pop() || "";
+    preview = `<div class="essay-preview">${esc(sent.join(" "))}${sent.length ? " " : ""}<span class="thesis-highlight">${esc(last)}</span></div>`;
+  }
+  return `<div class="card"><h3>Step 4 · Introduction</h3><p>Write the introduction as its own section. Establish the novel and the issue your argument will address. Your <strong>saved thesis must be the final sentence</strong>.</p><div class="thesis-preview"><strong>Thesis to place last:</strong> ${esc(thesis || "Complete your thesis first.")}</div><textarea id="introBox" class="writingbox" placeholder="Write your introduction here. End with your thesis statement...">${esc(state.essay.intro)}</textarea>${preview}<div id="introCoach">${coach(state.essay.intro, "intro")}</div></div>`;
+}
+
+function conclusionStep() {
+  return `<div class="card"><h3>Step 5 · Conclusion</h3><p>Bring the argument together: return to your thesis, synthesize what your body paragraphs prove, and end with the larger significance of Fitzgerald’s message. Avoid simply repeating the introduction.</p><textarea id="conclusionBox" class="writingbox" placeholder="Write your conclusion here...">${esc(state.essay.conclusion)}</textarea><div id="conclusionCoach">${coach(state.essay.conclusion, "conclusion")}</div></div>`;
+}
+
+function assembleStep() {
+  let e = state.essay;
+  // Reading order: introduction, every body paragraph, the counterargument if
+  // there is one, then the conclusion.
+  let parts = [e.intro]
+    .concat(e.bodies)
+    .concat(String(e.rebuttal || "").trim() ? [e.rebuttal] : [])
+    .concat([e.conclusion]);
+  let full = parts.filter((x) => String(x || "").trim()).join("\n\n");
+  // Required = introduction + three body paragraphs + conclusion. Extra
+  // paragraphs and the counterargument are counted separately so a student who
+  // writes more is never shown as less than finished.
+  let required = [e.intro, e.bodies[0], e.bodies[1], e.bodies[2], e.conclusion];
+  let done = required.filter((x) => String(x || "").trim()).length;
+  let extraBodies = e.bodies.slice(REQUIRED_BODIES).filter((x) => String(x || "").trim()).length;
+  let hasRebuttal = !!String(e.rebuttal || "").trim();
+  let bonus = [];
+  if (extraBodies) bonus.push(`${extraBodies} extra body paragraph${extraBodies === 1 ? "" : "s"}`);
+  if (hasRebuttal) bonus.push("a counterargument paragraph");
+  let words = full.trim() ? full.trim().split(/\s+/).length : 0;
+  return `<div class="card"><h3>Step 6 · Put It Together</h3>
+    <p>This view combines each piece without deleting the separate drafts. Return to any step to revise.</p>
+    <div class="progressbar"><span style="width:${(done / required.length) * 100}%"></span></div>
+    <p><strong>${done}/${required.length} required sections complete</strong>${
+      bonus.length ? ` · plus ${bonus.join(" and ")}` : ""
+    }${words ? ` · ${words} words` : ""}</p>
+    ${
+      done === required.length && !hasRebuttal
+        ? `<p class="toolbar-note">Your essay is complete. If you want to strengthen it, Step 4 shows you how to add a counterargument paragraph.</p>`
+        : ""
+    }
+    <div class="essay-preview">${esc(full || "Your completed sections will appear here.")}</div>
+    <button class="btn" id="copyEssay">Copy Full Essay</button></div>`;
+}
+
+function rubricTable() {
+  let bands = ["7 to >6 pts", "6 to >5 pts", "5 to >4 pts", "4 to >1 pts", "1 to >0 pts"];
+  return `<div class="rubric-wrap"><table class="rubric"><thead><tr><th>Criteria</th>${bands.map((x) => `<th>${x}</th>`).join("")}</tr></thead><tbody>${Object.entries(
+    RUBRIC,
+  )
+    .map(
+      ([c, ds]) =>
+        `<tr><td class="crit">${c}</td>${ds.map((d) => `<td>${esc(d)}</td>`).join("")}</tr>`,
+    )
+    .join("")}</tbody></table></div>`;
+}
+
+function selfEvalStep() {
+  let e = state.essay,
+    bands = ["7 to >6 pts", "6 to >5 pts", "5 to >4 pts", "4 to >1 pts", "1 to >0 pts"];
+  let labels = [
+    "Exceeds / Deep",
+    "Strong / Good",
+    "Developing / Basic",
+    "Limited / Weak",
+    "Beginning / Poor",
+  ];
+  return `<div class="card"><h3>Step 7 · Self-Evaluation</h3><p>Read your assembled essay and click the rubric description that best matches your work for each criterion. Then explain your choice in the comment box directly below it.</p>${[
+    "Meaning",
+    "Style",
+    "Form",
+    "Conventions",
+  ]
+    .map((c) => {
+      let selected = e.selfEval[c];
+      return `<section class="self-criterion"><div class="self-criterion-head"><div><strong>${c}</strong><br><small>Choose the description that most closely matches your essay.</small></div>${selected !== undefined && selected !== "" ? `<span class="pill">Selected: ${bands[+selected]}</span>` : '<span class="pill">Not selected</span>'}</div><div class="self-band-grid">${RUBRIC[c].map((d, i) => `<button type="button" class="self-band ${String(selected) === String(i) ? "selected" : ""}" data-crit="${c}" data-band="${i}"><strong>${labels[i]}<br><small>${bands[i]}</small></strong>${esc(d)}</button>`).join("")}</div><div class="self-comment-wrap"><label><strong>Your ${c} reflection</strong></label><textarea class="selfComment self-comment" data-crit="${c}" placeholder="Explain why you chose this level. Identify a specific strength and/or something you would revise.">${esc(e.selfComments[c] || "")}</textarea></div></section>`;
+    })
+    .join(
+      "",
+    )}<div class="self-summary"><strong>Self-assessment status:</strong> ${["Meaning", "Style", "Form", "Conventions"].filter((c) => e.selfEval[c] !== undefined && e.selfEval[c] !== "").length}/4 criteria selected.</div><h3>Full Gatsby Essay Rubric</h3>${rubricTable()}<div class="bottom-standards"><button class="btn primary standards-btn openStandards">View Common Core Standards</button></div></div>`;
+}
+
+function essay() {
+  // If a stage is closed while a student is standing in it, they land on the
+  // last one still open rather than on a page they are not allowed to see.
+  // Their work in the closed stage is untouched and comes back when it reopens.
+  let step = essayOpenStep(state.essay.step || "thesis"),
+    content =
+      step === "thesis"
+        ? thesisGuide()
+        : step === "discussion"
+          ? discussion()
+          : step === "body"
+            ? bodiesStep()
+            : step === "intro"
+              ? introStep()
+              : step === "conclusion"
+                ? conclusionStep()
+                : step === "assemble"
+                  ? assembleStep()
+                  : selfEvalStep();
+  return `<div class="sectionhead"><div><div class="pill">Writing Workshop</div><h2>The Great Gatsby Literary Analysis</h2></div></div>${essayHero()}${essayNav(step)}${content}${essayNextBar(step)}`;
+}
+
+// Releasing the writing, the way the reading is released. One setting rather
+// than seven switches: the stages are genuinely sequential, so "open through
+// Body Paragraphs" is the only shape that makes sense, and it cannot be put
+// into a state where Conclusion is open while Body Paragraphs is shut.
+function essayReleaseHtml_() {
+  let through = essayReleasedThrough();
+  let next = through < ESSAY_JOURNEY.length - 1 ? ESSAY_JOURNEY[through + 1] : null;
+  return `<div class="essay-release">
+    <div class="essay-release-head">
+      <div><strong>The Essay</strong><br><small>Open through stage ${through + 1} of ${ESSAY_JOURNEY.length}</small></div>
+      ${
+        next
+          ? `<button class="btn primary essayReleaseNext">Release ${esc(next[1])} →</button>`
+          : `<span class="mini-chip body-chip-done">All ${ESSAY_JOURNEY.length} open</span>`
+      }
+    </div>
+    <label class="essay-release-pick"><span>Open through</span>
+      <select class="essayReleaseSelect">${ESSAY_JOURNEY.map(
+        ([id, label], i) =>
+          `<option value="${id}" ${i === through ? "selected" : ""}>${i + 1}. ${esc(label)}</option>`,
+      ).join("")}</select>
+    </label>
+    <p class="toolbar-note">Stages after this one show to students as locked, with the name of what is coming. Work already written in a stage you close is kept, and comes back when you reopen it.</p>
+  </div>`;
+}
+
+function manage() {
+  let rows = "";
+  for (let a = 1; a <= 9; a++) {
+    let card = ACT_CARDS[a - 1];
+    rows += `<div class="toggle"><div><strong>Chapter ${a}</strong><br><small>${esc(card[1])}</small></div><label><input type="checkbox" class="actRelease" data-act="${a}" ${state.releasedActs.includes(a) ? "checked" : ""}> Released</label></div>`;
+  }
+  return `<div class="sectionhead"><h2>Teacher Dashboard</h2></div><div class="admin-grid"><div class="card"><h3>Release Controls</h3>${rows}${essayReleaseHtml_()}</div><div class="card"><h3>Class Snapshot</h3><div class="score">${Object.keys(state.answers).length}/9</div><p>chapter comprehension checks answered in this demo account</p><div class="score">${state.evidence.length}</div><p>evidence annotations saved</p><label><input id="resourceToggle" type="checkbox" ${state.teacherResources ? "checked" : ""}> Show enrichment resources to students</label></div></div>`;
+}
+
+function batchGrade() {
+  return `<div class="sectionhead"><h2>Grade Written Responses</h2></div><p class="toolbar-note">Connect a deployed class backend (see SETUP_BACKEND.md) to grade a whole class's written responses to one question at a time.</p>`;
+}
+
+function essayGrade() {
+  return `<div class="sectionhead"><h2>Grade the Essay</h2></div><p class="toolbar-note">Connect a deployed class backend (see SETUP_BACKEND.md) to grade the class's essay one step at a time.</p>`;
+}
+
+function admin() {
+  return `<div class="sectionhead"><h2>Admin Backend</h2></div><div class="admin-grid"><div class="card"><h3>Unit Template</h3><p><strong>The Great Gatsby - American Dream, Class, Illusion</strong></p><p>9 chapters · 3 essential questions · final literary analysis</p><button class="btn" id="dupUnitBtn">Duplicate Unit</button></div><div class="card"><h3>Roles</h3><p><strong>Admin</strong> · manages unit templates and teachers</p><p><strong>Teacher</strong> · releases content and reviews student work</p><p><strong>Student</strong> · reads, responds, highlights, and writes</p></div></div><div class="card"><h3>Deployment note</h3><p>This is the local preview of Admin. Once this file is deployed through Google Apps Script (see SETUP_BACKEND.md), this screen is replaced by the connected Admin Backend: authorize teachers by email, and each teacher creates their own classes from the Teacher Dashboard. There is no Firestore or paid service involved — the class backend is a Google Sheet in your Drive.</p></div>`;
+}
+
+function openStandards() {
+  document.getElementById("modalRoot").innerHTML =
+    `<div class="modal"><div class="modalbox" style="max-width:900px;max-height:88vh;overflow:auto"><div class="pill">Grades 11–12 ELA</div><h3>Common Core Standards for The Great Gatsby Unit</h3><p>These are the Common Core ELA standards directly addressed by the reading, evidence collection, discussion, drafting, revision, and literary-analysis work in this unit.</p><div class="standards-grid">${Object.entries(
+      COMMON_CORE,
+    )
+      .map(
+        ([group, items]) =>
+          `<section class="standards-group"><h4>${esc(group)}</h4>${items.map(([code, desc]) => `<div class="standard-item"><strong>${esc(code)}</strong><br>${esc(desc)}</div>`).join("")}</section>`,
+      )
+      .join(
+        "",
+      )}</div><div class="modal-actions"><button class="btn primary modal-dismiss" id="closeStandards">Close</button></div></div></div>`;
+  document.getElementById("closeStandards").onclick = () =>
+    (document.getElementById("modalRoot").innerHTML = "");
+}
+
+function activityTableRowHtml(cols, values) {
+  values = values || [];
+  return `<tr>${cols.map((c, i) => `<td><input type="text" class="actTableCell" data-col="${i}" value="${esc(values[i] || "")}" placeholder="${esc(c)}"></td>`).join("")}<td><button type="button" class="btn actRemoveRow" title="Remove row" style="padding:4px 9px;font-size:12px">✕</button></td></tr>`;
+}
+
+function openActivity(title) {
+  let detail = ACTIVITY_DETAILS[title] || { prompt: "Complete the activity described by your teacher." };
+  let saved = state.activityResponses[title];
+  let isStructured = !!(detail.table || detail.fields);
+  let bodyHtml = "";
+  if (detail.table) {
+    let cols = detail.table;
+    let savedRows = saved && Array.isArray(saved.table) ? saved.table : null;
+    let rows = savedRows && savedRows.length ? savedRows : detail.presetRows || Array.from({ length: detail.minRows || 1 }, () => []);
+    bodyHtml += `<div style="overflow:auto"><table class="rubric" id="actTable"><thead><tr>${cols.map((c) => `<th>${esc(c)}</th>`).join("")}<th></th></tr></thead><tbody id="actTableBody">${rows.map((r) => activityTableRowHtml(cols, r)).join("")}</tbody></table></div><button type="button" class="btn" id="actAddRow" style="margin-top:8px">+ Add Row</button>`;
+  }
+  if (detail.fields) {
+    let savedFields = saved && Array.isArray(saved.fields) ? saved.fields : [];
+    bodyHtml += detail.fields
+      .map((f, i) => `<div class="field"><label>${esc(f.label)}</label><textarea class="actField writingbox short" data-idx="${i}" placeholder="${esc(f.placeholder || "")}">${esc(savedFields[i] || "")}</textarea></div>`)
+      .join("");
+  }
+  if (!isStructured) {
+    let legacyVal = typeof saved === "string" ? saved : "";
+    bodyHtml += `<textarea id="activityResponse" class="activity-response" placeholder="Record your thinking or response here...">${esc(legacyVal)}</textarea>`;
+  }
+  if (detail.reflection) {
+    let savedReflection = (saved && typeof saved === "object" && saved.reflection) || "";
+    bodyHtml += `<div class="field" style="margin-top:14px"><label><strong>${esc(detail.reflection)}</strong></label><textarea id="actReflection" class="writingbox short" placeholder="Your answer...">${esc(savedReflection)}</textarea></div>`;
+  }
+  document.getElementById("modalRoot").innerHTML =
+    `<div class="modal"><div class="modalbox" style="max-width:720px;max-height:88vh;overflow:auto"><div class="pill">Built-in Activity</div><h3>${esc(title)}</h3><p>${esc(detail.prompt || "")}</p>${bodyHtml}<div class="modal-actions"><button class="btn modal-dismiss" id="cancelModal">Close</button><button class="btn primary" id="saveActivity">Save Response</button></div></div></div>`;
+  document.getElementById("cancelModal").onclick = () =>
+    (document.getElementById("modalRoot").innerHTML = "");
+  function bindRowRemovers() {
+    document.querySelectorAll(".actRemoveRow").forEach((b) => (b.onclick = () => {
+      let body = document.getElementById("actTableBody");
+      if (body && body.children.length > 1) b.closest("tr").remove();
+    }));
+  }
+  let addRowBtn = document.getElementById("actAddRow");
+  if (addRowBtn)
+    addRowBtn.onclick = () => {
+      document.getElementById("actTableBody").insertAdjacentHTML("beforeend", activityTableRowHtml(detail.table, []));
+      bindRowRemovers();
+    };
+  bindRowRemovers();
+  document.getElementById("saveActivity").onclick = () => {
+    if (!isStructured) {
+      state.activityResponses[title] = document.getElementById("activityResponse").value;
+      save();
+      document.getElementById("modalRoot").innerHTML = "";
+      alert("Activity response saved.");
+      return;
+    }
+    let response = {};
+    if (detail.table)
+      response.table = Array.from(document.querySelectorAll("#actTableBody tr"))
+        .map((tr) => Array.from(tr.querySelectorAll(".actTableCell")).map((inp) => inp.value))
+        .filter((row) => row.some((c) => c.trim()));
+    if (detail.fields) response.fields = Array.from(document.querySelectorAll(".actField")).map((t) => t.value);
+    if (detail.reflection) response.reflection = document.getElementById("actReflection").value;
+    state.activityResponses[title] = response;
+    save();
+    document.getElementById("modalRoot").innerHTML = "";
+    alert("Activity response saved.");
+  };
+}
+
+// Reads the selected passage WITHOUT the margin line numbers. CSS user-select
+// keeps them out of a normal drag, but a selection that starts before a number
+// and ends after it can still pick the digits up, so the numbers are removed
+// from a copy of the selected markup rather than trusted to styling alone.
+function selectedQuote_(sel) {
+  if (!sel || !sel.rangeCount) return "";
+  try {
+    let frag = sel.getRangeAt(0).cloneContents();
+    Array.prototype.slice.call(frag.querySelectorAll(".lineno")).forEach((el) => el.remove());
+    return frag.textContent.replace(/[ \t]+\n/g, "\n").trim();
+  } catch (e) {
+    return sel.toString().trim();
+  }
+}
+
+function addHighlight(eqId, key) {
+  let sel = window.getSelection();
+  let quote = selectedQuote_(sel);
+  if (!quote) return alert("Select a passage in the Original Text first.");
+  let pane = document.getElementById("originalPane");
+  if (!pane.contains(sel.anchorNode)) return alert("Select text from the Original Text pane.");
+  let e = EQ.find((x) => x.id === eqId);
+  document.getElementById("modalRoot").innerHTML =
+    `<div class="modal"><div class="modalbox"><div class="pill">${eqLabel(e)}</div><h3>Explain your evidence</h3><blockquote>“${esc(quote)}”</blockquote><p>${esc(e.q)}</p><textarea class="notearea" id="evNote" placeholder="Explain how this passage helps answer the essential question..."></textarea><div class="modal-actions"><button class="btn modal-dismiss" id="cancelModal">Cancel</button><button class="btn primary" id="saveEv">Save Evidence</button></div></div></div>`;
+  document.getElementById("cancelModal").onclick = () =>
+    (document.getElementById("modalRoot").innerHTML = "");
+  document.getElementById("saveEv").onclick = () => {
+    let note = document.getElementById("evNote").value.trim();
+    if (!note) return alert("Add a note explaining the connection.");
+    let s = CHAPTERS[key];
+    try {
+      state.evidence.push({ id: Date.now(), eq: eqId, quote, note, act: s.act, scene: s.scene });
+      save();
+      alert("Evidence saved to your Evidence Bank.");
+    } catch (err) {
+      console.error("Evidence save failed:", err);
+      alert(
+        "Your evidence was recorded, but there was a problem saving it (" +
+          (err && err.message ? err.message : err) +
+          "). If this keeps happening, tell your teacher this exact message.",
+      );
+    } finally {
+      document.getElementById("modalRoot").innerHTML = "";
+      render();
+    }
+  };
+}
+
+
+// ---------------------------------------------------------------------------
+// Written-response origin tracking
+//
+// The DOK box records which CHARACTERS of the final answer arrived by paste
+// rather than by typing, so the teacher can see pasted spans highlighted when
+// marking. It stores character ranges only -- no keystroke log, no clipboard
+// history, nothing the student does not submit anyway. Text pasted out of the
+// chapter the student is reading is tagged separately as a quotation, because
+// citing the novel is the assignment, not a red flag.
+// ---------------------------------------------------------------------------
+const PASTE_MIN_CHARS = 8; // a pasted word or a fixed typo is not worth flagging
+
+function dokOriginArray_(meta, len) {
+  let a = new Array(len).fill("t");
+  let spans = meta && Array.isArray(meta.spans) ? meta.spans : [];
+  spans.forEach((sp) => {
+    let from = Math.max(0, sp[0] | 0);
+    let to = Math.min(len, sp[1] | 0);
+    for (let i = from; i < to; i++) a[i] = sp[2] === "q" ? "q" : "p";
+  });
+  return a;
+}
+function dokMetaFromOrigin_(a, events) {
+  let spans = [];
+  let i = 0;
+  while (i < a.length) {
+    if (a[i] === "t") { i++; continue; }
+    let j = i;
+    while (j < a.length && a[j] === a[i]) j++;
+    spans.push([i, j, a[i]]);
+    i = j;
+  }
+  let pasted = 0, quoted = 0;
+  spans.forEach((sp) => { if (sp[2] === "q") quoted += sp[1] - sp[0]; else pasted += sp[1] - sp[0]; });
+  return { spans: spans, pasted: pasted, quoted: quoted, total: a.length, events: events || 0 };
+}
+// A single input event changes one contiguous region, so a common prefix /
+// suffix diff tells us exactly which characters are new. Marking only those
+// keeps the rest of the map correct through later edits anywhere in the answer.
+function dokDiff_(oldText, newText) {
+  let max = Math.min(oldText.length, newText.length);
+  let p = 0;
+  while (p < max && oldText[p] === newText[p]) p++;
+  let s = 0;
+  while (s < max - p && oldText[oldText.length - 1 - s] === newText[newText.length - 1 - s]) s++;
+  return { p: p, s: s, insertedLen: newText.length - s - p };
+}
+function dokApplyEdit_(origin, oldText, d, kind) {
+  let mid = new Array(d.insertedLen > 0 ? d.insertedLen : 0).fill(kind);
+  return origin.slice(0, d.p).concat(mid, origin.slice(oldText.length - d.s));
+}
+function normalizeForMatch_(t) {
+  return String(t || "")
+    .replace(/[‘’‛]/g, "'")
+    .replace(/[“”]/g, '"')
+    .replace(/[–—]/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+// Is this pasted text lifted from the chapter the student is reading (a quote)?
+// The chapter text lives only in the DOM (the teacher's pasted storyTextStore
+// section), never in this file, so this reads it back the same way the reader does.
+function pastedFromScene_(text, key) {
+  let needle = normalizeForMatch_(text);
+  if (needle.length < PASTE_MIN_CHARS) return false;
+  let act = +String(key).split(".")[0];
+  let hay = normalizeForMatch_(chapterFullText_(act));
+  if (!hay) return false;
+  return hay.indexOf(needle) !== -1;
+}
+function attachDokBox(el, key) {
+  if (!el) return;
+  state.dokMeta = state.dokMeta || {};
+  let prev = el.value;
+  let meta = state.dokMeta[key] || null;
+  let origin = dokOriginArray_(meta, prev.length);
+  let events = meta && meta.events ? meta.events : 0;
+  let pendingKind = null;
+  let clipboardRead = false; // did the paste handler actually see the text?
+
+  function noteIncoming(text) {
+    let t = String(text || "");
+    clipboardRead = t.length > 0;
+    // A pasted word or a corrected typo is not worth marking up.
+    if (t.length < PASTE_MIN_CHARS) { pendingKind = null; return; }
+    pendingKind = pastedFromScene_(t, key) ? "q" : "p";
+  }
+  el.addEventListener("paste", (e) => {
+    let t = "";
+    try { t = ((e.clipboardData || window.clipboardData).getData("text") || ""); } catch (err) { t = ""; }
+    noteIncoming(t);
+  });
+  el.addEventListener("drop", (e) => {
+    let t = "";
+    try { t = (e.dataTransfer && e.dataTransfer.getData("text")) || ""; } catch (err) { t = ""; }
+    noteIncoming(t);
+  });
+  el.oninput = (e) => {
+    let next = el.value;
+    // inputType is the reliable signal that this was a paste; the paste handler
+    // above only exists to read the text, so a quotation can be told from an
+    // outside paste. If the clipboard could not be read, fall back to the size
+    // of the insertion so a real paste is still caught.
+    let it = e && e.inputType;
+    let pasteish = it === "insertFromPaste" || it === "insertFromDrop" || it === "insertFromPasteAsQuotation";
+    let d = dokDiff_(prev, next);
+    let kind = "t";
+    if (pendingKind) kind = pendingKind;
+    else if (pasteish && !clipboardRead && d.insertedLen >= PASTE_MIN_CHARS) kind = "p";
+    if (kind !== "t") events++;
+    pendingKind = null;
+    clipboardRead = false;
+    origin = dokApplyEdit_(origin, prev, d, kind);
+    if (origin.length !== next.length) origin = dokOriginArray_(null, next.length); // safety net
+    prev = next;
+    state.dok[key] = next;
+    state.dokMeta[key] = dokMetaFromOrigin_(origin, events);
+    save();
+  };
+}
+
+// A quote captured from the page and the scene text it came from do not agree
+// about whitespace: the source has a newline between verse lines, while the
+// browser hands back whatever the selection's textContent happened to contain
+// once the line-number spans were stripped. An exact indexOf then failed for
+// any selection spanning more than one line -- the evidence saved fine, but the
+// highlight silently never appeared. So match on a whitespace-flattened copy
+// and map the hit back to real offsets in the original.
+function flattenForSearch_(text) {
+  let flat = "";
+  let map = [];   // index in `flat` -> index in `text`
+  let lastWasSpace = true;
+  for (let i = 0; i < text.length; i++) {
+    let ch = text[i];
+    if (/\s/.test(ch)) {
+      if (lastWasSpace) continue;
+      flat += " ";
+      map.push(i);
+      lastWasSpace = true;
+    } else {
+      flat += ch;
+      map.push(i);
+      lastWasSpace = false;
+    }
+  }
+  return { flat: flat, map: map };
+}
+function findQuoteRange_(text, flatIndex, quote, isFree) {
+  let needle = String(quote || "").replace(/\s+/g, " ").trim();
+  if (!needle) return null;
+  let from = 0;
+  while (true) {
+    let at = flatIndex.flat.indexOf(needle, from);
+    if (at < 0) return null;
+    let start = flatIndex.map[at];
+    let end = flatIndex.map[at + needle.length - 1] + 1;
+    if (isFree(start, end)) return { start: start, end: end };
+    from = at + 1;
+  }
+}
+function injectHighlights(text, act) {
+  let items = (state.evidence || []).filter((x) => x.act === act);
+  if (!items.length) return text;
+  let ranges = [];
+  let flatIndex = flattenForSearch_(text);
+  items.forEach((item) => {
+    let q = esc(item.quote || "");
+    if (!q) return;
+    let hit = findQuoteRange_(text, flatIndex, q, function (start, end) {
+      return !ranges.some((r) => start < r.end && end > r.start);
+    });
+    if (hit) ranges.push({ start: hit.start, end: hit.end, item: item });
+  });
+  if (!ranges.length) return text;
+  ranges.sort((a, b) => a.start - b.start);
+  let out = "";
+  let cursor = 0;
+  ranges.forEach((r) => {
+    let eqDef = EQ.find((e) => e.id === r.item.eq);
+    let color = eqDef ? eqDef.color : "var(--gold)";
+    out += text.slice(cursor, r.start);
+    out += `<mark class="ev-hl" data-ev-id="${r.item.id}" style="--ev-color:${color}" title="${esc(
+      eqDef ? eqDef.label : "Saved evidence",
+    )}${r.item.note ? " — " + esc(r.item.note.slice(0, 90)) : ""}">`;
+    out += text.slice(r.start, r.end);
+    out += "</mark>";
+    cursor = r.end;
+  });
+  out += text.slice(cursor);
+  return out;
+}
+
+function bind() {
+  let dupUnitBtn = document.getElementById("dupUnitBtn");
+  if (dupUnitBtn)
+    dupUnitBtn.onclick = () =>
+      alert(
+        "Unit duplication is managed from the connected class backend. Once deployed, use Teacher Dashboard > Create a Class to start a new section of this same unit — each class gets its own code and release settings automatically.",
+      );
+  document.querySelectorAll("[data-role]").forEach((b) => {
+    b.classList.toggle("active", b.dataset.role === state.role);
+    b.onclick = () => {
+      state.role = b.dataset.role;
+      save();
+      render();
+    };
+  });
+  document.querySelectorAll("[data-goto]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        // Paging from the last scene of an Act into the first of the next one
+        // should open that Act in the sidebar too.
+        syncNavAct_(b.dataset.goto);
+        state.view = b.dataset.goto;
+        save();
+        render();
+      }),
+  );
+  document
+    .querySelectorAll(".openActivity")
+    .forEach((b) => (b.onclick = () => openActivity(b.dataset.activity)));
+  // Every way of moving between stages goes through here: a stop on the journey
+  // strip, the Next button, the Back button. Work is already saved on every
+  // keystroke; save() again so the step itself is remembered, then put the
+  // reader at the top of the new stage rather than wherever they were scrolled
+  // to on the old one.
+  document.querySelectorAll("[data-estep]").forEach(
+    (b) =>
+      (b.onclick = () => {
+        if (!essayStepReleased(b.dataset.estep))
+          return alert(
+            essayStepLabel(b.dataset.estep) +
+              " has not been opened yet. Your teacher releases each stage of the essay as the class reaches it.",
+          );
+        let moving = state.essay.step !== b.dataset.estep;
+        state.essay.step = b.dataset.estep;
+        save();
+        render();
+        if (moving) {
+          let head = document.querySelector(".essay-journey");
+          if (head && head.scrollIntoView) head.scrollIntoView({ block: "start" });
+          else window.scrollTo(0, 0);
+        }
+      }),
+  );
+  document.querySelectorAll(".themePick").forEach(
+    (r) =>
+      (r.onchange = () => {
+        state.essay.theme = r.value;
+        save();
+        render();
+      }),
+  );
+  let tb = document.getElementById("thesisBox");
+  if (tb)
+    tb.oninput = (e) => {
+      state.essay.thesis = e.target.value;
+      save();
+      document.getElementById("thesisCoach").innerHTML = coach(e.target.value, "thesis");
+    };
+  let post = document.getElementById("postThesis");
+  if (post)
+    post.onclick = () => {
+      let text = state.essay.thesis.trim();
+      if (!text) return;
+      state.essay.discussion.push({ text, date: new Date().toLocaleString() });
+      save();
+      render();
+    };
+  document.querySelectorAll(".bodyBox").forEach(
+    (t) =>
+      (t.oninput = (e) => {
+        let i = +t.dataset.body;
+        state.essay.bodies[i] = e.target.value;
+        save();
+        let c = document.getElementById("bodyCoach" + i);
+        if (c) c.innerHTML = coach(e.target.value, "body");
+        // The "n of 3 drafted" line and the Required/Drafted chip are the only
+        // other things on screen that depend on this text, so patch those two
+        // rather than re-rendering and throwing away the cursor mid-sentence.
+        refreshBodyProgress_();
+      }),
+  );
+  let addBody = document.getElementById("addBodyBtn");
+  if (addBody)
+    addBody.onclick = () => {
+      if (state.essay.bodies.length >= MAX_BODIES) return;
+      state.essay.bodies.push("");
+      save();
+      render();
+      // Put the cursor in the box they just asked for.
+      let boxes = document.querySelectorAll(".bodyBox");
+      let last = boxes[boxes.length - 1];
+      if (last) { last.focus(); last.scrollIntoView({ behavior: "smooth", block: "center" }); }
+    };
+  document.querySelectorAll(".removeBodyBtn").forEach(
+    (b) =>
+      (b.onclick = () => {
+        let i = +b.dataset.body;
+        if (i < REQUIRED_BODIES) return;   // the first three are not removable
+        let written = String(state.essay.bodies[i] || "").trim();
+        if (written && !confirm("Delete this extra paragraph? What you wrote in it will be lost.")) return;
+        state.essay.bodies.splice(i, 1);
+        while (state.essay.bodies.length < REQUIRED_BODIES) state.essay.bodies.push("");
+        save();
+        render();
+      }),
+  );
+  let rebuttal = document.getElementById("rebuttalBox");
+  if (rebuttal)
+    rebuttal.oninput = (e) => {
+      state.essay.rebuttal = e.target.value;
+      save();
+      let c = document.getElementById("rebuttalCoach");
+      if (c) c.innerHTML = coach(e.target.value, "body");
+    };
+  let intro = document.getElementById("introBox");
+  if (intro)
+    intro.oninput = (e) => {
+      state.essay.intro = e.target.value;
+      save();
+      document.getElementById("introCoach").innerHTML = coach(e.target.value, "intro");
+    };
+  let con = document.getElementById("conclusionBox");
+  if (con)
+    con.oninput = (e) => {
+      state.essay.conclusion = e.target.value;
+      save();
+      document.getElementById("conclusionCoach").innerHTML = coach(e.target.value, "conclusion");
+    };
+  let copy = document.getElementById("copyEssay");
+  if (copy)
+    copy.onclick = async () => {
+      let full = [state.essay.intro, ...state.essay.bodies, state.essay.conclusion]
+        .filter((x) => x.trim())
+        .join("\n\n");
+      try {
+        await navigator.clipboard.writeText(full);
+        alert("Full essay copied.");
+      } catch (e) {
+        alert("Copy is not available in this browser. Select the essay text and copy it manually.");
+      }
+    };
+  document.querySelectorAll(".self-band").forEach(
+    (x) =>
+      (x.onclick = () => {
+        state.essay.selfEval[x.dataset.crit] = x.dataset.band;
+        save();
+        render();
+      }),
+  );
+  document.querySelectorAll(".selfComment").forEach(
+    (x) =>
+      (x.oninput = () => {
+        state.essay.selfComments[x.dataset.crit] = x.value;
+        save();
+      }),
+  );
+  document.querySelectorAll(".openStandards").forEach((x) => (x.onclick = openStandards));
+  if (state.view.startsWith("scene:")) {
+    let key = state.view.split(":")[1];
+    let sb = document.getElementById("supportBtn");
+    if (sb)
+      sb.onclick = () => {
+        // Remembered in state, not just in the DOM. Answering a multiple-choice
+        // question re-renders the chapter, and a DOM-only toggle was wiped every
+        // time -- students had to reopen the reading support panel after every answer.
+        state.supportOpen = !state.supportOpen;
+        let panel = document.getElementById("readingSupportPanel");
+        if (panel) panel.classList.toggle("hide", !state.supportOpen);
+        sb.classList.toggle("active", state.supportOpen);
+        save();
+      };
+    document
+      .querySelectorAll(".hilite")
+      .forEach((b) => (b.onclick = () => addHighlight(b.dataset.eq, key)));
+    document.querySelectorAll("[data-answer]").forEach(
+      (b) =>
+        (b.onclick = () => {
+          let info = answerInfo(key, state.answers[key]);
+          if (info.locked) return;
+          let picked = +b.dataset.answer;
+          if (info.picks.includes(picked)) return;
+          state.answers[key] = [...info.picks, picked];
+          save();
+          render();
+        }),
+    );
+    attachDokBox(document.getElementById("dok"), key);
+  }
+  document.querySelectorAll(".scene-pager-btn").forEach(
+    (b) =>
+      (b.onclick = () => {
+        let v = b.dataset.view;
+        if (!v) return;
+        if (v.startsWith("scene:") && !released(v.split(":")[1])) {
+          alert("This chapter has not been released yet.");
+          return;
+        }
+        state.view = v;
+        save();
+        render();
+        window.scrollTo(0, 0);
+      }),
+  );
+  document.querySelectorAll(".removeEv").forEach(
+    (b) =>
+      (b.onclick = () => {
+        state.evidence = state.evidence.filter((x) => x.id != b.dataset.id);
+        save();
+        render();
+      }),
+  );
+  document.querySelectorAll(".actRelease").forEach(
+    (c) =>
+      (c.onchange = () => {
+        let a = +c.dataset.act;
+        state.releasedActs = c.checked
+          ? [...new Set([...state.releasedActs, a])]
+          : state.releasedActs.filter((x) => x !== a);
+        save();
+        render();
+      }),
+  );
+  document.querySelectorAll(".sceneRelease").forEach(
+    (c) =>
+      (c.onchange = () => {
+        state.releasedScenes[c.dataset.key] = c.checked;
+        save();
+      }),
+  );
+  let esel = document.querySelector(".essayReleaseSelect");
+  if (esel)
+    esel.onchange = () => {
+      state.releasedEssayThrough = esel.value;
+      save();
+      render();
+    };
+  let enext = document.querySelector(".essayReleaseNext");
+  if (enext)
+    enext.onclick = () => {
+      let i = essayReleasedThrough();
+      if (i >= ESSAY_JOURNEY.length - 1) return;
+      state.releasedEssayThrough = ESSAY_JOURNEY[i + 1][0];
+      save();
+      render();
+    };
+  let rt = document.getElementById("resourceToggle");
+  if (rt)
+    rt.onchange = () => {
+      state.teacherResources = rt.checked;
+      save();
+    };
+}
+
+function render() {
+  sidebar();
+  let app = document.getElementById("app");
+  let v = String(state.view || "home");
+  if (v.startsWith("scene:")) app.innerHTML = scene(v.split(":")[1]);
+  else if (v === "evidence") app.innerHTML = evidence();
+  else if (v === "essay") app.innerHTML = essay();
+  else if (v === "manage") app.innerHTML = manage();
+  else if (v === "batchGrade") app.innerHTML = batchGrade();
+  else if (v === "essayGrade") app.innerHTML = essayGrade();
+  else if (v === "admin") app.innerHTML = admin();
+  else app.innerHTML = home();
+  bind();
+  navSync_();
+}
+
+(function bindModalBackdropDismiss() {
+  const root = document.getElementById("modalRoot");
+  if (!root) return;
+  root.addEventListener("click", function (e) {
+    if (e.target && e.target.classList && e.target.classList.contains("modal")) {
+      const dismiss = e.target.querySelector(".modal-dismiss");
+      if (dismiss) dismiss.click();
+      else root.innerHTML = "";
+    }
+  });
+})();
+__MB.AppLogic = 'ok';
+</script>

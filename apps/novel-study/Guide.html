@@ -1,0 +1,552 @@
+<script>
+// ============================================================================
+// Teacher guide for each unit (week / arc / day) + the Common Core standards button.
+//   * NV.std    -- which CCSS ELA standards an activity, a unit and the whole study practice
+//                  (grade from builder step 2, activity types, the study's focus areas).
+//   * NV.G.plan -- the timed session plan, worked out from how the teacher teaches (mode, class
+//                  length, sessions per unit, where students read) and the unit's activities.
+//   * view "guide" -- one unit at a time: at a glance, session plan, book notes (AI, editable),
+//                  standards, ideas to add, how to run each activity in this mode. Printable.
+//   * NV.G.standardsModal -- the 🎯 Standards button (dashboard, builder, guide).
+// Teacher-only. The look is in NovelTheme.
+// ============================================================================
+(function () {
+  var G = NV.G = { data: null, classId: '', n: 0, edit: false, dirty: false, busy: false, run: null, msg: '', teachOpen: false };
+  var A = NV.act = NV.act || {};
+  function esc(s) { return NV.esc(s); }
+  function cid() { return (NV.T && NV.T.classId) || G.classId; }
+
+  // ---------------------------------------------------------------- standards
+  var STRAND_ORDER = { RL: 1, W: 2, SL: 3, L: 4 };
+  NV.std = {
+    full: function (std, short) { var m = /^([A-Z]+)\.(\d+)$/.exec(short); return m ? m[1] + '.' + std.band + '.' + m[2] : short; },
+    sort: function (codes) {
+      return codes.slice().sort(function (a, b) {
+        var x = /^([A-Z]+)\.[^.]+\.(\d+)/.exec(a) || [], y = /^([A-Z]+)\.[^.]+\.(\d+)/.exec(b) || [];
+        return ((STRAND_ORDER[x[1]] || 9) - (STRAND_ORDER[y[1]] || 9)) || (Number(x[2]) - Number(y[2])) || (a < b ? -1 : 1);
+      });
+    },
+    strandOf: function (code) { var m = /^([A-Z]+)\./.exec(code); return m ? m[1] : ''; },
+    /** One activity: its type's standards, plus the focus areas' reading standards for the activities that
+     *  analyze, plus any codes the AI attached that exist at this grade. */
+    forAct: function (std, a, focus) {
+      if (!std) return [];
+      var out = [], seen = {};
+      function add(c) { if (!seen[c] && std.statements[c]) { seen[c] = true; out.push(c); } }
+      ((std.byActivity || {})[a.type] || []).forEach(function (s) { add(NV.std.full(std, s)); });
+      if ((std.focusActs || []).indexOf(a.type) >= 0) (focus || []).forEach(function (f) { ((std.byFocus || {})[f] || []).forEach(function (s) { add(NV.std.full(std, s)); }); });
+      (a.standards || []).forEach(function (c) { add(String(c).trim()); });
+      return NV.std.sort(out);
+    },
+    forUnit: function (std, u, focus) {
+      var acts = (u.activities || []).map(function (a) { return { a: a, codes: NV.std.forAct(std, a, focus) }; });
+      var read = NV.std.forAct(std, { type: 'read' }, focus), all = {};
+      read.concat.apply(read, acts.map(function (x) { return x.codes; })).forEach(function (c) { all[c] = true; });
+      return { read: read, acts: acts, all: NV.std.sort(Object.keys(all)) };
+    },
+    /** code -> [{n, label, what}] across every unit of the study. */
+    forStudy: function (std, study) {
+      var map = {};
+      (study.units || []).forEach(function (u) {
+        if (!(u.reading && u.reading.label) && !(u.activities || []).length) return;
+        var r = NV.std.forUnit(std, u, study.focusAreas);
+        function note(c, what) { (map[c] = map[c] || []).push({ n: u.n, label: u.label || ((study.unitWord || 'Week') + ' ' + u.n), what: what }); }
+        r.read.forEach(function (c) { note(c, 'Reading'); });
+        r.acts.forEach(function (x) { x.codes.forEach(function (c) { note(c, x.a.title || x.a.type); }); });
+      });
+      return map;
+    },
+    chips: function (codes, std) {
+      return codes.map(function (c) { return '<span class="nv-std-chip" title="' + esc(std.statements[c] || '') + '">' + esc(c) + '</span>'; }).join('');
+    }
+  };
+  /** Which activity would add a standard nobody practices yet. */
+  var ADDS = { 'SL.1': 'discussion', 'SL.4': 'discussion', 'SL.5': 'creative', 'W.1': 'analysis', 'W.2': 'analysis', 'W.3': 'creative', 'W.4': 'analysis', 'W.9': 'evidence', 'W.10': 'reflection',
+    'L.4': 'vocabulary', 'L.5': 'vocabulary', 'L.6': 'vocabulary', 'RL.4': 'close_reading', 'RL.5': 'close_reading', 'RL.1': 'evidence', 'RL.2': 'reflection', 'RL.3': 'quiz' };
+  var ADD_HOW = { 'RL.6': 'Pick “Point of View” as a focus area (step 3): written responses and discussions then work on it.', 'RL.7': 'Pair the book with a film clip, painting or audio version and compare what each one stresses.',
+    'RL.9': 'Pair a reading with a source or historical text (the AI notes suggest companions), or pick “Historical / Social Context” as a focus area.', 'SL.4': 'Have students present a claim to the class (a short talk or a recorded video).', 'W.2': 'Ask for an explanatory piece: how the author builds an idea, in a Written Response.' };
+
+  function actLabel(type) { var L = (((G.data || {}).choices || (NV.T && NV.T.dash && NV.T.dash.choices) || {}).activities || {})[type]; return L ? L.icon + ' ' + L.label : type; }
+
+  /** The 🎯 Standards button: one unit (n) or the whole study. */
+  G.standardsModal = function (study, std, n) {
+    if (!std || !study) return;
+    var word = study.unitWord || 'Week', units = study.units || [];
+    function body(sel) {
+      var h = '<div class="nv-std-head"><div><h2 id="nvModalTitle">🎯 Common Core standards</h2><p class="nv-muted">' + esc(std.bandLabel) + (std.gradeChosen ? '' : ' (no grade chosen yet: set it in builder step 2, “The book”)') + ' · Reading: Literature, Writing, Speaking &amp; Listening, Language. They follow the grade and the activities in each ' + esc(word.toLowerCase()) + '.</p></div></div>';
+      h += '<div class="nv-std-pick" role="tablist"><button type="button" class="nv-chip-btn' + (!sel ? ' is-on' : '') + '" data-std-n="0">Whole study</button>' + units.map(function (u) { return '<button type="button" class="nv-chip-btn' + (sel === u.n ? ' is-on' : '') + '" data-std-n="' + u.n + '">' + esc(word + ' ' + u.n) + '</button>'; }).join('') + '</div>';
+      if (sel) {
+        var u = units[sel - 1]; if (!u) return h;
+        var r = NV.std.forUnit(std, u, study.focusAreas);
+        h += '<p class="nv-small"><b>' + esc(word + ' ' + sel) + (u.title ? ' · ' + esc(u.title) : '') + '</b>' + (u.reading && u.reading.label ? ' · ' + esc(u.reading.label) : '') + '</p>';
+        h += '<div class="nv-std-acts">' + [{ a: { title: 'The reading', type: 'read' }, codes: r.read }].concat(r.acts).map(function (x) {
+          return '<div class="nv-std-act"><b>' + (x.a.type === 'read' ? '📖 The reading' : esc(actLabel(x.a.type).split(' ')[0] + ' ' + (x.a.title || x.a.type))) + (x.a.graded === false ? ' <small class="nv-muted">practice</small>' : '') + '</b><div>' + (x.codes.length ? NV.std.chips(x.codes, std) : '<span class="nv-muted nv-small">—</span>') + '</div></div>';
+        }).join('') + '</div>';
+        h += listHtml(r.all.map(function (c) { return { code: c, where: [] }; }));
+        h += '<div class="nv-row"><button type="button" class="nv-btn small" data-std-copy="' + sel + '">Copy for a lesson plan</button></div>';
+      } else {
+        var map = NV.std.forStudy(std, study), covered = NV.std.sort(Object.keys(map));
+        if (!covered.length) h += '<p class="nv-empty">Nothing planned yet. Readings and activities you add in the builder show up here.</p>';
+        h += listHtml(covered.map(function (c) { return { code: c, where: map[c] }; }));
+        var missing = NV.std.sort(Object.keys(std.statements).filter(function (c) { return !map[c]; }));
+        if (missing.length) h += '<details class="nv-std-missing"><summary>Not practiced yet: ' + missing.length + '</summary><ul>' + missing.map(function (c) {
+          var short = c.replace('.' + std.band + '.', '.'), add = ADDS[short], how = ADD_HOW[short] || (add ? 'Add a ' + actLabel(add) + ' to a ' + word.toLowerCase() + '.' : '');
+          return '<li><b>' + esc(c) + '</b> ' + esc(std.statements[c]) + (how ? '<br><span class="nv-std-how">→ ' + esc(how) + '</span>' : '') + '</li>';
+        }).join('') + '</ul></details>';
+        h += '<div class="nv-row"><button type="button" class="nv-btn small" data-std-copy="0">Copy the whole list</button></div>';
+      }
+      h += '<p class="nv-std-credit">' + esc(std.credit) + '</p><div class="nv-row"><button type="button" class="nv-btn" onclick="NV.closeModal()">Close</button></div>';
+      return h;
+    }
+    function listHtml(rows) {
+      return NV_STD_STRANDS(std).map(function (s) {
+        var mine = rows.filter(function (r) { return NV.std.strandOf(r.code) === s.key; }); if (!mine.length) return '';
+        return '<h3 class="nv-std-strand">' + esc(s.label) + '</h3><ul class="nv-std-list">' + mine.map(function (r) {
+          var where = (r.where || []), byUnit = {};
+          where.forEach(function (w) { (byUnit[w.n] = byUnit[w.n] || []).push(w.what); });
+          return '<li><span class="nv-std-code">' + esc(r.code) + '</span><span class="nv-std-text">' + esc(std.statements[r.code] || '') +
+            (where.length ? '<span class="nv-std-where">' + Object.keys(byUnit).map(function (k) { return esc(word + ' ' + k); }).join(' · ') + '</span>' : '') + '</span></li>';
+        }).join('') + '</ul>';
+      }).join('');
+    }
+    function copyText(sel) {
+      var lines = [std.bandLabel + ' — Common Core ELA'];
+      var codes = sel ? NV.std.forUnit(std, units[sel - 1], study.focusAreas).all : NV.std.sort(Object.keys(NV.std.forStudy(std, study)));
+      if (sel) lines[0] = word + ' ' + sel + (units[sel - 1].title ? ': ' + units[sel - 1].title : '') + ' — ' + lines[0];
+      codes.forEach(function (c) { lines.push(c + '  ' + std.statements[c]); });
+      return lines.join('\n');
+    }
+    function paint(sel) {
+      NV.modal('<div class="nv-std">' + body(sel) + '</div>');
+      var card = document.querySelector('#nvModal .nv-modal-card'); if (card) card.classList.add('is-wide');
+      document.querySelectorAll('[data-std-n]').forEach(function (b) { b.onclick = function () { paint(Number(b.dataset.stdN)); }; });
+      document.querySelectorAll('[data-std-copy]').forEach(function (b) {
+        b.onclick = function () {
+          var t = copyText(Number(b.dataset.stdCopy));
+          try { navigator.clipboard.writeText(t).then(function () { NV.toast('Copied.'); }, function () { fallback(t); }); } catch (e) { fallback(t); }
+        };
+      });
+    }
+    function fallback(t) { var ta = document.createElement('textarea'); ta.value = t; document.body.appendChild(ta); ta.select(); try { document.execCommand('copy'); NV.toast('Copied.'); } catch (e) { NV.toast('Select the text and copy it yourself.'); } ta.remove(); }
+    paint(n || 0);
+  };
+  function NV_STD_STRANDS(std) { return std.strands || [{ key: 'RL', label: 'Reading: Literature' }, { key: 'W', label: 'Writing' }, { key: 'SL', label: 'Speaking & Listening' }, { key: 'L', label: 'Language' }]; }
+  // The modal card shrinks back for every other modal.
+  var _modal = NV.modal; NV.modal = function (html, opts) { var c = document.querySelector('#nvModal .nv-modal-card'); if (c) c.classList.remove('is-wide'); return _modal(html, opts); };
+
+  // ---------------------------------------------------------------- how each activity runs, by mode
+  // Content as data: edit the wording here.
+  var TIPS = {
+    launch: { inperson: 'Put the essential question on the board. Students write a two-minute first answer they will come back to at the end.', live: 'Post the essential question in the chat and do a “waterfall”: everyone types an answer and sends it at the same moment.', async: 'Post a short note or video that opens the unit: the essential question, what to read, and what is due when.', hybrid: 'Show the essential question on screen for both groups; everyone answers in the chat so remote and in-room answers sit together.' },
+    read: { inperson: 'Quiet reading with Sora open (or books out). Read the first page aloud to set the voice, then circulate. The reading tracker on the dashboard shows who is behind.', live: 'Play the audiobook for the first few minutes, then quiet reading with a timer on screen, cameras optional. Students tick the Read step when they reach the stop.', async: 'Give a day to finish the reading by. Students tick “done” or “partway” in the Read step, so the dashboard shows who needs a nudge.', hybrid: 'One timer for both groups. Remote students can use the audiobook; the room reads silently.' },
+    bellringer: { inperson: 'Up on the board as students walk in. Five minutes, then two volunteers share.', live: 'Post it as class opens; students answer in the app while you take attendance.', async: 'The first thing in each day’s work. A quick look tells you who started.', hybrid: 'Everyone answers in the app, so in-room and remote answers are in one place.' },
+    evidence: { inperson: 'Model one highlight with the class color key on the board, then students turn their highlights into evidence cards.', live: 'Share your screen in Sora, highlight one line together, then show “Make cards” from Sora’s copied notes.', async: 'Post a two-minute screen recording: one highlight turned into an evidence card.', hybrid: 'Model it once on the shared screen for both groups.' },
+    quiz: { inperson: 'Closed book, once the reading is finished. It scores itself: open its tile to see which questions most students missed and reteach those.', live: 'Give a fixed window during class. Treat it as a reading check, not a test.', async: 'Open it once the reading should be done. Review the most-missed questions at the next check-in.', hybrid: 'Everyone takes it in the app at the same time.' },
+    close_reading: { inperson: 'Model with a different passage first (I do, we do, you do). Then pairs choose their own passage.', live: 'Model on a shared screen, then pairs in breakout rooms choose a passage; bring each pair back to share one author’s choice.', async: 'Post a short model analysis of a different passage; students follow the same steps.', hybrid: 'Put remote students in a breakout room together; pairs in the room work side by side.' },
+    analysis: { inperson: 'Plan first (a claim plus two pieces of evidence with locations). Conference with a few students while the rest draft.', live: 'Plan together, then quiet drafting with cameras optional. Keep one breakout room open as a help room.', async: 'Set a plan-by day and a turn-in day; comment on plans before students draft.', hybrid: 'Same timer for both groups; conference with remote students in a breakout while the room drafts.' },
+    vocabulary: { inperson: 'Introduce two or three words before the reading; students find the rest in context.', live: 'Quick poll on what a word might mean before reading; check it after.', async: 'Words first, then the reading; students come back to the meanings once they have met them.', hybrid: 'Same poll for both groups, in the app or the chat.' },
+    discussion: { inperson: 'Socratic seminar or fishbowl: the inner circle talks, the outer circle tracks evidence, then swap. Students post in the app afterwards.', live: 'Breakout rooms of three or four, one question each; each room posts a summary and replies to another room.', async: 'Set a post-by day and a reply-by day. Post the first reply yourself to show what a good one looks like.', hybrid: 'Fishbowl in the room, a second circle in a breakout for remote students. Everyone posts in the app so the groups hear each other.' },
+    creative: { inperson: 'Show one example you made and a short checklist: it still needs evidence from the book.', live: 'Students share screens in breakout rooms to show work in progress.', async: 'Give a checkpoint day to show a first draft.', hybrid: 'Gallery walk in the room plus a shared slide deck for remote students.' },
+    reflection: { inperson: 'Back to the essential question: students compare their answer now with the one they wrote at the launch.', live: 'Two minutes of quiet writing, then three students read one line aloud.', async: 'Last task of the unit; read a few and open the next unit with one of them.', hybrid: 'Everyone writes in the app; read one in-room and one remote answer aloud.' }
+  };
+  var CHECK = {
+    read: 'Who hasn’t started? (dashboard tracker)', bellringer: 'Who wrote one line vs. a real answer?', evidence: 'Are the cards evidence, or summary?', quiz: 'Which question did most students miss?',
+    close_reading: 'Do they name a specific choice, or just say it’s “descriptive”?', analysis: 'Claim first? Evidence with a location?', vocabulary: 'Meaning in THIS sentence, not the dictionary’s first line?',
+    discussion: 'Are they answering each other, or only you?', creative: 'Is the evidence still there?', reflection: 'Did their thinking change, and do they say why?'
+  };
+
+  // ---------------------------------------------------------------- the timed plan
+  var MIN = { bellringer: 7, evidence: 10, close_reading: 25, vocabulary: 15, discussion: 30, creative: 40, reflection: 12 };
+  function actMin(a) {
+    if (a.type === 'quiz') return Math.max(6, Math.round(((a.mc || []).length || a.count || 6) * 1.5) + 2);
+    if (a.type === 'analysis') return 45;
+    return MIN[a.type] || 20;
+  }
+  /** Session-by-session plan. t = study.teaching; sessions = this unit's class sessions. Pure: no DOM. */
+  G.plan = function (u, t, sessions, word) {
+    t = t || {}; var mode = t.mode || 'inperson', sync = mode !== 'async', M = Number(t.minutes) || 50, S = Math.max(1, Number(sessions) || 1);
+    var open = sync ? 5 : 0, close = sync ? 4 : 0, cap = Math.max(10, M - open - close);
+    var acts = u.activities || [], has = function (type) { return acts.filter(function (a) { return a.type === type; }); };
+    var first = [], during = [], after = [], evid = has('evidence');
+    has('bellringer').forEach(function (a) { first.push({ kind: 'bellringer', label: a.title, min: actMin(a) }); });
+    first.push({ kind: 'launch', label: 'Launch: the essential question', min: u.eq ? 8 : 5 });
+    has('vocabulary').forEach(function (a) { first.push({ kind: 'vocabulary', label: a.title + ' (before reading)', min: actMin(a) }); });
+    has('close_reading').forEach(function (a) { during.push({ kind: 'close_reading', label: a.title, min: actMin(a) }); });
+    has('quiz').forEach(function (a) { after.push({ kind: 'quiz', label: a.title, min: actMin(a) }); });
+    has('discussion').forEach(function (a) { after.push({ kind: 'discussion', label: a.title, min: actMin(a) }); });
+    has('analysis').forEach(function (a) { after.push({ kind: 'analysis', label: a.title + ': plan', min: 15 }); after.push({ kind: 'analysis', label: a.title + ': draft', min: 30, split: true }); });
+    has('creative').forEach(function (a) { after.push({ kind: 'creative', label: a.title, min: actMin(a), split: true }); });
+    acts.forEach(function (a) { if (['bellringer', 'vocabulary', 'close_reading', 'quiz', 'discussion', 'analysis', 'creative', 'reflection', 'evidence'].indexOf(a.type) < 0) after.push({ kind: a.type, label: a.title, min: actMin(a) }); });
+    has('reflection').forEach(function (a) { after.push({ kind: 'reflection', label: a.title, min: actMin(a) }); });
+    var fixed = first.concat(during, after).reduce(function (n, x) { return n + x.min; }, 0) + evid.reduce(function (n, a) { return n + actMin(a); }, 0);
+    var room = Math.max(0, S * cap - fixed), R = t.readWhere === 'home' ? 0 : t.readWhere === 'class' ? room : Math.min(room, 20 * Math.max(1, S - 1));
+    // Reading time is the flexible part: if the plan doesn't fit, read a little less in class and pack again.
+    function pack(R) {
+      var seq = first.slice(), base = 'Reading time' + (u.reading && u.reading.label ? ': ' + u.reading.label : '');
+      var r1 = during.length ? Math.round(R / 2 / 5) * 5 : R;
+      if (r1 > 0) seq.push({ kind: 'read', label: base, min: r1, split: true });
+      seq = seq.concat(during);
+      if (R - r1 > 0) seq.push({ kind: 'read', label: base, min: R - r1, split: true, cont: r1 > 0 });
+      evid.forEach(function (a) { seq.push({ kind: 'evidence', label: a.title + ': turn highlights into cards', min: actMin(a) }); });
+      seq = seq.concat(after);
+      // Long work splits across a session boundary; short tasks never do.
+      var out = [], cur = null;
+      function next() { cur = { n: out.length + 1, blocks: [], used: 0 }; out.push(cur); }
+      next();
+      seq.forEach(function (task) {
+        var left = task.min, part = task.cont ? 1 : 0;
+        while (left > 0) {
+          var space = cap - cur.used;
+          if (space <= 0) { next(); continue; }
+          if (task.split || task.min > cap) {
+            var take = Math.min(space, left);
+            if (take < 8 && left > take) { cur.blocks.push({ kind: 'flex', label: 'Flex: catch up or start the next part', min: space }); cur.used = cap; next(); continue; }
+            if (task.kind === 'read' && left - take > 0 && left - take < 8) left = take;   // a few minutes of reading left over: done at home
+            cur.blocks.push({ kind: task.kind, label: task.label + (part ? ' (continued)' : ''), min: take }); cur.used += take; left -= take; part++;
+          } else {
+            if (left <= space || !cur.blocks.length) { cur.blocks.push({ kind: task.kind, label: task.label, min: left }); cur.used += left; left = 0; }
+            else {
+              var prev = cur.blocks[cur.blocks.length - 1];
+              if (prev && prev.kind === 'read') prev.min += space;   // more reading time instead of a gap
+              else if (space >= 5) cur.blocks.push({ kind: 'flex', label: 'Flex: catch-up reading or conferences', min: space });
+              cur.used = cap; next();
+            }
+          }
+        }
+      });
+      return out;
+    }
+    R = Math.round(R / 5) * 5;
+    var out = pack(R);
+    while (out.length > S && R > 0) { R = Math.max(0, R - 5); out = pack(R); }
+    var cur = null;
+    function next() { cur = { n: out.length + 1, blocks: [], used: 0 }; out.push(cur); }
+    while (out.length < S) { next(); cur.blocks.push({ kind: 'flex', label: 'Flex session: catch-up reading, conferences, finish and revise work', min: cap }); cur.used = cap; }
+    var quizAt = 0; out.forEach(function (s) { if (!quizAt && s.blocks.some(function (b) { return b.kind === 'quiz' || b.kind === 'discussion'; })) quizAt = s.n; });
+    var stop = u.reading && (u.reading.stopAt || u.reading.label) || 'the stopping point';
+    out.forEach(function (s, i) {
+      var last = i === out.length - 1;
+      if (sync) {
+        s.blocks.unshift({ kind: 'open', label: i === 0 ? 'Arrival: agenda and where we are in the book' : 'Arrival: reading check-in (who reached the stop?)', min: open });
+        if (cap - s.used >= 3 && s.blocks[s.blocks.length - 1].kind !== 'flex') s.blocks.push({ kind: 'flex', label: 'Buffer', min: cap - s.used });
+        s.blocks.push({ kind: 'close', label: last ? 'Wrap-up: back to the essential question; what comes next' : 'Exit: one line on the essential question', min: close });
+      }
+      if (t.readWhere !== 'class' && (!quizAt || s.n < quizAt) && !last) s.hw = sync ? 'Before next class: keep reading toward ' + stop + '.' : 'Keep reading toward ' + stop + '.';
+      s.total = s.blocks.reduce(function (n, b) { return n + b.min; }, 0);
+      if (!sync) {
+        s.teacher = [];
+        if (i === 0) s.teacher.push('Post the launch: the essential question, the reading, and what is due when.');
+        if (s.blocks.some(function (b) { return b.kind === 'discussion'; })) s.teacher.push('Reply to two posts yourself; remind students of the reply-by day.');
+        if (i === Math.floor(out.length / 2) && out.length > 2) s.teacher.push('Check the reading tracker on the dashboard; message anyone who hasn’t started.');
+        if (last) s.teacher.push('Grade from the tiles; ↗ Push sends scores and comments to Canvas.');
+      }
+    });
+    return { mode: mode, sync: sync, minutes: M, sessions: S, cap: cap, sessionsList: out, overflow: Math.max(0, out.length - S), fixed: fixed, reading: R, word: word || 'Week' };
+  };
+
+  // ---------------------------------------------------------------- the "how you teach" form (builder step 3 and the guide)
+  G.teachForm = function (t, choices, word, structure) {
+    t = t || {}; var modes = choices.teachModes || {}, rw = choices.readWhere || {}, wl = String(word || 'Week').toLowerCase();
+    var daily = structure === 'daily';
+    return '<div class="nv-teach" data-teach>' +
+      '<div class="nv-opts is-teach" role="group" aria-label="How your class meets">' + Object.keys(modes).map(function (k) {
+        var on = t.mode === k;
+        return '<button type="button" class="nv-opt' + (on ? ' is-on' : '') + '" data-act="gTeachMode" data-v="' + k + '" aria-pressed="' + on + '"><b>' + modes[k].icon + ' ' + esc(modes[k].label) + '</b><span>' + esc(modes[k].note) + '</span></button>';
+      }).join('') + '</div><input type="hidden" data-t="mode" value="' + esc(t.mode || '') + '">' +
+      '<div class="nv-form-grid is-three"><label class="nv-field"><span>' + (t.mode === 'async' ? 'Work time a day <small>(minutes)</small>' : 'Class length <small>(minutes)</small>') + '</span><input class="nv-input" type="number" min="15" max="240" step="5" data-t="minutes" value="' + esc(t.minutes || 50) + '"></label>' +
+      (daily ? '<input type="hidden" data-t="sessions" value="1">' : '<label class="nv-field"><span>' + (t.mode === 'async' ? 'Work days per ' + esc(wl) : 'Class sessions per ' + esc(wl)) + '</span><input class="nv-input" type="number" min="1" max="30" data-t="sessions" value="' + esc(t.sessions || 5) + '"><small>Each ' + esc(wl) + '’s guide can change its own number.</small></label>') +
+      '<label class="nv-field"><span>Where students read</span><select class="nv-input" data-t="readWhere">' + Object.keys(rw).map(function (k) { return '<option value="' + k + '"' + (t.readWhere === k ? ' selected' : '') + '>' + esc(rw[k].label) + '</option>'; }).join('') + '</select></label></div>' +
+      '<label class="nv-field"><span>Anything else about your schedule? <small>(optional: A/B days, a shortened Friday, students who are online on some days…)</small></span><input class="nv-input" data-t="notes" maxlength="600" value="' + esc(t.notes || '') + '"></label></div>';
+  };
+  G.readTeach = function (root) {
+    root = root || document; var box = root.querySelector('[data-teach]'); if (!box) return null;
+    var v = function (k) { var el = box.querySelector('[data-t="' + k + '"]'); return el ? el.value : ''; };
+    return { mode: v('mode'), minutes: Number(v('minutes')) || 50, sessions: Number(v('sessions')) || 1, readWhere: v('readWhere') || 'both', notes: v('notes') };
+  };
+  A.gTeachMode = function (el) {
+    var box = el.closest('[data-teach]'); box.querySelector('[data-t="mode"]').value = el.dataset.v;
+    box.querySelectorAll('[data-act="gTeachMode"]').forEach(function (b) { var on = b === el; b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on); });
+    var lab = box.querySelector('[data-t="minutes"]'); if (lab) lab.closest('label').querySelector('span').innerHTML = el.dataset.v === 'async' ? 'Work time a day <small>(minutes)</small>' : 'Class length <small>(minutes)</small>';
+    if (NV.state.view === 'build' && NV.B) NV.B.dirtyForm = true;
+    if (NV.state.view === 'guide') G.teachDirty = true;
+  };
+
+  // ---------------------------------------------------------------- the guide page
+  function st() { return G.data.study; }
+  function word() { return st().unitWord || 'Week'; }
+  function guideOf(n) { return (G.data.guides || {})[n] || null; }
+  function sessionsOf(n) { var s = st(); if (s.structure === 'daily') return 1; var g = guideOf(n); return (g && g.sessions) || (s.teaching || {}).sessions || 5; }
+  function load(cb) { NV.rpc('getGuide', { classId: cid() }, { retry: true }).then(function (r) { G.data = r; G.classId = cid(); cb(null); }).catch(cb); }
+  NV.openGuide = function (n) { NV.leave(function () { NV.go('guide', { guideUnit: Number(n) || 0 }); }); };
+  NV.views.guide = function (app) {
+    if (!cid()) { NV.go('dashboard'); return; }
+    var want = NV.state.guideUnit; NV.state.guideUnit = 0;
+    if (want) G.n = want;
+    var fresh = !G.data || G.classId !== cid() || G.stale;
+    G.stale = false;
+    if (fresh) { G.n = want || 0; G.edit = false; app.innerHTML = '<section class="nv-card nv-skeleton"><p>Opening the teacher guide…</p></section>'; }
+    else draw(app);
+    load(function (err) {
+      if (NV.state.view !== 'guide') return;
+      if (err) return NV.fail(app, err);
+      var units = st().units || [];
+      if (!G.n || G.n > units.length) G.n = currentUnit() || (units[0] && units[0].n) || 0;
+      if (!G.edit) draw(app);
+    });
+  };
+  function currentUnit() {
+    var set = G.data.settings || {}, rel = set.release || {}, openOn = set.openOn || {}, today = G.data.today || '', best = 0;
+    (st().units || []).forEach(function (u) {
+      var keys = (u.activities || []).map(function (a) { return 'w' + u.n + '_' + a.id; }).concat(['w' + u.n + '__read']);
+      if (keys.some(function (k) { return rel[k] === true || (rel[k] !== false && openOn[u.n] && openOn[u.n] <= today); })) best = u.n;
+    });
+    return best;
+  }
+  function draw(app) {
+    app = app || NV.byId('app');
+    var s = st(), k = G.data.klass || {}, units = s.units || [], wl = word().toLowerCase();
+    var h = '<div class="nv-guide">' +
+      '<div class="nv-build-head nv-noprint"><button type="button" class="nv-btn small ghost" data-act="gBack">← Dashboard</button><div class="nv-build-title"><span class="nv-eyebrow">' + esc(k.className || '') + (k.period ? ' · Period ' + esc(k.period) : '') + ' · Teacher guide</span><h1>' + (s.book ? esc(s.book.title) : 'Teacher guide') + '</h1></div>' +
+      '<div class="nv-guide-tools"><button type="button" class="nv-btn small" data-act="gStandards">🎯 Standards</button><button type="button" class="nv-btn small" data-act="gPrint">🖨 Print this ' + esc(wl) + '</button><button type="button" class="nv-btn small" data-act="gPrintAll">🖨 Print all</button></div></div>';
+    if (!s.book) return (app.innerHTML = h + '<section class="nv-card"><p>Set up the book in the builder first.</p><button type="button" class="nv-btn primary" data-act="openBuilder">Open the builder →</button></section></div>');
+    h += teachCard();
+    if (!units.length) return (app.innerHTML = h + '<section class="nv-card"><p class="nv-empty">No ' + esc(wl) + 's yet. Break the book up in builder step 4 first.</p></section></div>');
+    h += '<nav class="nv-gtabs nv-noprint" aria-label="' + esc(word()) + 's">' + units.map(function (u) {
+      var g = guideOf(u.n), on = u.n === G.n;
+      return '<button type="button" class="nv-gtab' + (on ? ' is-on' : '') + '" data-act="gUnit" data-n="' + u.n + '"' + (on ? ' aria-current="page"' : '') + '><span class="nv-gtab-n">' + esc(word() + ' ' + u.n) + '</span><span class="nv-gtab-t">' + esc(u.title || (u.reading || {}).label || 'Not planned') + '</span>' + (g && g.notes ? '<span class="nv-gtab-dot" title="Has notes">●</span>' : '') + '</button>';
+    }).join('') + '</nav>';
+    h += aiAllBar();
+    h += '<div id="nvGuideUnit">' + unitGuide(G.n, false) + '</div></div>';
+    app.innerHTML = h;
+  }
+  function teachCard() {
+    var s = st(), t = s.teaching || {}, ch = G.data.choices || {}, modes = ch.teachModes || {}, rw = ch.readWhere || {}, wl = word().toLowerCase();
+    if (!s.teachingSet || G.teachOpen) {
+      return '<section class="nv-card nv-teach-card nv-noprint"><h2>How do you teach this class?</h2><p class="nv-muted">The session plans are built from this. ' + (s.teachingSet ? '' : 'Until you choose, the plans assume in-person classes.') + '</p>' + G.teachForm(t, ch, word(), s.structure) +
+        '<div class="nv-row"><button type="button" class="nv-btn primary" data-act="gSaveTeach">Save</button>' + (s.teachingSet ? '<button type="button" class="nv-btn ghost" data-act="gTeachClose">Cancel</button>' : '') + '<span class="nv-form-msg" id="gTeachMsg" role="status"></span></div></section>';
+    }
+    var m = modes[t.mode] || {};
+    return '<div class="nv-teach-sum"><span class="nv-teach-sum-mode">' + esc((m.icon || '') + ' ' + (m.label || '')) + '</span><span>' + esc(t.minutes) + '-minute ' + (t.mode === 'async' ? 'work days' : 'classes') + '</span>' +
+      (s.structure === 'daily' ? '' : '<span>' + NV.plural(t.sessions, t.mode === 'async' ? 'work day' : 'session') + ' per ' + esc(wl) + '</span>') + '<span>Reading: ' + esc(((rw[t.readWhere] || {}).label || '').toLowerCase()) + '</span>' +
+      (t.notes ? '<span class="nv-teach-sum-note">' + esc(t.notes) + '</span>' : '') + '<button type="button" class="nv-link nv-noprint" data-act="gTeachOpen">Change</button></div>';
+  }
+  function aiAllBar() {
+    if (!G.data.aiConfigured) return '';
+    var run = G.run, units = st().units || [], todo = units.filter(function (u) { return u.reading && u.reading.label && !(guideOf(u.n) || {}).notes; }).length;
+    if (run) return '<div class="nv-aibar nv-noprint"><div class="nv-progress" role="progressbar" aria-valuemin="0" aria-valuemax="' + run.total + '" aria-valuenow="' + run.done + '"><span style="width:' + Math.round(run.done / Math.max(1, run.total) * 100) + '%"></span></div><span class="nv-small" aria-live="polite">' + esc(run.msg || '') + '</span><button type="button" class="nv-btn small" data-act="gStopAll"' + (run.stop ? ' disabled' : '') + '>' + (run.stop ? 'Stopping after this one…' : 'Stop') + '</button></div>';
+    return todo ? '<div class="nv-aibar nv-noprint"><button type="button" class="nv-btn small" data-act="gAiAll">✨ Write book notes for ' + (todo === units.length ? 'every ' + esc(word().toLowerCase()) : NV.plural(todo, word().toLowerCase()) + ' without notes') + '</button><span class="nv-small nv-muted">One at a time; each is saved as soon as it’s written.</span></div>' : '';
+  }
+  function list(items, cls) { return items && items.length ? '<ul class="' + (cls || 'nv-glist') + '">' + items.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>' : ''; }
+  function unitGuide(n, printing) {
+    var s = st(), u = (s.units || [])[n - 1]; if (!u) return '';
+    var std = G.data.standards, t = s.teaching || {}, word0 = word(), wl = word0.toLowerCase(), g = guideOf(n) || {}, notes = g.notes;
+    var sessions = sessionsOf(n), plan = G.plan(u, s.teachingSet ? t : Object.assign({}, t, { mode: 'inperson' }), sessions, word0);
+    var r = u.reading || {}, acts = u.activities || [], graded = acts.filter(function (a) { return a.graded !== false; });
+    var pts = graded.reduce(function (x, a) { return x + (a.type === 'quiz' ? (a.mc || []).length : Number(a.points) || 0); }, 0);
+    var h = '<article class="nv-gunit" data-n="' + n + '">';
+    // head
+    h += '<header class="nv-card nv-ghead"><div class="nv-ghead-main"><span class="nv-eyebrow">' + esc(word0 + ' ' + n) + (u.date ? ' · ' + esc(NV.fmtDay(u.date)) : '') + (u.status === 'approved' ? '' : ' · draft') + '</span>' +
+      '<h2>' + esc(u.title || r.label || 'Not planned yet') + '</h2>' + (r.label ? '<p class="nv-gread"><b>Read</b> ' + esc(r.label) + (r.stopAt ? ' · stop at ' + esc(r.stopAt) : '') + '</p>' : '<p class="nv-ainote">No reading yet: add it in builder step 4.</p>') +
+      (u.eq ? '<p class="nv-geq"><b>Essential question</b> ' + esc(u.eq) + '</p>' : '') + '</div>' +
+      '<dl class="nv-gglance"><div><dt>' + (plan.sync ? 'Class sessions' : 'Work days') + '</dt><dd>' + (s.structure === 'daily' || printing ? esc(sessions) : '<input class="nv-input nv-gsessions" type="number" min="1" max="30" value="' + esc(sessions) + '" aria-label="Class sessions for ' + esc(word0 + ' ' + n) + '">') + '</dd></div>' +
+      '<div><dt>Minutes</dt><dd>' + esc(plan.minutes) + ' each</dd></div><div><dt>Activities</dt><dd>' + acts.length + (acts.length ? ' · ' + acts.map(function (a) { return (actLabel(a.type).split(' ')[0]); }).join(' ') : '') + '</dd></div>' +
+      '<div><dt>Graded</dt><dd>' + (graded.length ? NV.plural(graded.length, 'assignment') + ' · ' + pts + ' pts' : 'none') + '</dd></div></dl></header>';
+    h += '<div class="nv-guide-grid"><div class="nv-guide-main">';
+    // session plan
+    h += '<section class="nv-card nv-gplan"><div class="nv-sub-head"><h3>' + (plan.sync ? 'Session plan' : 'Pacing plan') + '</h3><span class="nv-chip">' + esc(((G.data.choices.teachModes || {})[plan.mode] || {}).label || '') + (s.teachingSet ? '' : ' (assumed)') + '</span></div>' +
+      '<p class="nv-small nv-muted">' + (plan.sync ? 'Worked out from your ' + plan.minutes + '-minute classes and this ' + esc(wl) + '’s activities. A starting point: move things to suit your class.' : 'Roughly ' + plan.minutes + ' minutes of student work a day, with what you do each day.') + '</p>';
+    var biggest = acts.filter(function (a) { return ['analysis', 'creative', 'close_reading'].indexOf(a.type) >= 0; }).map(function (a) { return a.title; })[0] || '';
+    if (plan.overflow) h += '<p class="nv-ainote"><b>Tight fit:</b> these activities need about ' + NV.plural(plan.sessionsList.length, plan.sync ? 'session' : 'day') + ', and this ' + esc(wl) + ' has ' + plan.sessions + '. Raise the number above to ' + plan.sessionsList.length + (biggest ? ', set ' + esc(biggest) + ' as homework,' : '') + ' or take an activity out of this ' + esc(wl) + '.</p>';
+    if (!acts.length) h += '<p class="nv-empty">No activities in this ' + esc(wl) + ' yet: the plan is reading time.</p>';
+    h += '<ol class="nv-sessions">' + plan.sessionsList.map(function (se) {
+      var over = se.n > plan.sessions;
+      return '<li class="nv-session' + (over ? ' is-over' : '') + '"><div class="nv-session-head"><b>' + (plan.sync ? 'Session ' : 'Day ') + se.n + '</b>' + (over ? '<span class="nv-chip is-warn">beyond your ' + plan.sessions + '</span>' : '') + '<span class="nv-small nv-muted">' + (plan.sync ? plan.minutes : '≈ ' + se.total) + ' min</span></div>' +
+        '<div class="nv-strip" aria-hidden="true">' + se.blocks.map(function (b) { return '<span class="is-' + esc(b.kind) + '" style="flex:' + b.min + ' 1 0"></span>'; }).join('') + '</div>' +
+        '<ul class="nv-blocks">' + se.blocks.map(function (b) { return '<li class="nv-block is-' + esc(b.kind) + '"><span class="nv-block-min">' + b.min + ' min</span><span class="nv-block-label">' + esc(b.label) + '</span></li>'; }).join('') + '</ul>' +
+        (se.hw ? '<p class="nv-session-hw">🏠 ' + esc(se.hw) + '</p>' : '') + (se.teacher && se.teacher.length ? '<ul class="nv-session-you">' + se.teacher.map(function (x) { return '<li>👩‍🏫 ' + esc(x) + '</li>'; }).join('') + '</ul>' : '') + '</li>';
+    }).join('') + '</ol></section>';
+    // notes (AI or teacher)
+    h += notesCard(n, u, g, printing);
+    // tips
+    var kinds = ['launch', 'read'].concat(acts.map(function (a) { return a.type; })).filter(function (x, i, a) { return a.indexOf(x) === i; });
+    h += '<section class="nv-card nv-gtips"><h3>' + esc({ inperson: 'Running it in person', live: 'Running it in live online classes', async: 'Running it self-paced online', hybrid: 'Running it hybrid (room + online)' }[plan.mode] || 'Running it') + '</h3><dl class="nv-gtiplist">' + kinds.map(function (k) {
+      var tip = (TIPS[k] || {})[plan.mode] || (TIPS[k] || {}).inperson; if (!tip) return '';
+      var name = k === 'launch' ? '🚀 Launch' : k === 'read' ? '📖 Reading' : actLabel(k);
+      return '<div class="nv-tip"><dt>' + esc(name) + '</dt><dd>' + esc(tip) + (CHECK[k] ? '<span class="nv-tip-check">Look for: ' + esc(CHECK[k]) + '</span>' : '') + '</dd></div>';
+    }).join('') + '</dl></section>';
+    h += '</div><aside class="nv-guide-side">';
+    // standards
+    if (std) {
+      var su = NV.std.forUnit(std, u, s.focusAreas);
+      h += '<section class="nv-card nv-gstd"><div class="nv-sub-head"><h3>🎯 Standards</h3><button type="button" class="nv-btn small ghost nv-noprint" data-act="gStandardsUnit" data-n="' + n + '">Details</button></div><p class="nv-small nv-muted">' + esc(std.bandLabel) + (std.gradeChosen ? '' : ' (no grade chosen yet)') + '</p>' +
+        (su.all.length ? '<ul class="nv-gstd-list">' + su.all.map(function (c) { return '<li><span class="nv-std-code">' + esc(c) + '</span> <span class="nv-small">' + esc(std.statements[c]) + '</span></li>'; }).join('') + '</ul>' : '<p class="nv-empty">Add activities to see the standards.</p>') + '</section>';
+    }
+    // ideas
+    h += ideasCard(u, std, s);
+    if (notes && notes.prep && notes.prep.length) h += '<section class="nv-card"><h3>✅ Before you teach it</h3>' + list(notes.prep, 'nv-glist is-check') + '</section>';
+    h += '</aside></div></article>';
+    return h;
+  }
+  function ideasCard(u, std, s) {
+    var have = {}; (u.activities || []).forEach(function (a) { have[a.type] = true; });
+    var ideas = [], all = ((G.data.choices || {}).activities) || {};
+    var mine = std ? NV.std.forUnit(std, u, s.focusAreas).all : [];
+    Object.keys(all).forEach(function (type) {
+      if (have[type]) return;
+      var adds = std ? NV.std.forAct(std, { type: type }, s.focusAreas).filter(function (c) { return mine.indexOf(c) < 0; }) : [];
+      if (std && !adds.length) return;
+      ideas.push({ type: type, adds: adds });
+    });
+    ideas.sort(function (a, b) { return b.adds.length - a.adds.length; });
+    if (!ideas.length) return '';
+    return '<section class="nv-card nv-gideas nv-noprint"><h3>💡 Could add</h3><ul class="nv-glist">' + ideas.slice(0, 4).map(function (x) {
+      return '<li><b>' + esc(actLabel(x.type)) + '</b> ' + esc(all[x.type].desc) + (x.adds.length ? '<div>' + NV.std.chips(x.adds, std) + '</div>' : '') + '</li>';
+    }).join('') + '</ul><button type="button" class="nv-btn small" data-act="gToBuilder" data-n="' + u.n + '">Add one in the builder →</button></section>';
+  }
+  function notesCard(n, u, g, printing) {
+    var notes = g.notes, ai = G.data.aiConfigured, wl = word().toLowerCase();
+    var h = '<section class="nv-card nv-gnotes' + (notes || G.edit ? '' : ' is-empty') + '" id="gNotes"><div class="nv-sub-head"><h3>📚 Book notes</h3>';
+    if (!G.edit && !printing) h += '<span class="nv-row nv-noprint">' + (notes ? '<button type="button" class="nv-btn small" data-act="gEdit">✏️ Edit</button>' : '') +
+      (ai ? '<button type="button" class="nv-btn small' + (notes ? '' : ' primary') + '" data-act="gAi"' + (G.busy || G.run ? ' disabled' : '') + '>✨ ' + (notes ? 'Write again with AI' : 'Write notes with AI') + '</button>' : '') +
+      (!notes ? '<button type="button" class="nv-btn small" data-act="gEdit">✏️ Write my own</button>' : '') + '</span>';
+    h += '</div>';
+    if (G.edit) return h + editForm(G.typing || notes || {}) + '</section>';
+    if (G.msg) h += '<p class="nv-gmsg nv-noprint' + (G.msgBad ? ' is-error' : '') + '" role="status">' + esc(G.msg) + '</p>';
+    if (g.unreadable) h += '<p class="nv-ainote">These notes couldn’t be read. Write them again; nothing else was changed.</p>';
+    if (!notes) {
+      h += '<p class="nv-muted">' + (ai ? 'Let the AI draft notes for this ' + esc(wl) + ': what happens, key moments to stop on, discussion questions, what students often miss, companion readings, and support and extension ideas. You can edit everything.' : 'Write your own notes for this ' + esc(wl) + '. (AI drafts are off: add a GEMINI_API_KEY in Script properties to turn them on.)') + '</p>';
+      if (ai && !printing) h += '<label class="nv-field nv-noprint"><span>Anything the AI should know? <small>(optional)</small></span><input class="nv-input" id="gReq" maxlength="600" placeholder="Spend time on the green light; several students read below grade level"></label>';
+      return h + '</section>';
+    }
+    h += '<p class="nv-small nv-muted">' + (g.source === 'teacher' ? 'Your notes' : g.source === 'ai+teacher' ? 'Drafted by AI' + (g.aiAt ? ' ' + esc(NV.fmtDate(g.aiAt)) : '') + ', edited by you' : 'Drafted by AI' + (g.aiAt ? ' ' + esc(NV.fmtDate(g.aiAt)) : '') + '. It hasn’t read the book: check names, events and chapters.') + '</p>';
+    if (notes.overview) h += '<p class="nv-goverview">' + esc(notes.overview) + '</p>';
+    if (notes.keyMoments.length) h += '<h4>Key moments to stop on</h4><ol class="nv-gmoments">' + notes.keyMoments.map(function (m) { return '<li>' + (m.where ? '<span class="nv-gwhere">' + esc(m.where) + '</span> ' : '') + esc(m.what) + (m.ask ? '<span class="nv-gask">Ask: ' + esc(m.ask) + '</span>' : '') + '</li>'; }).join('') + '</ol>';
+    if (notes.questions.length) h += '<h4>Discussion questions</h4>' + list(notes.questions);
+    if (notes.misconceptions.length) h += '<h4>What students often miss</h4>' + list(notes.misconceptions);
+    if (notes.companions.length) h += '<h4>Companion readings</h4><ul class="nv-glist">' + notes.companions.map(function (c) { return '<li><b>' + esc(c.title) + '</b>' + (c.by ? ' · ' + esc(c.by) : '') + (c.type ? ' <span class="nv-chip">' + esc(c.type) + '</span>' : '') + (c.why ? '<br>' + esc(c.why) : '') + '</li>'; }).join('') + '</ul>' + (g.source !== 'teacher' ? '<p class="nv-small nv-muted">Find each one yourself before you use it.</p>' : '');
+    if (notes.support.length || notes.extension.length) h += '<div class="nv-gtwo">' + (notes.support.length ? '<div><h4>Support</h4>' + list(notes.support) + '</div>' : '') + (notes.extension.length ? '<div><h4>Extension</h4>' + list(notes.extension) + '</div>' : '') + '</div>';
+    if (notes.watchFor) h += '<h4>Handle with care</h4><p>' + esc(notes.watchFor) + '</p>';
+    if (notes.teacherNote) h += '<h4>My notes</h4><p class="nv-gmine">' + esc(notes.teacherNote) + '</p>';
+    return h + '</section>';
+  }
+  function lines(a) { return (a || []).join('\n'); }
+  function editForm(nt) {
+    var km = (nt.keyMoments || []).map(function (m) { return [m.where, m.what, m.ask].join(' | '); }).join('\n');
+    var co = (nt.companions || []).map(function (c) { return [c.title, c.by, c.type, c.why].join(' | '); }).join('\n');
+    function ta(k, label, v, rows, hint) { return '<label class="nv-field"><span>' + label + (hint ? ' <small>(' + hint + ')</small>' : '') + '</span><textarea class="nv-input" data-g="' + k + '" rows="' + (rows || 3) + '">' + esc(v || '') + '</textarea></label>'; }
+    return '<div class="nv-gedit">' + ta('overview', 'Overview', nt.overview, 3) +
+      ta('keyMoments', 'Key moments', km, 4, 'one per line: where | what happens | a question to ask') +
+      '<div class="nv-form-grid">' + ta('questions', 'Discussion questions', lines(nt.questions), 4, 'one per line') + ta('misconceptions', 'What students often miss', lines(nt.misconceptions), 4, 'one per line') + '</div>' +
+      ta('companions', 'Companion readings', co, 3, 'one per line: title | by | type | why') +
+      '<div class="nv-form-grid">' + ta('support', 'Support', lines(nt.support), 3, 'one per line') + ta('extension', 'Extension', lines(nt.extension), 3, 'one per line') + '</div>' +
+      '<div class="nv-form-grid">' + ta('prep', 'Before you teach it', lines(nt.prep), 3, 'one per line') + ta('watchFor', 'Handle with care', nt.watchFor, 3) + '</div>' +
+      ta('teacherNote', 'My notes', nt.teacherNote, 3, 'anything else') +
+      '<div class="nv-row"><button type="button" class="nv-btn primary" data-act="gSaveNotes">Save notes</button><button type="button" class="nv-btn ghost" data-act="gCancelEdit">Cancel</button><span class="nv-form-msg" id="gNotesMsg" role="status"></span></div></div>';
+  }
+  function readNotes() {
+    var root = NV.byId('gNotes'); if (!root) return null;
+    var v = function (k) { var el = root.querySelector('[data-g="' + k + '"]'); return el ? el.value : ''; };
+    var ls = function (k) { return v(k).split('\n').map(function (x) { return x.trim(); }).filter(String); };
+    return { overview: v('overview'), questions: ls('questions'), misconceptions: ls('misconceptions'), support: ls('support'), extension: ls('extension'), prep: ls('prep'), watchFor: v('watchFor'), teacherNote: v('teacherNote'),
+      keyMoments: ls('keyMoments').map(function (x) { var p = x.split('|').map(function (y) { return y.trim(); }); return p.length === 1 ? { where: '', what: p[0], ask: '' } : { where: p[0] || '', what: p[1] || '', ask: p.slice(2).join(' | ') }; }),
+      companions: ls('companions').map(function (x) { var p = x.split('|').map(function (y) { return y.trim(); }); return { title: p[0] || '', by: p[1] || '', type: p[2] || '', why: p.slice(3).join(' | ') }; }) };
+  }
+  function redrawUnit() {
+    var el = NV.byId('nvGuideUnit'); if (!el) return;
+    G.typing = G.edit && NV.byId('gNotes') && document.querySelector('.nv-gedit') ? readNotes() : null;   // what's being typed survives the redraw
+    el.innerHTML = unitGuide(G.n, false); G.typing = null;
+  }
+
+  A.gBack = function () { NV.leave(function () { if (NV.T) NV.T.dash = null; NV.go('dashboard'); }); };
+  A.gUnit = function (el) { var n = Number(el.dataset.n); NV.leave(function () { G.n = n; G.edit = false; G.msg = ''; G.msgBad = false; draw(); try { window.scrollTo(0, 0); } catch (e) {} }); };
+  A.gToBuilder = function (el) { var n = Number(el.dataset.n); NV.leave(function () { if (NV.B) { NV.B.open = NV.B.open || {}; NV.B.open[n] = true; } NV.go('build', { buildStep: 5, buildOpen: n }); }); };
+  A.gStandards = function () { G.standardsModal(st(), G.data.standards, 0); };
+  A.gStandardsUnit = function (el) { G.standardsModal(st(), G.data.standards, Number(el.dataset.n)); };
+  A.gTeachOpen = function () { G.teachOpen = true; draw(); };
+  A.gTeachClose = function () { G.teachOpen = false; G.teachDirty = false; draw(); };
+  A.gSaveTeach = function (el) {
+    var t = G.readTeach(document.querySelector('.nv-teach-card')), m = NV.byId('gTeachMsg');
+    if (!t.mode) { if (m) { m.textContent = 'Choose how your class meets.'; m.classList.add('is-error'); } return; }
+    el.disabled = true; if (m) m.textContent = 'Saving…';
+    NV.rpc('saveSetup', { classId: cid(), base: st().updatedAt || '', teaching: t }, { retry: true }).then(function (r) {
+      G.data.study = r.study; if (r.standards) G.data.standards = r.standards; G.teachOpen = false; G.teachDirty = false; if (NV.B) NV.B.data = null; if (NV.T) NV.T.dash = null; draw(); NV.toast('Saved. The plans now follow your schedule.');
+    }).catch(function (e) { el.disabled = false; if (m) { m.textContent = e.message; m.classList.add('is-error'); } });
+  };
+  document.addEventListener('change', function (e) {
+    if (NV.state.view !== 'guide' || !e.target.classList.contains('nv-gsessions')) return;
+    var k = Math.floor(Number(e.target.value)); if (!(k >= 1 && k <= 30)) { NV.toast('Between 1 and 30.'); return; }
+    var n = G.n, g = guideOf(n);
+    NV.rpc('saveGuide', { classId: cid(), n: n, sessions: k, base: g ? g.updatedAt : '' }, { retry: true }).then(function (r) { G.data.guides[n] = r.guide; redrawUnit(); NV.toast('Saved: ' + NV.plural(k, 'session') + ' for ' + word() + ' ' + n + '.'); })
+      .catch(function (err) { NV.toast(err.message, 'error'); });
+  });
+  document.addEventListener('input', function (e) { if (NV.state.view === 'guide' && e.target.closest && e.target.closest('.nv-gedit')) G.dirty = true; if (NV.state.view === 'guide' && e.target.closest && e.target.closest('.nv-teach-card')) G.teachDirty = true; });
+  A.gEdit = function () { G.edit = true; G.dirty = false; G.msg = ''; redrawUnit(); var f = document.querySelector('.nv-gedit textarea'); if (f) f.focus(); };
+  A.gCancelEdit = function () { if (G.dirty && !confirm('Throw away the changes to these notes?')) return; G.edit = false; G.dirty = false; redrawUnit(); };
+  A.gSaveNotes = function (el) {
+    var n = G.n, notes = readNotes(), g = guideOf(n), m = NV.byId('gNotesMsg');
+    el.disabled = true; if (m) m.textContent = 'Saving…';
+    NV.rpc('saveGuide', { classId: cid(), n: n, notes: notes, base: g ? g.updatedAt : '' }, { retry: true }).then(function (r) {
+      G.data.guides[n] = r.guide; G.edit = false; G.dirty = false; G.msg = 'Saved.'; G.msgBad = false; draw();
+    }).catch(function (e) { el.disabled = false; if (m) { m.textContent = e.message; m.classList.add('is-error'); } });
+  };
+  A.gAi = function (el) {
+    var n = G.n, g = guideOf(n), req = NV.byId('gReq');
+    if (g && g.notes && (g.source === 'teacher' || g.source === 'ai+teacher') && !confirm('Write these notes again with AI? Your edits to ' + word() + ' ' + n + '’s notes are replaced.')) return;
+    G.busy = true; el.disabled = true; el.textContent = '✨ Writing…';
+    var forClass = cid();
+    NV.rpc('draftGuide', { classId: forClass, n: n, request: req ? req.value : '' }, { timeoutMs: 120000 }).then(function (r) {
+      G.busy = false; if (!G.data || G.classId !== forClass) return;
+      G.data.guides[n] = r.guide; G.msg = ''; if (NV.state.view === 'guide' && G.n === n && !G.edit) draw();
+    }).catch(function (e) { G.busy = false; if (!G.data || G.classId !== forClass) return; G.msg = e.message; G.msgBad = true; if (NV.state.view === 'guide') redrawUnit(); });
+  };
+  A.gAiAll = function () {
+    var units = (st().units || []).filter(function (u) { return u.reading && u.reading.label && !(guideOf(u.n) || {}).notes; });
+    if (!units.length) return;
+    var forClass = cid(), w = word(), run = G.run = { total: units.length, done: 0, written: 0, msg: 'Starting…', stop: false, classId: forClass }; draw();
+    var i = 0, fails = [];
+    function paint() { if (NV.state.view === 'guide' && !G.edit && G.data && G.classId === forClass) draw(); }
+    (function next() {
+      if (G.run !== run) return;
+      // Stops when asked, when the teacher switches class, or when everything is done.
+      if (i >= units.length || run.stop || cid() !== forClass) {
+        G.run = null;
+        NV.toast('Book notes written for ' + NV.plural(run.written, w.toLowerCase()) + (fails.length ? '. Not done: ' + fails.join(', ') : '') + '.');
+        paint(); return;
+      }
+      var u = units[i++]; run.msg = 'Writing ' + w + ' ' + u.n + '…'; paint();
+      NV.rpc('draftGuide', { classId: forClass, n: u.n, onlyIfEmpty: true }, { timeoutMs: 120000 }).then(function (r) {
+        try { if (G.data && G.classId === forClass && r.guide) G.data.guides[u.n] = r.guide; } catch (e) {}
+        run.done++; if (!r.skipped) run.written++; next();
+      }).catch(function (e) { fails.push(w + ' ' + u.n); run.done++; run.msg = e.message; next(); });
+    })();
+  };
+  A.gStopAll = function () { if (G.run) { G.run.stop = true; if (G.data) draw(); } };
+  A.gPrint = function () { document.body.classList.add('nv-printing'); try { window.print(); } finally { setTimeout(function () { document.body.classList.remove('nv-printing'); }, 500); } };
+  A.gPrintAll = function () {
+    var box = document.createElement('div'); box.className = 'nv-print-all';
+    box.innerHTML = (st().units || []).map(function (u) { return unitGuide(u.n, true); }).join('');
+    document.body.appendChild(box); document.body.classList.add('nv-printing-all');
+    try { window.print(); } finally { setTimeout(function () { box.remove(); document.body.classList.remove('nv-printing-all'); }, 500); }
+  };
+  // Leaving with unsaved notes asks first.
+  var _leave = NV.leave;
+  NV.leave = function (fn) {
+    if (NV.state.view === 'guide' && ((G.edit && G.dirty) || G.teachDirty)) {
+      if (!confirm('Your changes to this guide aren’t saved. Leave anyway?')) return;
+      G.edit = false; G.dirty = false; G.teachDirty = false;
+    }
+    _leave(fn);
+  };
+  window.addEventListener('beforeunload', function (e) { if (NV.state.view === 'guide' && ((G.edit && G.dirty) || G.teachDirty)) { e.preventDefault(); e.returnValue = ''; return ''; } });
+  // Every other page that has a study can open these two.
+  A.openGuide = function (el) { NV.openGuide(el && el.dataset.n); };
+  A.openStandards = function (el) {
+    var src = NV.state.view === 'build' && NV.B && NV.B.data ? NV.B.data : NV.T && NV.T.dash;
+    if (!src || !src.study || !src.standards) { NV.toast('Set up the book first.'); return; }
+    var study = src.study;
+    if (NV.state.view === 'build' && NV.B && NV.B.drafts) { study = JSON.parse(JSON.stringify(study)); Object.keys(NV.B.drafts).forEach(function (n) { var d = NV.B.drafts[n]; if (d && study.units[n - 1]) study.units[n - 1] = Object.assign({}, study.units[n - 1], d); }); }
+    G.standardsModal(study, src.standards, Number(el && el.dataset.n) || 0);
+  };
+  window.__MB.Guide = 'ok';
+})();
+</script>

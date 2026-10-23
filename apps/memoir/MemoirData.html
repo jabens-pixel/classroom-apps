@@ -1,0 +1,329 @@
+<script>
+window.__MB = window.__MB || {}; __MB.MemoirData = 'started';
+// ---------------------------------------------------------------------------
+// MEMOIR CONTENT
+//
+// Everything a teacher might want to reword lives in this one small file:
+// the six stages (why / task / starters / example / checklist), the rubrics,
+// and the short notes shown on the grading tiles. Nothing here is code that
+// needs to change when a sentence changes.
+//
+// Sibling <script> tags share one global scope, so AppLogic and BackendClient
+// read these directly. Code.gs mirrors only the KEYS and POINT VALUES (it
+// never needs the words) -- if you add a stage or change a point value here,
+// change the matching constant at the top of Code.gs too.
+//
+// The "why" and "task" strings may contain <b>..</b>; they are trusted content
+// written by the teacher, never student input.
+// ---------------------------------------------------------------------------
+
+// Each stage's colour is used everywhere that stage appears -- the sidebar, the
+// story-arc strip, the top stripe of its grading tile, the gradebook and the
+// student's grade card -- so the app reads as one system.
+const STAGES = [
+  {
+    key: "lead",
+    label: "The Lead",
+    short: "Lead",
+    color: "#E9A94B",
+    note: "A flash before the climax",
+    title: "The Lead — A Flash Before the Climax",
+    why: "Great memoirs often don't open at the true beginning — they drop the reader into <b>one vivid beat right before the most intense moment</b> of the story, then rewind to explain how you got there. This flash-forward lead hooks readers with tension and curiosity before you slow down to tell the full story.",
+    task: "Write a short lead — a few sentences to a paragraph — capturing <b>one beat right before your climax</b>. Weave in all four: an <b>action</b>, an internal <b>thought or question</b>, a <b>sound</b>, and a line of <b>dialogue</b>. Don't stack them in the same order every time — alternate between what's happening outside you and what's happening inside you.",
+    starters: [
+      "My hands were ___ when ___.",
+      "I heard ___ and thought, ___.",
+      "“___,” [someone] said. My stomach ___.",
+      "For one second I wondered if ___."
+    ],
+    example: "My fingers curled over the edge of the block. Beep. Beep. Beep. Was I even going to move when the horn sounded? “Take your mark,” the official said, and my whole body went still.",
+    checklist: ["A physical action", "A thought or question", "A sound", "A line of dialogue"],
+    refKey: null
+  },
+  {
+    key: "beginning",
+    label: "The Beginning",
+    short: "Beginning",
+    color: "#86C5A5",
+    note: "Rewind to your “before” world",
+    title: "Back to the Beginning — Setting the Scene",
+    why: "Now that readers are hooked, rewind the clock. Take them to the <b>true beginning</b> of your story, chronologically. Ground them in the world before things changed — who you were, where you were, what was “normal,” and the small want or worry that was already quietly there.",
+    task: "Write the opening of your chronological story. Include the <b>time and place</b>, the <b>people</b> who matter, your <b>“before” normal</b>, and a hint of the tension to come.",
+    starters: [
+      "It was the kind of ___ where ___.",
+      "Back then, I ___.",
+      "Nobody knew yet that ___."
+    ],
+    example: "It was the kind of small town where everyone waved from their porches, even at strangers. I was eleven, and the biggest problem in my life was whether I'd make the swim team. Nobody in my family knew yet how much that would change.",
+    checklist: ["Time and place", "The key people", "Your “before” normal", "A hint of what's coming"],
+    refKey: null
+  },
+  {
+    key: "rising",
+    label: "Rising Action",
+    short: "Rising",
+    color: "#D98C5F",
+    note: "Events that raise the stakes",
+    title: "Rising Action — Building the Tension",
+    why: "This is the chronological middle — the sequence of events, choices, and obstacles that build from your ordinary beginning toward your climax. Each beat should raise the stakes a little more than the last.",
+    task: "Narrate the key events in order. For each major beat, show us <b>what happened</b> and <b>how it changed</b> what you wanted, feared, or believed.",
+    starters: [
+      "Then ___ happened, and suddenly ___.",
+      "I started to realize ___.",
+      "Every day, ___ got a little more ___."
+    ],
+    example: "Then the coach posted the meet schedule, and suddenly it was real. I started to realize I wasn't just nervous about losing — I was scared of what people would think if I froze on the block again, the way I had last year.",
+    checklist: ["2–3 escalating events", "Stakes clearly rising", "An internal reaction included"],
+    refKey: null
+  },
+  {
+    key: "callback",
+    label: "The Callback",
+    short: "Callback",
+    color: "#B7A3F0",
+    note: "Echo your lead",
+    title: "The Callback — Echo Your Lead",
+    why: "Skilled memoirists circle back to their opening image, line, or question right before the climax, so the reader feels the story click into place — <b>“oh, we're back to where we started.”</b> This “frame” makes your structure feel intentional and your climax feel earned.",
+    task: "Reread your Lead below. Choose one image, phrase, sound, or question from it and <b>echo it here</b>, signaling that we're arriving back at that moment.",
+    starters: [
+      "And now, here I was again, ___.",
+      "The same ___ from before — but this time ___."
+    ],
+    example: "And now, here I was again: fingers on the block, that same beeping in my ears. Only this time, the sound didn't feel far away. It felt like it was counting down inside my own chest.",
+    checklist: ["Refers back to something specific from the Lead"],
+    refKey: "lead"
+  },
+  {
+    key: "climax",
+    label: "The Climax",
+    short: "Climax",
+    color: "#F07A7A",
+    note: "Slow it all the way down",
+    title: "The Climax — Slow It Down",
+    why: "The climax deserves <b>more space on the page than it took in real life</b>. Slow-motion writing stretches a few seconds into a few paragraphs — short sentences, fragments, and a close-up lens on sensory and emotional detail make the reader feel like they're inside the moment with you.",
+    task: "This is the same beat you flashed forward to in your Lead (shown below) — now slow it all the way down. Break it into <b>3–5 micro-moments</b>. For each one, try to include one external detail and one internal reaction.",
+    starters: [
+      "Time seemed to ___.",
+      "Everything went quiet except ___.",
+      "In that half-second, I ___."
+    ],
+    example: "The horn cracked the air. Time seemed to stretch. My arms moved before my brain caught up. Water rushed past my ears, and everything went quiet except my own heartbeat, counting strokes I couldn't hear myself take.",
+    checklist: ["Climax stretched into multiple micro-beats", "Mix of external + internal in each beat", "Short or fragmented sentences for pacing"],
+    refKey: "lead"
+  },
+  {
+    key: "sowhat",
+    label: "So What?",
+    short: "So What?",
+    color: "#7FB5F0",
+    note: "Why the moment mattered",
+    title: "So What? — The Significance",
+    why: "A powerful moment isn't enough on its own — readers want to know <b>why it mattered</b>. This is the reflective step memoirists take after the action ends: stepping back to name how that moment changed you, what it taught you, or how it shifted the way you see yourself or the world.",
+    task: "Look back at your Climax (shown below) and reflect. In a paragraph or two, explain <b>how this moment changed or impacted you</b> — what you understood afterward that you didn't before, how it affected who you became, or how you still carry it with you now.",
+    starters: [
+      "Looking back, I realize ___.",
+      "That moment taught me ___.",
+      "I'm not the same person who ___ — now I ___.",
+      "Even now, when ___, I think about ___."
+    ],
+    example: "Looking back, I realize that race was never really about winning. It was the first time I finished something that terrified me, and that mattered more than any ribbon could. Even now, when something feels impossible, I remember standing on that block — and I remind myself I've already survived one moment like this.",
+    checklist: ["Reflects on how the moment changed or impacted you", "Names a feeling, belief, or lesson", "Feels honest, not just a generic 'I learned a lesson'"],
+    refKey: "climax"
+  }
+];
+const STAGE_KEYS = STAGES.map((s) => s.key);
+const STAGE_BY_KEY = {};
+STAGES.forEach((s, i) => { s.index = i; STAGE_BY_KEY[s.key] = s; });
+
+// ---------------------------------------------------------------------------
+// GRADED PIECES
+//
+// Nine graded pieces, each its own gradebook column, its own grading tile and
+// its own Canvas assignment. The six stages are drafted in order; the Lead Share
+// board sits right after the Lead because that is when students post it; the
+// Final Memoir and the Poster finish the unit.
+//
+// Callback and Poster are complete / incomplete: they mark themselves complete
+// when the student turns them in, and the teacher can override. Everything else
+// is scored on its own rubric.
+// ---------------------------------------------------------------------------
+const MEMOIR_STEP_KEYS = ["lead", "share", "beginning", "rising", "callback", "climax", "sowhat"];
+const MEMOIR_FINAL_KEY = "final";
+const MEMOIR_POSTER_KEY = "poster";
+const MEMOIR_GRADE_KEYS = MEMOIR_STEP_KEYS.concat([MEMOIR_FINAL_KEY, MEMOIR_POSTER_KEY]);
+const MEMOIR_GRADE_LABELS = {
+  lead: "The Lead",
+  share: "Lead Share",
+  beginning: "The Beginning",
+  rising: "Rising Action",
+  callback: "The Callback",
+  climax: "The Climax",
+  sowhat: "So What?",
+  final: "Final Memoir",
+  poster: "Memoir Poster"
+};
+// Column headings have to fit nine across one table.
+const MEMOIR_GRADE_SHORT = {
+  lead: "Lead", share: "Share", beginning: "Begin", rising: "Rising", callback: "Callback",
+  climax: "Climax", sowhat: "So What", final: "Final", poster: "Poster"
+};
+const MEMOIR_STEP_POINTS = { lead: 7, share: 7, beginning: 7, rising: 7, callback: 1, climax: 7, sowhat: 7, poster: 1 };
+const MEMOIR_PASS_FAIL = { callback: true, poster: true };
+const MEMOIR_RUBRIC_MAX = 7;
+// Colours for the pieces that are not one of the six stages.
+const PIECE_COLORS = { share: "#E4C27E", final: "#EDE9E1", poster: "#9FD4D0" };
+function pieceColor(key) {
+  return (STAGE_BY_KEY[key] && STAGE_BY_KEY[key].color) || PIECE_COLORS[key] || "#A3A8B4";
+}
+
+// Seven-band rubrics. Index 0 is unused; scores are 1-7. Each descriptor is
+// written "Name. Sentence..." -- the marking screen splits the band name off
+// the front and shows it on the score button.
+const LEAD_RUBRIC = [
+  null,
+  "Incomplete. The lead is missing, or is a single line that does not place the reader inside a moment.",
+  "Minimal. The lead summarizes the event from a distance and uses one or none of the four moves (action, thought, sound, dialogue).",
+  "Developing. The lead is set in a moment but uses only two of the four moves, or stacks them like a list so the beat never moves.",
+  "Adequate. The lead uses three of the four moves in a real moment, but the tension is mild or it is not clearly the beat just before the climax.",
+  "Proficient. The lead drops the reader into one beat right before the climax and weaves in an action, a thought or question, a sound, and a line of dialogue.",
+  "Strong. All four moves are woven naturally, outside and inside alternate, and the beat creates real curiosity about what happens next.",
+  "Exemplary. Every detail earns its place, the inside/outside rhythm builds tension, and the lead plants an image or line the story can echo later."
+];
+const SHARE_RUBRIC = [
+  null,
+  "Incomplete. No lead was posted to the Lead Share board.",
+  "Minimal. A lead was posted, but the student did not reply to any classmate.",
+  "Developing. A lead was posted with a reply that is only praise or agreement (“Nice job!”).",
+  "Adequate. A lead was posted and replies name something specific in a classmate's lead, but offer no question or suggestion.",
+  "Proficient. A lead was posted and the student replied to at least two classmates with specific, useful feedback: what works, plus one question or suggestion.",
+  "Strong. Replies point to exact words or moves in classmates' leads, explain their effect on a reader, and offer a suggestion the writer could act on.",
+  "Exemplary. Replies are generous and precise and push a classmate's thinking, and the student's own post shows they used the feedback they received."
+];
+const BEGINNING_RUBRIC = [
+  null,
+  "Incomplete. The beginning is missing or too brief to set a scene.",
+  "Minimal. The beginning names where and when, but gives no people, no sense of “before,” and no tension.",
+  "Developing. Time and place are clear, but the people and the “before” normal are thin and nothing hints at what is coming.",
+  "Adequate. Time, place, people and the “before” normal are all there, but mostly told rather than shown, and the hint of tension is faint.",
+  "Proficient. The beginning grounds the reader in time and place, introduces the people who matter, shows the “before” normal, and hints at the tension to come.",
+  "Strong. Specific details make the “before” world feel lived-in, and the hint of tension is placed so the reader starts to lean forward.",
+  "Exemplary. The rewind from the lead is smooth, the “before” world is vivid and specific, and a quiet want or worry is already at work."
+];
+const RISING_RUBRIC = [
+  null,
+  "Incomplete. The rising action is missing or is a single event.",
+  "Minimal. Events are listed (“and then… and then…”) with no sense of stakes.",
+  "Developing. Two or more events are told in order, but the stakes do not clearly rise and internal reactions are missing.",
+  "Adequate. Events build in order and the stakes rise somewhat, but reactions are brief or the link between events is left to the reader.",
+  "Proficient. Two to three events escalate in order, each raises the stakes, and the writer shows how each one changed what they wanted, feared, or believed.",
+  "Strong. Each beat raises the stakes more than the last, inside and outside detail are balanced, and the pacing pulls the reader toward the climax.",
+  "Exemplary. The build feels inevitable: every event matters, the tension tightens with each beat, and the internal story grows as clearly as the external one."
+];
+const CLIMAX_RUBRIC = [
+  null,
+  "Incomplete. The climax is missing or told in a single sentence.",
+  "Minimal. The climax is summarized at normal speed, with little detail and no internal reaction.",
+  "Developing. The moment is slowed a little, but it has only one or two beats and leans almost entirely on outside or inside detail.",
+  "Adequate. The climax is broken into several beats with some sensory detail, but the inside/outside mix is uneven or every sentence moves at the same pace.",
+  "Proficient. The climax is stretched into 3–5 micro-moments, each with an external detail and an internal reaction, and sentence length is used for pacing.",
+  "Strong. The slow motion is sustained and controlled; precise sensory and emotional detail, fragments and short sentences put the reader inside the moment.",
+  "Exemplary. The climax is the heart of the piece: it pays off the lead and the callback, every beat is vivid and purposeful, and the pacing is masterful."
+];
+const SOWHAT_RUBRIC = [
+  null,
+  "Incomplete. The reflection is missing or is a single sentence.",
+  "Minimal. The reflection states a generic lesson (“I learned to never give up”) with no link to the moment.",
+  "Developing. The reflection names a change or lesson and connects it to the moment, but stays general.",
+  "Adequate. The reflection explains how the moment changed the writer, with some specifics, but does not deepen the idea or look forward.",
+  "Proficient. The reflection explains honestly how the moment changed or affected the writer, names a feeling, belief or lesson, and ties it to specific details from the story.",
+  "Strong. The reflection shows real insight — what the writer understands now that they did not then — and how they still carry the moment.",
+  "Exemplary. The reflection is honest and surprising, reframes the whole memoir, and leaves the reader with a lasting sense of why this moment mattered."
+];
+const STEP_RUBRICS = {
+  lead: LEAD_RUBRIC,
+  share: SHARE_RUBRIC,
+  beginning: BEGINNING_RUBRIC,
+  rising: RISING_RUBRIC,
+  climax: CLIMAX_RUBRIC,
+  sowhat: SOWHAT_RUBRIC
+};
+
+// The finished memoir, on four criteria. Five levels each, best first, worth
+// 7 / 6 / 5 / 4 / 1 points -- the same bands as the Macbeth final essay. Students
+// rate themselves on this same rubric before they turn the memoir in; their
+// choice is shown to the teacher, dashed, until the teacher decides.
+const MEMOIR_CRITERIA = ["Structure & Frame", "Pacing & Detail", "Reflection & Significance", "Voice & Conventions"];
+const CRITERION_POINTS = [7, 6, 5, 4, 1];
+const CRITERION_MAX = 7;
+const BAND_LABELS = ["Exceeds", "Strong", "Developing", "Limited", "Beginning"];
+const MEMOIR_RUBRIC = {
+  "Structure & Frame": [
+    "The memoir opens on a gripping flash-forward, rewinds cleanly, builds in order, and the callback lands so the climax feels earned. The frame is unmistakably intentional and every section flows into the next.",
+    "The lead, rewind, rising action, callback and climax are all present and in order, the callback clearly echoes the lead, and transitions carry the reader through.",
+    "All the parts are present, but a transition is abrupt, the rewind is confusing, or the callback only loosely echoes the lead.",
+    "One or more parts are missing or out of place, and the piece reads more like a list of events than a framed story.",
+    "The piece has no recognizable structure or is too incomplete to judge."
+  ],
+  "Pacing & Detail": [
+    "Pacing is deliberate throughout: the climax is slowed into micro-moments, scene and summary are balanced, and precise sensory and internal detail are woven together.",
+    "The climax is clearly slowed down, and the writing uses specific sensory detail with a good balance of internal and external beats.",
+    "Some moments are vivid, but the pacing is uneven — the climax rushes, or the detail leans heavily toward only inside or only outside.",
+    "The story is mostly told in summary, with little sensory detail or internal reaction.",
+    "Detail and pacing are minimal or missing."
+  ],
+  "Reflection & Significance": [
+    "The reflection is honest and insightful, grows naturally out of the story, and makes the reader understand exactly why this moment changed the writer.",
+    "The reflection clearly explains how the moment changed or affected the writer and connects to specific moments in the story.",
+    "The reflection names a change or lesson but stays general, or only loosely connects to the story.",
+    "The reflection is a generic moral or a single line added at the end.",
+    "There is no reflection on why the moment mattered."
+  ],
+  "Voice & Conventions": [
+    "The writing has a distinct, authentic voice; word choice is precise, sentences vary with purpose, and conventions are nearly flawless.",
+    "The voice is clear and engaging, word choice is specific, sentences vary, and errors are few and do not distract.",
+    "The voice comes through in places, but word choice is sometimes vague, sentence patterns repeat, or errors occasionally distract.",
+    "The voice is flat, word choice is general, and frequent errors make parts hard to follow.",
+    "Errors or gaps make the writing very difficult to read."
+  ]
+};
+
+// One line per grading tile: what the student did (for the teacher at a glance).
+const STEP_TILE_NOTE = {
+  lead: "Scored on the Lead rubric",
+  share: "Their post plus replies to classmates",
+  beginning: "Scored on the Beginning rubric",
+  rising: "Scored on the Rising Action rubric",
+  callback: "Marks itself complete when turned in",
+  climax: "Scored on the Climax rubric",
+  sowhat: "Scored on the reflection rubric",
+  final: "Four criteria, 7 points each",
+  poster: "Marks itself complete when turned in"
+};
+// What the teacher is judging on each marking screen. Written for the grader.
+const STEP_GRADE_NOTES = {
+  lead: "One beat right before the climax, weaving in an action, a thought or question, a sound, and a line of dialogue. Pasting is allowed in this box, because students often bring the lead over from a discussion post.",
+  share: "What each student posted to the Lead Share board, and the replies they wrote to classmates. Score the post and the quality of their feedback together.",
+  beginning: "Time and place, the people who matter, the “before” normal, and a hint of the tension to come.",
+  rising: "Two or three events in order, each raising the stakes, with the student's internal reaction shown.",
+  callback: "Does it echo something specific from the lead? This is a completion mark: the app ticks anyone who turned one in, and you override it where you disagree. Their lead is shown beside each callback.",
+  climax: "The same beat as the lead, slowed into 3–5 micro-moments, each with an external detail and an internal reaction. Their lead is shown for comparison.",
+  sowhat: "An honest reflection on how the moment changed the writer, tied to the story. Their climax is shown for comparison.",
+  final: "The whole memoir as the student assembled and revised it, scored on four criteria. Read it once and score all four; the student's own rating is shown dashed until you decide.",
+  poster: "The finished memoir as a poster: the student's title and byline at the top, with every word exactly as written. A completion mark the app fills in when the poster is turned in."
+};
+
+// The story-arc strip. x is story time (left to right), y is tension (higher on
+// the page is more tense). The Lead sits at the same height as the Callback --
+// it opens on that moment, then the story rewinds to the Beginning.
+const ARC_POINTS = {
+  beginning: [90, 118],
+  rising: [360, 90],
+  callback: [600, 36],
+  climax: [720, 16],
+  sowhat: [860, 100],
+  lead: [36, 36]
+};
+const ARC_PATH = "M90,118 C135,113 275,104 360,90 C445,76 540,48 600,36 C660,24 677,5 720,16 C763,27 837,86 860,100";
+
+__MB.MemoirData = 'ok';
+</script>

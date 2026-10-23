@@ -1,0 +1,373 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Classroom Apps</title>
+<meta name="description" content="Free Google Apps Script apps for high-school English. Make your own copy, or change the code however you like.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #f7f3ec; --surface: #fffdf9; --ink: #1f1b16; --muted: #5d554b; --line: #e3dacb;
+    --brand: #8c2f39; --brand-ink: #ffffff; --chip: #efe7da; --focus: #1f5f74;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17140f; --surface: #211d17; --ink: #f1ebe1; --muted: #b8ad9d; --line: #3a332a;
+      --brand: #d9707b; --brand-ink: #1b0d0f; --chip: #2c261e; --focus: #7cc3d8;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #17140f; --surface: #211d17; --ink: #f1ebe1; --muted: #b8ad9d; --line: #3a332a;
+    --brand: #d9707b; --brand-ink: #1b0d0f; --chip: #2c261e; --focus: #7cc3d8;
+  }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: inherit; text-underline-offset: 3px; }
+  a:focus-visible, summary:focus-visible, .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
+  h1, h2, h3 { font-family: Literata, Georgia, "Times New Roman", serif; line-height: 1.2; margin: 0; }
+
+  header.hero { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
+  .kicker { font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brand); margin: 0 0 14px; }
+  .hero h1 { font-size: clamp(38px, 6vw, 60px); font-weight: 700; max-width: 20ch; }
+  .hero .lede { font-size: 20px; color: var(--muted); max-width: 46ch; margin: 18px 0 28px; }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+  .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; font-size: 16px; text-decoration: none; color: var(--ink); white-space: nowrap; }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+  .btn.primary:hover { filter: brightness(1.08); }
+  .btn.is-off { background: var(--chip); border-color: var(--line); color: var(--muted); cursor: default; filter: none; }
+
+  section { padding: 56px 0; }
+  section + section { border-top: 1px solid var(--line); }
+  h2 { font-size: 30px; margin-bottom: 8px; }
+  .section-note { color: var(--muted); margin: 0 0 28px; max-width: 60ch; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; counter-reset: step; list-style: none; padding: 0; margin: 0; }
+  .steps li { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
+  .steps li::before { counter-increment: step; content: counter(step); display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font-weight: 700; margin-bottom: 12px; }
+  .steps h3 { font-size: 20px; margin-bottom: 6px; }
+  .steps p { margin: 0; color: var(--muted); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
+  .app { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 12px; padding: 22px; }
+  .app-head { display: flex; gap: 14px; align-items: center; margin-bottom: 12px; }
+  .tile { flex: none; width: 48px; height: 48px; border-radius: 10px; display: grid; place-items: center; background: var(--accent); color: #fff; font: 700 18px/1 Literata, Georgia, serif; letter-spacing: .02em; }
+  .app h3 { font-size: 22px; }
+  .meta { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+  .blurb { margin: 0 0 18px; flex: 1; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; }
+  details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
+  summary { cursor: pointer; font-weight: 700; min-height: 32px; display: flex; align-items: center; gap: 8px; list-style: none; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: "+"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); font-weight: 700; line-height: 1; }
+  details[open] summary::before { content: "−"; }
+  details ol { padding-left: 22px; margin: 10px 0; }
+  details li { margin-bottom: 6px; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; background: var(--chip); padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+  .small { font-size: 15px; color: var(--muted); margin: 0; }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
+  .panel h3 { font-size: 21px; margin-bottom: 8px; }
+  .panel p { margin: 0 0 16px; color: var(--muted); }
+  .panel ul { margin: 0; padding-left: 20px; }
+  .panel li { margin-bottom: 6px; }
+
+  footer { padding: 32px 0 48px; color: var(--muted); font-size: 15px; border-top: 1px solid var(--line); }
+  footer p { margin: 0 0 6px; }
+
+  @media (max-width: 860px) { .steps, .two { grid-template-columns: 1fr; } }
+  @media (max-width: 480px) {
+    .wrap { padding: 0 16px; }
+    header.hero { padding: 48px 0 32px; }
+    .hero .lede { font-size: 18px; }
+    .grid { grid-template-columns: 1fr; }
+    .actions .btn { flex: 1 1 auto; }
+  }
+</style>
+</head>
+<body>
+<header class="hero">
+  <div class="wrap">
+    <p class="kicker">Free for teachers · Google Apps Script</p>
+    <h1>Classroom apps for English teachers</h1>
+    <p class="lede">Units and tools built and used in a real high-school English classroom. Make your own copy and use it tomorrow, or change the code however you like.</p>
+    <div class="hero-actions">
+      <a class="btn primary" href="#apps">Browse the apps</a>
+      <a class="btn" href="https://github.com/jabens-pixel/classroom-apps" target="_blank" rel="noopener">All the code on GitHub</a>
+    </div>
+  </div>
+</header>
+
+<main>
+  <section>
+    <div class="wrap">
+      <h2>How it works</h2>
+      <p class="section-note">Each app runs in your own Google account. Your students’ work saves to your Drive. Nothing is shared with anyone else.</p>
+      <ol class="steps">
+        <li><h3>Make a copy</h3><p>One click copies the app into your Google account.</p></li>
+        <li><h3>Run setup once</h3><p>It builds the app’s Sheet and makes you the admin. Add other teachers at your school from inside the app.</p></li>
+        <li><h3>Share your link</h3><p>Deploy it as a web app and post the link for students. Connect Canvas if you like.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section id="apps">
+    <div class="wrap">
+      <h2>The apps</h2>
+      <p class="section-note">You’ll need a Google Workspace for Education account, so students sign in with their school Google account. Canvas and AI feedback are optional.</p>
+      <div class="grid">
+      <article class="app" style="--accent:#8c2f39">
+        <div class="app-head">
+          <div class="tile" aria-hidden="true">MC</div>
+          <div>
+            <h3>Macbeth Curriculum</h3>
+            <p class="meta">Grades 9–12</p>
+          </div>
+        </div>
+        <p class="blurb">A full Macbeth unit: the play act by act with side-by-side support, activities, discussion, grading and Canvas.</p>
+        <div class="actions">
+          <span class="btn primary is-off" aria-disabled="true" title="The one-click copy link for this app is coming soon. You can set it up from the code now.">Copy link soon</span>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/macbeth-curriculum" target="_blank" rel="noopener">View code</a>
+        </div>
+        <details>
+          <summary>Set it up</summary>
+          <ol>
+            <li>Follow the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/macbeth-curriculum/README.md" target="_blank" rel="noopener">setup guide</a> to add the files to a new Apps Script project.</li>
+            <li>In your copy, open <strong>Extensions → Apps Script</strong>.</li>
+            <li>Pick <code>setupMacbethBackend</code> in the function list, click <strong>Run</strong>, and allow the permissions. You’re now the admin.</li>
+            <li><strong>Deploy → New deployment → Web app</strong>: execute as <em>Me</em>, access for <em>anyone in your school</em>. Share that link with students.</li>
+          </ol>
+          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/macbeth-curriculum/README.md" target="_blank" rel="noopener">Full setup guide</a> · Canvas and AI feedback are optional.</p>
+        </details>
+      </article>
+      <article class="app" style="--accent:#1f5f74">
+        <div class="app-head">
+          <div class="tile" aria-hidden="true">GG</div>
+          <div>
+            <h3>The Great Gatsby</h3>
+            <p class="meta">Grades 11–12</p>
+          </div>
+        </div>
+        <p class="blurb">A Great Gatsby unit with the full novel (public domain in the US since 2021), activities, grading and Canvas.</p>
+        <div class="actions">
+          <span class="btn primary is-off" aria-disabled="true" title="The one-click copy link for this app is coming soon. You can set it up from the code now.">Copy link soon</span>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/great-gatsby" target="_blank" rel="noopener">View code</a>
+        </div>
+        <details>
+          <summary>Set it up</summary>
+          <ol>
+            <li>Follow the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/great-gatsby/README.md" target="_blank" rel="noopener">setup guide</a> to add the files to a new Apps Script project.</li>
+            <li>In your copy, open <strong>Extensions → Apps Script</strong>.</li>
+            <li>Pick <code>setupGatsbyBackend</code> in the function list, click <strong>Run</strong>, and allow the permissions. You’re now the admin.</li>
+            <li><strong>Deploy → New deployment → Web app</strong>: execute as <em>Me</em>, access for <em>anyone in your school</em>. Share that link with students.</li>
+          </ol>
+          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/great-gatsby/README.md" target="_blank" rel="noopener">Full setup guide</a> · Canvas and AI feedback are optional.</p>
+        </details>
+      </article>
+      <article class="app" style="--accent:#6a4c93">
+        <div class="app-head">
+          <div class="tile" aria-hidden="true">ME</div>
+          <div>
+            <h3>Memoir</h3>
+            <p class="meta">Grades 9–12</p>
+          </div>
+        </div>
+        <p class="blurb">A memoir writing unit: mentor ideas, drafting, revision, grading and Canvas.</p>
+        <div class="actions">
+          <span class="btn primary is-off" aria-disabled="true" title="The one-click copy link for this app is coming soon. You can set it up from the code now.">Copy link soon</span>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/memoir" target="_blank" rel="noopener">View code</a>
+        </div>
+        <details>
+          <summary>Set it up</summary>
+          <ol>
+            <li>Follow the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/memoir/README.md" target="_blank" rel="noopener">setup guide</a> to add the files to a new Apps Script project.</li>
+            <li>In your copy, open <strong>Extensions → Apps Script</strong>.</li>
+            <li>Pick <code>setupMemoirBackend</code> in the function list, click <strong>Run</strong>, and allow the permissions. You’re now the admin.</li>
+            <li><strong>Deploy → New deployment → Web app</strong>: execute as <em>Me</em>, access for <em>anyone in your school</em>. Share that link with students.</li>
+          </ol>
+          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/memoir/README.md" target="_blank" rel="noopener">Full setup guide</a> · Canvas and AI feedback are optional.</p>
+        </details>
+      </article>
+      <article class="app" style="--accent:#2e6b4f">
+        <div class="app-head">
+          <div class="tile" aria-hidden="true">NS</div>
+          <div>
+            <h3>Novel Study</h3>
+            <p class="meta">Grades 6–12</p>
+          </div>
+        </div>
+        <p class="blurb">A simple novel study built around books students read in Sora (or any copy they have).</p>
+        <div class="actions">
+          <span class="btn primary is-off" aria-disabled="true" title="The one-click copy link for this app is coming soon. You can set it up from the code now.">Copy link soon</span>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/novel-study" target="_blank" rel="noopener">View code</a>
+        </div>
+        <details>
+          <summary>Set it up</summary>
+          <ol>
+            <li>Follow the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/novel-study/README.md" target="_blank" rel="noopener">setup guide</a> to add the files to a new Apps Script project.</li>
+            <li>In your copy, open <strong>Extensions → Apps Script</strong>.</li>
+            <li>Pick <code>setupNovelStudy</code> in the function list, click <strong>Run</strong>, and allow the permissions. You’re now the admin.</li>
+            <li><strong>Deploy → New deployment → Web app</strong>: execute as <em>Me</em>, access for <em>anyone in your school</em>. Share that link with students.</li>
+          </ol>
+          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/novel-study/README.md" target="_blank" rel="noopener">Full setup guide</a> · Canvas and AI feedback are optional.</p>
+        </details>
+      </article>
+      <article class="app" style="--accent:#b5651d">
+        <div class="app-head">
+          <div class="tile" aria-hidden="true">PS</div>
+          <div>
+            <h3>Podcast Studio</h3>
+            <p class="meta">Grades 9–12</p>
+          </div>
+        </div>
+        <p class="blurb">A podcast unit: planning, scripting, read-aloud practice, grading and Canvas.</p>
+        <div class="actions">
+          <span class="btn primary is-off" aria-disabled="true" title="The one-click copy link for this app is coming soon. You can set it up from the code now.">Copy link soon</span>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/podcast-studio" target="_blank" rel="noopener">View code</a>
+        </div>
+        <details>
+          <summary>Set it up</summary>
+          <ol>
+            <li>Follow the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/podcast-studio/README.md" target="_blank" rel="noopener">setup guide</a> to add the files to a new Apps Script project.</li>
+            <li>In your copy, open <strong>Extensions → Apps Script</strong>.</li>
+            <li>Pick <code>setupPodcastStudio</code> in the function list, click <strong>Run</strong>, and allow the permissions. You’re now the admin.</li>
+            <li><strong>Deploy → New deployment → Web app</strong>: execute as <em>Me</em>, access for <em>anyone in your school</em>. Share that link with students.</li>
+          </ol>
+          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/podcast-studio/README.md" target="_blank" rel="noopener">Full setup guide</a> · Canvas and AI feedback are optional.</p>
+        </details>
+      </article>
+      <article class="app" style="--accent:#3d5a80">
+        <div class="app-head">
+          <div class="tile" aria-hidden="true">BR</div>
+          <div>
+            <h3>Bell Ringers</h3>
+            <p class="meta">Grades 9–12</p>
+          </div>
+        </div>
+        <p class="blurb">Daily writing warm-ups with a built-in library of craft lessons, scoring and Canvas.</p>
+        <div class="actions">
+          <span class="btn primary is-off" aria-disabled="true" title="The one-click copy link for this app is coming soon. You can set it up from the code now.">Copy link soon</span>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/bell-ringers" target="_blank" rel="noopener">View code</a>
+        </div>
+        <details>
+          <summary>Set it up</summary>
+          <ol>
+            <li>Follow the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/bell-ringers/README.md" target="_blank" rel="noopener">setup guide</a> to add the files to a new Apps Script project.</li>
+            <li>In your copy, open <strong>Extensions → Apps Script</strong>.</li>
+            <li>Pick <code>setupSchEnglishBellRingers</code> in the function list, click <strong>Run</strong>, and allow the permissions. You’re now the admin.</li>
+            <li><strong>Deploy → New deployment → Web app</strong>: execute as <em>Me</em>, access for <em>anyone in your school</em>. Share that link with students.</li>
+          </ol>
+          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/bell-ringers/README.md" target="_blank" rel="noopener">Full setup guide</a> · Canvas and AI feedback are optional.</p>
+        </details>
+      </article>
+      <article class="app" style="--accent:#7a5c2e">
+        <div class="app-head">
+          <div class="tile" aria-hidden="true">LC</div>
+          <div>
+            <h3>Lit Circles</h3>
+            <p class="meta">Grades 9–12</p>
+          </div>
+        </div>
+        <p class="blurb">Literature circles: weekly roles and steps, discussion, peer and self assessment, grading and Canvas.</p>
+        <div class="actions">
+          <span class="btn primary is-off" aria-disabled="true" title="The one-click copy link for this app is coming soon. You can set it up from the code now.">Copy link soon</span>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles" target="_blank" rel="noopener">View code</a>
+        </div>
+        <details>
+          <summary>Set it up</summary>
+          <ol>
+            <li>Follow the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles/README.md" target="_blank" rel="noopener">setup guide</a> to add the files to a new Apps Script project.</li>
+            <li>In your copy, open <strong>Extensions → Apps Script</strong>.</li>
+            <li>Pick <code>setupLiteratureCirclesBackend</code> in the function list, click <strong>Run</strong>, and allow the permissions. You’re now the admin.</li>
+            <li><strong>Deploy → New deployment → Web app</strong>: execute as <em>Me</em>, access for <em>anyone in your school</em>. Share that link with students.</li>
+          </ol>
+          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles/README.md" target="_blank" rel="noopener">Full setup guide</a> · Canvas and AI feedback are optional.</p>
+        </details>
+      </article>
+      <article class="app" style="--accent:#5b6c2f">
+        <div class="app-head">
+          <div class="tile" aria-hidden="true">RW</div>
+          <div>
+            <h3>Root Word Study</h3>
+            <p class="meta">Grades 9–12</p>
+          </div>
+        </div>
+        <p class="blurb">Weekly Greek and Latin roots: sentences, flashcards, pretests and a self-scoring final quiz.</p>
+        <div class="actions">
+          <span class="btn primary is-off" aria-disabled="true" title="The one-click copy link for this app is coming soon. You can set it up from the code now.">Copy link soon</span>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/root-word-study" target="_blank" rel="noopener">View code</a>
+        </div>
+        <details>
+          <summary>Set it up</summary>
+          <ol>
+            <li>Follow the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/root-word-study/README.md" target="_blank" rel="noopener">setup guide</a> to add the files to a new Apps Script project.</li>
+            <li>In your copy, open <strong>Extensions → Apps Script</strong>.</li>
+            <li>Pick <code>setupRootWordStudy</code> in the function list, click <strong>Run</strong>, and allow the permissions. You’re now the admin.</li>
+            <li><strong>Deploy → New deployment → Web app</strong>: execute as <em>Me</em>, access for <em>anyone in your school</em>. Share that link with students.</li>
+          </ol>
+          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/root-word-study/README.md" target="_blank" rel="noopener">Full setup guide</a> · Canvas and AI feedback are optional.</p>
+        </details>
+      </article>
+      <article class="app" style="--accent:#a23b5a">
+        <div class="app-head">
+          <div class="tile" aria-hidden="true">SS</div>
+          <div>
+            <h3>Short Story Lab</h3>
+            <p class="meta">Grades 9–10</p>
+          </div>
+        </div>
+        <p class="blurb">A short story unit: ten stories with reading support (three public-domain texts included; you paste in the rest), a writing workshop, grading and Canvas.</p>
+        <div class="actions">
+          <span class="btn primary is-off" aria-disabled="true" title="The one-click copy link for this app is coming soon. You can set it up from the code now.">Copy link soon</span>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/short-story-lab" target="_blank" rel="noopener">View code</a>
+        </div>
+        <details>
+          <summary>Set it up</summary>
+          <ol>
+            <li>Follow the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/short-story-lab/README.md" target="_blank" rel="noopener">setup guide</a> to add the files to a new Apps Script project.</li>
+            <li>In your copy, open <strong>Extensions → Apps Script</strong>.</li>
+            <li>Pick <code>setupShortStoryBackend</code> in the function list, click <strong>Run</strong>, and allow the permissions. You’re now the admin.</li>
+            <li><strong>Deploy → New deployment → Web app</strong>: execute as <em>Me</em>, access for <em>anyone in your school</em>. Share that link with students.</li>
+          </ol>
+          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/short-story-lab/README.md" target="_blank" rel="noopener">Full setup guide</a> · Canvas and AI feedback are optional.</p>
+        </details>
+      </article>
+      </div>
+    </div>
+  </section>
+
+  <section id="contribute">
+    <div class="wrap">
+      <h2>Make it better</h2>
+      <p class="section-note">These apps get better when teachers share what they learn. You don’t have to write code to help.</p>
+      <div class="two">
+        <div class="panel">
+          <h3>Share an idea or a problem</h3>
+          <p>Tell us what broke, what your students needed, or how you adapted an app for your class.</p>
+          <a class="btn primary" href="https://github.com/jabens-pixel/classroom-apps/issues/new" target="_blank" rel="noopener">Send a suggestion</a>
+        </div>
+        <div class="panel">
+          <h3>Improve the code</h3>
+          <p>Fork the project, make your change in one app’s folder, and open a pull request. Every change is reviewed before it goes in.</p>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">How to contribute</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <p>Made by Jaben Schalk, a high-school English teacher.</p>
+    <p>Code: MIT license. Lesson content: CC BY-NC-SA 4.0 (share and adapt with credit, not for sale). Story and book texts included are in the public domain.</p>
+  </div>
+</footer>
+</body>
+</html>

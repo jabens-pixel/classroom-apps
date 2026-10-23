@@ -1,0 +1,542 @@
+<script>
+// ============================================================================
+// Marking screens (exactly like Macbeth): groups Resubmitted → Ready to Grade → Not Submitted →
+// Graded → Excluded, in roster (name) order inside each; scoring, excluding or clearing a student
+// moves their row to its new group at once (place); marks save on the click, comments 2.5 s after
+// typing stops and on blur (kept on this device until confirmed); saves for one student run in
+// order and the last action wins; ⤢ Focused grading on every screen.
+// ============================================================================
+(function () {
+  var M = PC.M = { data: null, hideNot: false, focus: null, order: [] };
+  var A = PC.act = PC.act || {};
+  function esc(s) { return PC.esc(s); }
+  function cid() { return PC.T.classId; }
+  var GROUPS = [
+    { k: 'redo', label: 'Resubmitted', note: 'Changed after you graded it', hideEmpty: true },
+    { k: 'ready', label: 'Ready to Grade', note: 'Turned in, not graded yet' },
+    { k: 'none', label: 'Not Submitted', note: 'Not turned in yet' },
+    { k: 'graded', label: 'Graded', note: 'Scored or marked' },
+    { k: 'excluded', label: 'Excluded', note: 'Left out of the grade', hideEmpty: true }
+  ];
+  function groupOf(r) {
+    var c = r.cell;
+    if (c.redo) return 'redo';
+    if (c.excluded) return 'excluded';
+    if (M.data.item.kind === 'quiz') return c.submitted ? 'graded' : 'none';
+    if (c.toGrade) return 'ready';
+    if (c.handled) return 'graded';
+    return 'none';
+  }
+
+  // ---------------------------------------------------------------- view
+  PC.views.marking = function (app) {
+    app.innerHTML = '<section class="pc-card pc-skeleton"><p>Opening the marking screen…</p></section>';
+    load(app, PC.state.focusEmail || '');
+  };
+  function load(app, scrollTo) {
+    PC.rpc('getMarking', { classId: cid(), itemKey: PC.state.itemKey }, { retry: true }).then(function (d) {
+      if (PC.state.view !== 'marking') return;
+      M.data = d;
+      d.rows.forEach(function (r) { r.group = groupOf(r); });
+      draw(app);
+      restoreLocalComments();
+      var target = scrollTo || firstToMark();
+      if (target) setTimeout(function () { var el = document.querySelector('.pc-mrow[data-email="' + cssEsc(target) + '"]'); if (el) { el.scrollIntoView({ block: 'start', behavior: 'smooth' }); el.classList.add('is-jump'); setTimeout(function () { el.classList.remove('is-jump'); }, 2400); } }, 120);
+    }).catch(function (e) { PC.fail(app, e); });
+  }
+  function badCrit(t, cd) { PC.toast((cd ? cd.label : 'Scores') + ' go from 0 to ' + (cd ? cd.max : 7) + ' (halves allowed).', 'error'); var r = rowOf(t.dataset.email), v = (((r || {}).grade || {}).criteria || {})[t.dataset.crit]; t.value = v === undefined ? '' : v; }
+  function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
+  function firstToMark() {
+    var r = M.data.rows.filter(function (x) { return x.group === 'redo'; })[0] || M.data.rows.filter(function (x) { return x.group === 'ready'; })[0];
+    return r ? r.email : '';
+  }
+  function draw(app) {
+    var d = M.data, it = d.item, c = d.content;
+    var tabs = '<nav class="pc-mtabs" aria-label="This week’s assignments">' + d.weekItems.map(function (w) {
+      return '<button type="button" class="pc-mtab' + (w.key === it.key ? ' is-on' : '') + '" data-act="markTab" data-key="' + esc(w.key) + '"' + (w.key === it.key ? ' aria-current="page"' : '') + '>' + esc(w.kindLabel) + '</button>';
+    }).join('') + '</nav>';
+    var top = '<section class="pc-card pc-mtop"><div class="pc-eyebrow">' + esc(it.unitLabel) + (c.title ? ' · ' + esc(c.title) : '') + '</div><h1>' + esc((it.icon ? it.icon + ' ' : '') + it.kindLabel) + '<small> · ' + (it.type === 'auto' ? 'scores itself · ' + it.max + ' pts' : it.max + ' pts') + '</small></h1>' +
+      (c.eq ? '<p class="pc-eq"><span>Essential question</span>' + esc(c.eq) + '</p>' : '') + promptHtml() + legendHtml() +
+      '<div class="pc-row pc-mtools"><label class="pc-check"><input type="checkbox" id="mHideNot"' + (M.hideNot ? ' checked' : '') + '><span>Hide students who haven’t submitted</span></label>' +
+      '<button type="button" class="pc-btn small ' + (d.classExcluded ? '' : 'ghost is-danger') + '" data-act="markNoGrade" data-on="' + (!d.classExcluded) + '">' + (d.classExcluded ? '↺ Count this ' + esc(it.kindLabel) + ' again for everyone' : '🚫 Don’t grade this ' + esc(it.kindLabel) + ' for anyone') + '</button>' +
+      (!d.released ? '<span class="pc-chip is-warn">Hidden from students</span>' : '') + '</div>' +
+      (d.classExcluded ? '<p class="pc-excluded-note">This is left out of every student’s grade in this class. Scores you enter are kept.</p>' : '') + '</section>';
+    // Every group is on the page (an empty Resubmitted/Excluded is hidden), so a row can move into it.
+    var groups = GROUPS.map(function (g) {
+      var rows = d.rows.filter(function (r) { return r.group === g.k; });
+      var collapsed = g.k === 'none' && M.hideNot;
+      return '<section class="pc-mgroup pc-mgroup-' + g.k + (collapsed ? ' is-collapsed' : '') + '" data-group="' + g.k + '"' + (g.hideEmpty && !rows.length ? ' hidden' : '') + '><header><h2>' + g.label + '</h2><span class="pc-mgroup-count">' + rows.length + '</span><span class="pc-muted">' + (collapsed ? 'hidden' : g.note) + '</span></header>' +
+        '<div class="pc-mgroup-list"' + (collapsed ? ' hidden' : '') + '>' + rows.map(rowHtml).join('') + '</div>' +
+        (collapsed ? '' : '<p class="pc-empty pc-mgroup-empty"' + (rows.length ? ' hidden' : '') + '>No students here.</p>') + '</section>';
+    }).join('');
+    app.innerHTML = '<div class="pc-mhead"><button type="button" class="pc-btn" data-act="markBack">← Back to Dashboard</button>' + tabs + '<button type="button" class="pc-btn small" data-act="markRefresh">↻ Refresh</button></div>' + top +
+      '<div class="pc-mgroups" id="pcMGroups">' + groups + '</div><div id="pcFocus" class="pc-focus-overlay" hidden></div>';
+    PC.byId('mHideNot').onchange = function () { M.hideNot = this.checked; PC.store.set('pcHideNot', M.hideNot); draw(app); restoreLocalComments(); };
+  }
+  M.hideNot = PC.store.get('pcHideNot', false);
+  function promptHtml() {
+    var d = M.data, c = d.content, k = d.item.kind;
+    if (k === 'quiz') return '<details class="pc-akey"><summary>Answer key (' + c.mc.length + ' questions)</summary><ol>' + c.mc.map(function (q) { return '<li>' + esc(q.q) + ' <b>' + 'ABCD'.charAt(q.answer) + ': ' + esc(q.choices[q.answer]) + '</b></li>'; }).join('') + '</ol></details><p class="pc-small pc-muted">Multiple choice scores itself: 1 point right first try, ½ point second try. Students can take it twice; the best counted try is the score. For one student you can exclude it, set a try aside (“Don’t count”), or give another try.</p>';
+    var pa = c.assignment;
+    return (c.prompt ? '<div class="pc-prompt">' + esc(c.prompt) + '</div>' : '') +
+      (pa ? '<details class="pc-assignment"><summary>' + esc(pa.title) + ' (the assignment as students see it)</summary><h4>Overview</h4>' + pa.overview.map(function (x) { return '<p>' + esc(x) + '</p>'; }).join('') +
+        '<h4>Your Task</h4>' + pa.task.map(function (t) { return '<p><b>' + esc(t.h) + '</b></p><ul>' + t.list.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul>'; }).join('') +
+        '<h4>Tips for Success</h4><ul>' + pa.tips.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></details>' : '');
+  }
+  function legendHtml() {
+    var d = M.data;
+    if (d.rubric) return '<details class="pc-legend" open><summary>' + esc(d.item.kindLabel) + ' rubric — the full descriptors</summary><ol class="pc-rubric-list">' + d.rubric.map(function (r) { return '<li><b>' + r.score + ' · ' + esc(r.label) + '</b> ' + esc(r.text) + '</li>'; }).join('') + '</ol></details>';
+    if (d.criteria) return '<details class="pc-legend" open><summary>' + esc(d.item.kindLabel) + ' rubric — the full descriptors</summary>' + PC.critTableHtml(d.criteria) + '<p class="pc-small pc-muted">Score each criterion (a band, or any score 0–7 in halves). The grade is the total once every criterion is scored.</p></details>';
+    if (d.complete) return '<details class="pc-legend" open><summary>' + esc(d.item.kindLabel) + ' rubric — the full descriptors</summary><p><b>Complete (' + d.item.max + '):</b> ' + esc(d.complete.complete) + '</p><p><b>Partly complete (' + half(d.item.max) + '):</b> Some of it is there, or it’s thin on evidence.</p><p><b>Incomplete (0):</b> ' + esc(d.complete.incomplete) + '</p></details>';
+    return '';
+  }
+
+  function half(max) { return Math.round(max) / 2; }   // the Partly band (scores go in halves)
+  // ---------------------------------------------------------------- one row
+  function bandLabel(score) {
+    var d = M.data, it = d.item;
+    if (score === null || score === undefined) return '';
+    if (it.type === 'points') return score >= it.max ? 'Complete' : score > 0 ? 'Partly complete' : 'Incomplete';
+    if (it.type === 'rubric') return ((d.rubric || []).filter(function (r) { return r.score === Math.round(score); })[0] || {}).label || '';
+    return '';
+  }
+  function badges(r) {
+    var it = M.data.item, c = r.cell, g = r.grade || {}, out = [];
+    if (c.redo) out.push('<span class="pc-mbadge is-redo">↻ ' + (it.kind === 'discussion' ? 'REDONE' : 'RESUBMITTED') + ' — needs regrade</span>');
+    else if (c.toGrade) out.push('<span class="pc-mbadge is-needs">Needs grading</span>');
+    if (c.excluded) out.push('<span class="pc-mbadge">' + (c.classExcluded ? 'Not graded for this class' : 'Excluded') + '</span>');
+    if (it.kind === 'quiz') { if (c.submitted) out.push('<span class="pc-mbadge is-graded">' + c.score + '/' + (c.max || it.max) + '</span>'); else if (c.started) out.push('<span class="pc-mbadge">In progress</span>'); }
+    else if (c.score !== null && c.score !== undefined) out.push('<span class="pc-mbadge is-graded">' + esc(bandLabel(c.score)) + ' ' + c.score + '/' + it.max + '</span>');
+    if (!c.submitted && !(it.kind === 'quiz' && c.started)) out.push(r.hasDraft ? '<span class="pc-mbadge is-draft">Draft — not submitted</span>' : '<span class="pc-mbadge">Not submitted</span>');
+    if (r.workIsDraft && c.score !== null && c.score !== undefined) out.push('<span class="pc-mbadge is-draft">Teacher graded draft</span>');
+    if (r.editsAfterSubmit) out.push('<span class="pc-mbadge is-draft">Edits not turned in yet</span>');
+    var text = workText(r), pc = Object.keys(r.stats || {}).reduce(function (n, k) { return n + (Number((r.stats[k] || {}).pastedChars) || 0); }, 0);
+    if (pc && text.length) { var p = Math.min(100, Math.round(pc / text.length * 100)); if (p >= 10) out.push('<span class="pc-mbadge is-paste">📋 ' + p + '% pasted</span>'); }
+    if (it.type === 'criteria' && (c.score === null || c.score === undefined) && Object.keys(((r.grade || {}).criteria) || {}).length) out.push('<span class="pc-mbadge is-draft">Part of the rubric scored</span>');
+    if (r.demo) out.push('<span class="pc-demo-tag">demo</span>');
+    return out.join('');
+  }
+  function workText(r) {
+    var f = ((r.work || {}).f) || {};
+    return (M.data.content.fields || []).filter(function (fd) { return fd.kind === 'long'; }).map(function (fd) { return f[fd.id] || ''; }).join('\n');
+  }
+  function hasWriting(v) { if (v == null) return false; if (typeof v === 'string') return !!v.trim(); if (typeof v === 'object') return Object.keys(v).some(function (k) { return hasWriting(v[k]); }); return false; }
+  function shownFor(fd, f) { return !fd.showIf || String(f[fd.showIf.field] || '') === fd.showIf.eq; }
+  function episodeName(v) { var e = (M.data.library || []).filter(function (x) { return x.id === v; })[0]; return e ? '<a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.show + ': ' + e.title) + ' ↗</a> <small class="pc-muted">(' + esc(e.format) + ')</small>' : esc(v); }
+  function linkify(t) { return esc(t).replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"]/g, function (m) { return '<a href="' + m + '" target="_blank" rel="noopener">' + m + '</a>'; }); }
+  function linkHtml(v) { return /^https?:\/\//i.test(v) ? '<a class="pc-mlink" href="' + esc(v) + '" target="_blank" rel="noopener">' + esc(v.length > 70 ? v.slice(0, 68) + '…' : v) + ' ↗</a>' : esc(v); }
+  function workHtml(r) {
+    var d = M.data, k = d.item.kind, w = r.work;
+    if (r.unreadable) return '<p class="pc-error">This copy couldn’t be read. A backup is in the WorkBackups tab (editor tool: listWorkBackups).</p>';
+    if (k === 'quiz') return quizWorkHtml(r);
+    if (k === 'discussion') {
+      var posts = (w && w.posts) || [];
+      if (!posts.length) return '<p class="pc-empty">No posts yet.</p>';
+      return posts.map(function (p) { return '<div class="pc-mpost' + (p.replyTo ? ' is-reply' : '') + '">' + (p.replyTo ? '<div class="pc-mpost-ctx">↳ Reply to <b>' + esc(p.replyTo) + '</b>: “' + esc(p.replyToText) + (p.replyToText.length >= 160 ? '…' : '') + '”</div>' : '<div class="pc-mpost-ctx">Post</div>') + '<div class="pc-post-text pc-readable">' + linkify(p.text) + '</div><time>' + esc(PC.fmtDate(p.createdAt, true)) + (p.editedAt ? ' · edited' : '') + '</time></div>'; }).join('');
+    }
+    var f = (w && w.f) || {}, stats = r.stats || {};
+    if (!w || !hasWriting(f)) return '<p class="pc-empty">Nothing written yet.</p>';
+    var known = {}, out = '';
+    (d.content.fields || []).forEach(function (fd) {
+      known[fd.id] = true;
+      var v = f[fd.id];
+      if (!shownFor(fd, f) && !(v && String(v).trim && String(v).trim())) return;
+      var body;
+      if (fd.kind === 'rows') {
+        var rows = Array.isArray(v) ? v : [];
+        body = rows.length ? '<div class="pc-table-wrap"><table class="pc-table pc-mrows"><thead><tr>' + fd.cols.map(function (c) { return '<th>' + esc(c.label) + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.map(function (row) { return '<tr>' + fd.cols.map(function (c) { return '<td>' + esc(row[c.id] || '') + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' + (fd.min ? '<div class="pc-mmeta">' + rows.length + ' of ' + fd.min + ' rows asked for</div>' : '') : '<p class="pc-empty">—</p>';
+      } else if (fd.kind === 'long') {
+        var t = String(v || '');
+        body = t ? (PC.say ? '<button type="button" class="pc-btn small ghost pc-say-btn" data-act="sayStart" title="Read this box aloud">🔊 Read aloud</button>' : '') + '<div class="pc-mtext pc-readable" data-say="' + esc(fd.id) + '">' + PC.stats.highlightHtml(t, stats[fd.id]) + '</div><div class="pc-mmeta">' + PC.plural(PC.words(t), 'word') + (fd.minWords ? ' · asked for ' + fd.minWords + '+' : '') + '</div>' + PC.stats.chipsHtml(stats[fd.id], t) + pasteLegend(stats[fd.id]) : '<p class="pc-empty">—</p>';
+      } else if (fd.kind === 'episode') body = v ? '<p>' + episodeName(v) + '</p>' : '<p class="pc-empty">—</p>';
+      else if (fd.kind === 'link') body = v ? '<p>' + linkHtml(String(v)) + '</p>' : '<p class="pc-empty">No link</p>';
+      else body = v ? '<p>' + esc(v) + '</p>' : '<p class="pc-empty">—</p>';
+      out += '<div class="pc-mfield pc-mfield-' + esc(fd.kind) + '"><div class="pc-mflabel">' + esc(fd.label) + '</div>' + body + '</div>';
+    });
+    Object.keys(f).forEach(function (id) { if (known[id] || !hasWriting(f[id])) return; out += '<div class="pc-mfield"><div class="pc-mflabel">' + esc(id) + ' <small>(a box no longer on the form)</small></div><p>' + esc(typeof f[id] === 'string' ? f[id] : JSON.stringify(f[id])) + '</p></div>'; });
+    return out;
+  }
+  // The quiz: the try in progress, then every finished try (newest first) with Don't count / Count again.
+  function quizAnswersHtml(ans) {
+    var d = M.data;
+    return '<ol class="pc-mquiz">' + d.content.mc.map(function (q, i) {
+      var a = (ans || [])[i] || { tries: [], state: 'open', points: 0 };
+      return '<li class="is-' + esc(a.state) + '"><span class="pc-mquiz-q">' + esc(q.q) + '</span><span class="pc-mquiz-a">' + (a.tries.length ? a.tries.map(function (t) { return '<b class="' + (t === q.answer ? 'is-right' : 'is-wrong') + '">' + 'ABCD'.charAt(t) + '</b>'; }).join(' → ') : '—') + ' · ' + (a.state === 'open' ? 'not answered' : a.points + ' pt') + '</span></li>';
+    }).join('') + '</ol>';
+  }
+  function quizWorkHtml(r) {
+    var w = r.work || {}, tries = w.attempts || [], e = esc(r.email);
+    if (!r.cell.started && !tries.length) return '<p class="pc-empty">Not started.</p>';
+    var h = '';
+    if (!w.done) h += '<div class="pc-mflabel">Try ' + w.current + ' · ' + (w.started ? 'in progress' : 'not started yet') + '</div>' + (w.started ? quizAnswersHtml(w.answers) : '');
+    if (tries.length) h += '<div class="pc-mflabel">' + (tries.length === 1 ? 'Finished try' : 'Finished tries') + '</div><div class="pc-mtries">' + tries.slice().reverse().map(function (x, i) {
+      return '<div class="pc-mtry' + (x.counted ? '' : ' is-aside') + '"><span>Try ' + x.n + '</span><b>' + x.score + '/' + x.max + '</b>' +
+        (x.best ? '<span class="pc-mbadge is-graded">best · counts</span>' : '') + (!x.counted ? '<span class="pc-mbadge">Set aside · doesn’t count</span>' : '') +
+        (x.at ? '<span class="pc-muted">' + esc(PC.fmtDate(x.at, true)) + '</span>' : '') +
+        (x.counted ? '<button type="button" class="pc-btn small" data-act="quizCount" data-email="' + e + '" data-n="' + x.n + '" data-counted="0" title="Leave this try out of the score. It won’t use up one of the student’s tries.">Don’t count</button>'
+          : '<button type="button" class="pc-btn small" data-act="quizCount" data-email="' + e + '" data-n="' + x.n + '" data-counted="1">Count again</button>') +
+        (x.answers ? '<details' + (i === 0 && w.done ? ' open' : '') + '><summary>Answers</summary>' + quizAnswersHtml(x.answers) + '</details>' : '') + '</div>';
+    }).join('') + '</div>';
+    return h;
+  }
+  function quizToolsHtml(r) {
+    var w = r.work || {}, e = esc(r.email);
+    if (!r.cell.started && !(w.attempts || []).length) return '<div class="pc-mquiz-tools"><p>' + (w.allowed || 2) + ' tries; the best one counts.</p></div>';
+    var used = w.allowed - w.triesLeft;
+    return '<div class="pc-mquiz-tools"><p><b>Tries:</b> ' + used + ' of ' + w.allowed + ' used' + (w.extra ? ' (' + w.extra + ' extra from you)' : '') + '. The best counted try is the score.</p>' +
+      '<button type="button" class="pc-btn small" data-act="quizGiveTry" data-email="' + e + '">+ Give another try</button></div>';
+  }
+  function pasteLegend(s) { return s && s.pastes ? '<p class="pc-paste-legend"><span class="pc-swatch pc-pasted-swatch"></span>Pasted into the box</p>' : ''; }
+  function panelHtml(r) {
+    var it = M.data.item, c = r.cell, g = r.grade || {}, e = esc(r.email), ctx = cid() + '::' + it.key + '::' + r.email;
+    var score = c.score, h = '<div class="pc-mpanel">';
+    if (it.type === 'rubric') {
+      h += '<div class="pc-bands" role="group" aria-label="Rubric level">' + (M.data.rubric || []).map(function (b) { var on = score !== null && score !== undefined && Math.round(score) === b.score; return '<button type="button" class="pc-band' + (on ? ' is-on' : '') + '" data-act="markBand" data-email="' + e + '" data-score="' + b.score + '" aria-pressed="' + on + '" title="' + esc(b.text) + '"><b>' + b.score + '</b><span>' + esc(b.label) + '</span></button>'; }).join('') + '</div>';
+    } else if (it.type === 'points') {
+      h += '<div class="pc-bands is-three" role="group" aria-label="Complete, partly complete or incomplete">' + [[it.max, 'Complete', '✓'], [half(it.max), 'Partly', '½'], [0, 'Incomplete', '✗']].map(function (b) { var on = score !== null && score !== undefined && Number(score) === b[0]; return '<button type="button" class="pc-band' + (on ? ' is-on' : '') + '" data-act="markBand" data-email="' + e + '" data-score="' + b[0] + '" aria-pressed="' + on + '"><b>' + b[2] + '</b><span>' + b[1] + ' (' + b[0] + ')</span></button>'; }).join('') + '</div>';
+    } else if (it.type === 'criteria') {
+      var cr = ((r.grade || {}).criteria) || {};
+      h += M.data.criteria.map(function (cd) {
+        var v = cr[cd.id];
+        return '<div class="pc-crit" data-crit="' + esc(cd.id) + '"><div class="pc-crit-head"><b>' + esc(cd.label) + '</b><label class="pc-crit-score"><span class="pc-sr">' + esc(cd.label) + ' score</span><input type="number" class="pc-input pc-crit-box" data-email="' + e + '" data-crit="' + esc(cd.id) + '" min="0" max="' + cd.max + '" step="0.5" value="' + (v === undefined ? '' : v) + '"><span>/' + cd.max + '</span></label></div>' +
+          '<div class="pc-bands is-crit" role="group" aria-label="' + esc(cd.label) + '">' + cd.bands.map(function (b) { var on = v !== undefined && Number(v) === b.score; return '<button type="button" class="pc-band pc-crit-band' + (on ? ' is-on' : '') + '" data-act="markCrit" data-email="' + e + '" data-crit="' + esc(cd.id) + '" data-score="' + b.score + '" aria-pressed="' + on + '" title="' + esc(b.text) + '"><b>' + b.score + '</b><span>' + esc(b.text.split('. ')[0]) + '</span></button>'; }).join('') + '</div></div>';
+      }).join('') + '<p class="pc-crit-total" data-email="' + e + '">' + critTotal(r) + '</p>';
+    } else {
+      h += '<div class="pc-mquiz-panel">' + quizPanelInner(r) + '</div>';
+    }
+    if (it.type !== 'auto' && it.type !== 'criteria') h += '<label class="pc-score-entry"><span>Score (0–' + it.max + ', halves allowed)</span><input type="number" class="pc-input pc-score-box" data-email="' + e + '" min="0" max="' + it.max + '" step="0.5" value="' + (score === null || score === undefined ? '' : score) + '"></label>';
+    if (c.redo) h += '<button type="button" class="pc-btn small" data-act="markKeep" data-email="' + e + '">Keep ' + c.score + '/' + it.max + '</button>';
+    h += '<label class="pc-check pc-exclude"><input type="checkbox" class="pc-ex-box" data-email="' + e + '"' + (c.studentExcluded ? ' checked' : '') + '><span>Exclude from grade</span></label>';
+    h += '<label class="pc-field"><span>Optional feedback comment for the student</span><textarea class="pc-input pc-comment" rows="3" maxlength="6000" data-email="' + e + '" data-ctx="' + esc(ctx) + '">' + esc(g.comment || '') + '</textarea></label><span class="pc-mstate" id="ms_' + e.replace(/[^a-z0-9]/gi, '_') + '" aria-live="polite"></span>';
+    return h + '</div>';
+  }
+  function quizPanelInner(r) {
+    var c = r.cell, it = M.data.item;
+    return '<p class="pc-mauto">' + (c.submitted ? '<b>' + c.score + ' / ' + (c.max || it.max) + '</b> · best try · scores itself' : c.started ? 'In progress · scores itself' : 'Not started · scores itself') + '</p>' + quizToolsHtml(r);
+  }
+  function quizApply(email, res) {
+    var r = rowOf(email); if (!r) return;
+    r.work = res.work;
+    ['submitted', 'started', 'score', 'max'].forEach(function (k) { r.cell[k] = res.cell[k]; });
+    settle(r);
+    var el = document.querySelector('.pc-mrow[data-email="' + cssEsc(email) + '"]');
+    if (el) {
+      el.querySelector('.pc-mrow-work').innerHTML = quizWorkHtml(r);
+      var p = el.querySelector('.pc-mquiz-panel'); if (p) p.innerHTML = quizPanelInner(r);
+    }
+    refreshRow(email); placeSoon(email);
+  }
+  A.quizCount = function (el) {
+    if (el.disabled) return; el.disabled = true;
+    var email = el.dataset.email, counted = el.dataset.counted === '1';
+    PC.rpc('setQuizAttemptCounted', { classId: cid(), itemKey: M.data.item.key, email: email, n: Number(el.dataset.n), counted: counted }, { retry: true }).then(function (res) {
+      quizApply(email, res);
+      PC.toast(counted ? 'Try ' + el.dataset.n + ' counts again.' : 'Try ' + el.dataset.n + ' set aside. It no longer counts, and it gave the try back.', 'ok');
+    }).catch(function (e) { el.disabled = false; PC.toast(e.message, 'error'); });
+  };
+  A.quizGiveTry = function (el) {
+    if (el.disabled) return; el.disabled = true;
+    var email = el.dataset.email, r = rowOf(email);
+    PC.rpc('giveQuizTry', { classId: cid(), itemKey: M.data.item.key, email: email }, { retry: false }).then(function (res) {
+      quizApply(email, res);
+      PC.toast((r ? r.name : 'They') + ' can take the check once more. Their best try counts.', 'ok');
+    }).catch(function (e) { el.disabled = false; PC.toast(e.message, 'error'); });
+  };
+  function critTotal(r) {
+    var cr = ((r.grade || {}).criteria) || {}, defs = M.data.criteria || [], n = defs.filter(function (c) { return cr[c.id] !== undefined; }).length;
+    var sum = defs.reduce(function (t, c) { return t + (cr[c.id] !== undefined ? Number(cr[c.id]) : 0); }, 0);
+    return n === defs.length ? '<b>Total ' + sum + ' / ' + M.data.item.max + '</b>' : n ? 'Scored ' + n + ' of ' + defs.length + ' criteria · the grade appears when all are scored' : 'Not scored yet';
+  }
+  function rowHtml(r) {
+    return '<article class="pc-mrow" data-email="' + esc(r.email) + '"><header class="pc-mrow-head"><h3>' + esc(r.name) + '</h3><div class="pc-mbadges">' + badges(r) + '</div>' +
+      '<button type="button" class="pc-btn small ghost pc-focus-btn" data-act="markFocus" data-email="' + esc(r.email) + '" title="Open this student’s work full-screen beside the rubric">⤢ Focused grading</button></header>' +
+      '<div class="pc-mrow-work">' + workHtml(r) + (r.submittedAt ? '<div class="pc-small pc-muted">Turned in ' + esc(PC.fmtDate(r.submittedAt, true)) + '</div>' : '') + '</div>' + panelHtml(r) + '</article>';
+  }
+  function rowOf(email) { return M.data.rows.filter(function (r) { return r.email === email; })[0]; }
+  function refreshRow(email) {
+    var r = rowOf(email), el = document.querySelector('.pc-mrow[data-email="' + cssEsc(email) + '"]'); if (!r || !el) return;
+    // Repaint the badges and the band buttons only; the comment box keeps whatever is being typed.
+    el.querySelector('.pc-mbadges').innerHTML = badges(r);
+    var it = M.data.item, s = r.cell.score;
+    el.querySelectorAll('.pc-band:not(.pc-crit-band)').forEach(function (b) { var on = s !== null && s !== undefined && (it.type === 'rubric' ? Math.round(s) === Number(b.dataset.score) : Number(s) === Number(b.dataset.score)); b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on); });
+    var box = el.querySelector('.pc-score-box'); if (box && document.activeElement !== box) box.value = s === null || s === undefined ? '' : s;
+    if (it.type === 'criteria') {
+      var cr = ((r.grade || {}).criteria) || {};
+      el.querySelectorAll('.pc-crit-band').forEach(function (b) { var v = cr[b.dataset.crit], on = v !== undefined && Number(v) === Number(b.dataset.score); b.classList.toggle('is-on', on); b.setAttribute('aria-pressed', on); });
+      el.querySelectorAll('.pc-crit-box').forEach(function (b) { if (document.activeElement !== b) { var v = cr[b.dataset.crit]; b.value = v === undefined ? '' : v; } });
+      var tot = el.querySelector('.pc-crit-total'); if (tot) tot.innerHTML = critTotal(r);
+    }
+    var ex = el.querySelector('.pc-ex-box'); if (ex) ex.checked = !!r.cell.studentExcluded;
+    var keep = el.querySelector('[data-act="markKeep"]'); if (keep && !r.cell.redo) keep.remove();
+    updateFocusCount();
+  }
+  /** Mirrors the server's pcCellState_ (Grading.js) after a mark changes, so a live move and a fresh load agree. */
+  function settle(r) {
+    var c = r.cell, it = M.data.item;
+    c.excluded = !!c.studentExcluded || !!c.classExcluded;
+    if (it.kind === 'quiz') { c.handled = c.excluded || c.submitted; c.toGrade = false; c.redo = false; return; }
+    var scored = c.score !== null && c.score !== undefined, mfp = (r.grade || {}).markedFp;
+    c.handled = scored || c.excluded;
+    c.redo = scored && !c.excluded && c.submitted && !!mfp && mfp !== c.fp;
+    c.toGrade = !c.excluded && ((c.submitted && !scored) || c.redo);
+  }
+  // A scored student moves to Graded at once (Jaben, 2026-10-19); excluded → Excluded; cleared →
+  // back where a fresh load would put them, in the same order a fresh load gives (M.data.rows).
+  // Only a row that is out of place is moved: re-inserting one that is already in position
+  // swallows the next click in it. While a pointer is down nothing moves (a score box's change
+  // fires on mousedown elsewhere); the move waits until that click has landed.
+  var PLACE = {}, pointerIsDown = false;
+  document.addEventListener('pointerdown', function () { pointerIsDown = true; }, true);
+  function pointerDone() { if (!pointerIsDown) return; pointerIsDown = false; setTimeout(placeWaiting, 0); }
+  document.addEventListener('pointerup', pointerDone, true);
+  document.addEventListener('pointercancel', pointerDone, true);
+  window.addEventListener('blur', pointerDone);
+  document.addEventListener('click', function () { setTimeout(placeWaiting, 0); }, true);
+  function placeWaiting() { if (pointerIsDown) return; var k = Object.keys(PLACE); PLACE = {}; k.forEach(place); }
+  function placeSoon(email) { if (pointerIsDown) PLACE[email] = true; else place(email); }
+  function place(email) {
+    if (PC.state.view !== 'marking' || !M.data) return;
+    var r = rowOf(email); if (!r) return;
+    r.group = groupOf(r);
+    var inFocus = M.focus && M.focus.email === email;
+    var el = inFocus ? M.focus.placeholder : document.querySelector('#pcMGroups .pc-mrow[data-email="' + cssEsc(email) + '"]');
+    var list = document.querySelector('#pcMGroups .pc-mgroup[data-group="' + r.group + '"] .pc-mgroup-list');
+    if (!el || !list) return;
+    var idx = M.data.rows.indexOf(r), before = null;
+    for (var n = list.firstChild; n; n = n.nextSibling) {
+      if (n === el) continue;
+      var em = n === (M.focus && M.focus.placeholder) ? M.focus.email : (n.nodeType === 1 && n.classList.contains('pc-mrow') ? n.dataset.email : null);
+      if (em === null) continue;
+      if (M.data.rows.indexOf(rowOf(em)) > idx) { before = n; break; }
+    }
+    var next = el.nextSibling; while (next && next !== before && !(next.nodeType === 1 && next.classList.contains('pc-mrow')) && next !== (M.focus && M.focus.placeholder)) next = next.nextSibling;
+    if (el.parentNode !== list || (next || null) !== before) {
+      var active = document.activeElement, hadFocus = !inFocus && active && el.contains(active);
+      list.insertBefore(el, before);
+      if (hadFocus && document.activeElement !== active) try { active.focus({ preventScroll: true }); } catch (e) {}
+    }
+    refreshGroupCounts();
+  }
+  function refreshGroupCounts() {
+    GROUPS.forEach(function (g) {
+      var sec = document.querySelector('#pcMGroups .pc-mgroup[data-group="' + g.k + '"]'); if (!sec) return;
+      var n = M.data.rows.filter(function (r) { return r.group === g.k; }).length;
+      sec.querySelector('.pc-mgroup-count').textContent = n;
+      if (g.hideEmpty) sec.hidden = !n;
+      var empty = sec.querySelector(':scope > .pc-mgroup-empty'); if (empty) empty.hidden = !!n;
+    });
+  }
+  function msState(email, text, kind) { var el = PC.byId('ms_' + email.replace(/[^a-z0-9]/gi, '_')); if (el) { el.textContent = text; el.className = 'pc-mstate' + (kind ? ' is-' + kind : ''); } }
+
+  // ---------------------------------------------------------------- saving marks
+  // One queue per student: saves run in order; while one is on its way, newer marks replace the
+  // waiting one (the last action wins). Comments travel the same queue, with compare-and-swap.
+  var Q = {};
+  /** Shows a mark on the page before the server confirms it (same fields the save will write). */
+  function markLocally(r, patch) {
+    if (patch.score !== undefined && M.data.item.kind !== 'quiz') { r.cell.score = patch.score; r.grade = r.grade || {}; r.grade.markedFp = r.viewFp; }
+    if (patch.excluded !== undefined) r.cell.studentExcluded = patch.excluded;
+    if (patch.criteria) {
+      r.grade = r.grade || {}; var cr = Object.assign({}, r.grade.criteria || {});
+      Object.keys(patch.criteria).forEach(function (id) { if (patch.criteria[id] === null) delete cr[id]; else cr[id] = patch.criteria[id]; });
+      r.grade.criteria = cr; r.grade.markedFp = r.viewFp;
+      var defs = M.data.criteria || [], all = defs.every(function (c) { return cr[c.id] !== undefined; });
+      r.cell.score = all ? defs.reduce(function (t, c) { return t + Number(cr[c.id]); }, 0) : null;
+    }
+  }
+  /** A score or exclusion: show it, move the row to its group, then save. */
+  function mark(email, patch) {
+    var r = rowOf(email); if (!r) return;
+    markLocally(r, patch); settle(r); refreshRow(email); placeSoon(email);
+    return enqueue(email, patch);
+  }
+  function enqueue(email, patch) {
+    var q = Q[email] = Q[email] || { busy: false, next: null };
+    var crit = q.next && q.next.criteria && patch.criteria ? Object.assign({}, q.next.criteria, patch.criteria) : null;
+    q.next = Object.assign(q.next || {}, patch);
+    if (crit) q.next.criteria = crit;
+    if (!q.busy) pump(email);
+    return q;
+  }
+  function pump(email) {
+    var q = Q[email]; if (!q || q.busy || !q.next) return;
+    var patch = q.next; q.next = null; q.busy = true;
+    var r = rowOf(email), it = M.data.item;
+    var payload = Object.assign({ classId: cid(), itemKey: it.key, email: email }, patch);
+    if (patch.score !== undefined || patch.criteria) payload.markedFp = r ? r.viewFp : '';
+    msState(email, 'Saving…');
+    PC.rpc('saveGrade', payload, { retry: true }).then(function (res) {
+      q.busy = false;
+      if (res && res.conflict) {
+        failed(email, patch, 'Someone else changed this comment (another tab or a co-teacher). It now says: “' + (res.current || '(empty)').slice(0, 120) + '”. Retry saves yours over it.', res.current);
+        msState(email, 'Didn’t save', 'error');
+      } else {
+        var g = res.grade; r.grade = Object.assign(r.grade || {}, g);
+        if (g.criteria) r.grade.criteria = g.criteria;
+        if (M.data.item.kind !== 'quiz') r.cell.score = g.score;   // the quiz's score is its own, not the grade row's
+        r.cell.studentExcluded = g.excluded;
+        // A mark still waiting in the queue is newer than this answer: keep showing it (last action wins).
+        if (q.next) markLocally(r, q.next);
+        settle(r);
+        if (patch.comment !== undefined) { r.confirmedComment = g.comment; if (localCommentMatches(email, g.comment)) PC.store.del(lcKey(email)); }
+        refreshRow(email); placeSoon(email); msState(email, 'Saved', 'ok'); clearFailed(email);
+      }
+      pump(email);
+    }).catch(function (e) {
+      q.busy = false; failed(email, patch, e.message); msState(email, 'Didn’t save', 'error'); pump(email);
+    });
+  }
+  PC.flushMarks = function () {
+    flushComments();
+    return new Promise(function (resolve) {
+      var t0 = Date.now();
+      (function wait() { var busy = Object.keys(Q).some(function (k) { return Q[k].busy || Q[k].next; }); if (!busy || Date.now() - t0 > 30000) resolve(); else setTimeout(wait, 200); })();
+    });
+  };
+  A.markBand = function (el) {
+    var email = el.dataset.email, r = rowOf(email), s = Number(el.dataset.score);
+    var cur = r.cell.score, isOn = cur !== null && cur !== undefined && (M.data.item.type === 'rubric' ? Math.round(cur) === s : Number(cur) === s);
+    var next = isOn ? null : s;   // clicking the selected band again clears it
+    mark(email, { score: next });
+  };
+  A.markKeep = function (el) { var email = el.dataset.email, r = rowOf(email); if (M.data.item.type === 'criteria') mark(email, { criteria: Object.assign({}, (r.grade || {}).criteria || {}) }); else mark(email, { score: r.cell.score }); };
+  A.markCrit = function (el) {
+    var email = el.dataset.email, r = rowOf(email), id = el.dataset.crit, s = Number(el.dataset.score), cur = (((r.grade || {}).criteria) || {})[id];
+    var p = {}; p[id] = cur !== undefined && Number(cur) === s ? null : s;   // clicking the selected band again clears it
+    mark(email, { criteria: p });
+  };
+  document.addEventListener('change', function (e) {
+    var t = e.target;
+    if (t.classList.contains('pc-score-box') && PC.state.view === 'marking') {
+      var email = t.dataset.email, v = t.value.trim(), it = M.data.item;
+      if (v === '') return mark(email, { score: null });
+      var n = Number(v);
+      if (!isFinite(n) || n < 0 || n > it.max || Math.round(n * 2) !== n * 2) { PC.toast('Scores go from 0 to ' + it.max + ' (halves allowed).', 'error'); t.value = rowOf(email).cell.score == null ? '' : rowOf(email).cell.score; return; }
+      mark(email, { score: n });
+    }
+    if (t.classList.contains('pc-crit-box') && PC.state.view === 'marking') {
+      var em = t.dataset.email, id = t.dataset.crit, cd = (M.data.criteria || []).filter(function (c) { return c.id === id; })[0], raw = t.value.trim(), p = {};
+      if (raw === '') { p[id] = null; return mark(em, { criteria: p }); }
+      var x = Number(raw);
+      if (!cd || !isFinite(x) || x < 0 || x > cd.max || Math.round(x * 2) !== x * 2) { badCrit(t, cd); return; }
+      p[id] = x; mark(em, { criteria: p });
+    }
+    if (t.classList.contains('pc-ex-box') && PC.state.view === 'marking') mark(t.dataset.email, { excluded: t.checked });
+  });
+
+  // ---------------------------------------------------------------- comments
+  function lcKey(email) { return 'pcgc|' + cid() + '|' + M.data.item.key + '|' + email; }
+  function localCommentMatches(email, text) { var x = PC.store.get(lcKey(email), null); return !x || x.text === text; }
+  var CT = {};
+  function queueComment(box, now) {
+    // The comment is filed under the step it was typed on (its own data-ctx), never "whatever is on screen".
+    var parts = String(box.dataset.ctx).split('::'); if (parts[0] !== cid() || parts[1] !== M.data.item.key) return;
+    var email = parts.slice(2).join('::'), r = rowOf(email); if (!r) return;
+    var text = box.value;
+    PC.store.set(lcKey(email), { text: text, prev: r.confirmedComment !== undefined ? r.confirmedComment : ((r.grade || {}).comment || ''), at: Date.now() });
+    clearTimeout(CT[email]);
+    var send = function () { var prev = r.confirmedComment !== undefined ? r.confirmedComment : ((r.grade || {}).comment || ''); if (text === prev) { PC.store.del(lcKey(email)); return; } enqueue(email, { comment: text, prevComment: prev }); };
+    if (now) send(); else { msState(email, 'Saving soon…'); CT[email] = setTimeout(send, 2500); }
+  }
+  function flushComments() { document.querySelectorAll('.pc-comment').forEach(function (b) { var em = b.dataset.email; if (CT[em]) { clearTimeout(CT[em]); CT[em] = null; queueComment(b, true); } }); }
+  document.addEventListener('input', function (e) { if (e.target.classList && e.target.classList.contains('pc-comment') && PC.state.view === 'marking') queueComment(e.target, false); });
+  document.addEventListener('focusout', function (e) { if (e.target.classList && e.target.classList.contains('pc-comment') && PC.state.view === 'marking' && CT[e.target.dataset.email]) { clearTimeout(CT[e.target.dataset.email]); queueComment(e.target, true); } });
+  /** After a reload: comments that never reached the server are put back and saved. */
+  function restoreLocalComments() {
+    PC.store.keys('pcgc|' + cid() + '|' + M.data.item.key + '|').forEach(function (k) {
+      var x = PC.store.get(k, null), email = k.split('|').slice(3).join('|'), r = rowOf(email); if (!x || !r) return;
+      var cur = (r.grade || {}).comment || '';
+      if (x.text === cur) { PC.store.del(k); return; }
+      var box = document.querySelector('.pc-comment[data-email="' + cssEsc(email) + '"]'); if (!box) return;
+      box.value = x.text; r.confirmedComment = x.prev; msState(email, 'Unsaved comment put back. Saving…', 'warn');
+      enqueue(email, { comment: x.text, prevComment: x.prev });
+    });
+  }
+
+  // ---------------------------------------------------------------- "Didn't save" list
+  var FAILED = {};
+  function failed(email, patch, why, current) {
+    var r = rowOf(email); FAILED[email] = { patch: patch, why: why, name: r ? r.name : email, current: current, key: M.data.item.key };
+    drawFailed();
+  }
+  function clearFailed(email) { if (FAILED[email] && FAILED[email].key === M.data.item.key) { delete FAILED[email]; drawFailed(); } }
+  function drawFailed() {
+    var box = PC.byId('pcDidntSave'), keys = Object.keys(FAILED);
+    box.hidden = !keys.length;
+    box.innerHTML = keys.length ? '<h3>Didn’t save</h3><ul>' + keys.map(function (k) { var f = FAILED[k]; return '<li><b>' + esc(f.name) + '</b>: ' + esc(f.why) + '<div class="pc-row"><button type="button" class="pc-btn small primary" data-act="failRetry" data-email="' + esc(k) + '">Retry</button><button type="button" class="pc-btn small ghost" data-act="failDismiss" data-email="' + esc(k) + '">Dismiss</button></div></li>'; }).join('') + '</ul>' : '';
+  }
+  A.failRetry = function (el) {
+    var f = FAILED[el.dataset.email]; if (!f) return; delete FAILED[el.dataset.email]; drawFailed();
+    var p = Object.assign({}, f.patch); if (p.comment !== undefined && f.current !== undefined) p.prevComment = f.current;
+    enqueue(el.dataset.email, p);
+  };
+  A.failDismiss = function (el) { delete FAILED[el.dataset.email]; drawFailed(); };
+
+  // ---------------------------------------------------------------- navigation
+  A.markBack = function () { closeFocus(); PC.flushMarks().then(function () { PC.go('dashboard'); }); };
+  A.markRefresh = function () { PC.flushMarks().then(function () { load(PC.byId('app'), ''); }); };
+  A.markTab = function (el) { PC.flushMarks().then(function () { closeFocus(); PC.state.itemKey = el.dataset.key; PC.state.focusEmail = ''; PC.render(); }); };
+  A.markNoGrade = function (el) {
+    var on = el.dataset.on === 'true';
+    if (on && !confirm('Leave this out of every student’s grade in this class? Scores you already entered are kept.')) return;
+    PC.rpc('setNoGrade', { classId: cid(), itemKey: M.data.item.key, on: on }, { retry: true }).then(function () { load(PC.byId('app'), ''); }).catch(function (e) { PC.toast(e.message, 'error'); });
+  };
+
+  // ---------------------------------------------------------------- ⤢ Focused grading
+  // The student's row is moved (not copied) into the overlay, so typing and saves carry on unchanged.
+  function markable(r) { return r.group === 'ready' || r.group === 'redo'; }
+  function stillToMark(r) { return r.cell.toGrade || r.cell.redo; }
+  function updateFocusCount() {
+    var el = PC.byId('pcFocusLeft'); if (!el) return;
+    var n = M.data.rows.filter(function (r) { return markable(r) && stillToMark(r); }).length;
+    el.textContent = n + ' left to mark';
+  }
+  A.markFocus = function (el) { openFocus(el.dataset.email); };
+  function openFocus(email) {
+    closeFocus();
+    var row = document.querySelector('.pc-mrow[data-email="' + cssEsc(email) + '"]'), ov = PC.byId('pcFocus'); if (!row || !ov) return;
+    M.focus = { email: email, placeholder: document.createComment('focus') };
+    row.parentNode.insertBefore(M.focus.placeholder, row);
+    ov.innerHTML = '<div class="pc-focus-bar"><button type="button" class="pc-btn small" data-act="focusPrev">← Back</button><span class="pc-focus-title">' + esc(M.data.item.label) + '</span><span class="pc-focus-left" id="pcFocusLeft"></span><button type="button" class="pc-btn small primary" data-act="focusNext">Next to mark →</button><button type="button" class="pc-btn small ghost" data-act="focusClose">✕ Close focus</button></div><div class="pc-focus-body" id="pcFocusBody"></div>';
+    PC.byId('pcFocusBody').appendChild(row); ov.hidden = false; document.body.classList.add('pc-focus-grading');
+    M.focus.history = M.focus.history || [];
+    updateFocusCount();
+    var c = row.querySelector('.pc-band, .pc-crit-box, .pc-ex-box'); if (c) c.focus();
+  }
+  function closeFocus() {
+    if (!M.focus) return;
+    var row = document.querySelector('#pcFocusBody .pc-mrow'), ph = M.focus.placeholder;
+    if (row && ph && ph.parentNode) ph.parentNode.replaceChild(row, ph);
+    var ov = PC.byId('pcFocus'); if (ov) { ov.hidden = true; ov.innerHTML = ''; }
+    document.body.classList.remove('pc-focus-grading'); M.focus = null;
+  }
+  var focusTrail = [];
+  A.focusClose = function () { closeFocus(); };
+  A.focusNext = function () {
+    if (!M.focus) return;
+    var order = M.data.rows.filter(function (r) { return !(M.hideNot && r.group === 'none'); });
+    var cur = M.focus.email, idx = order.findIndex(function (r) { return r.email === cur; });
+    for (var i = 1; i <= order.length; i++) {
+      var r = order[(idx + i) % order.length];
+      if (r.email !== cur && markable(r) && stillToMark(r)) { focusTrail.push(cur); return openFocus(r.email); }
+    }
+    PC.toast('Nothing left to mark here.');
+  };
+  A.focusPrev = function () { var p = focusTrail.pop(); if (p) openFocus(p); else PC.toast('This is the first one you opened.'); };
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && M.focus && PC.byId('pcModal').hidden) closeFocus(); });
+
+  // Leaving the marking screen by any route saves the marks first.
+  var _leave = PC.leave;
+  PC.leave = function (fn) {
+    if (PC.state.view === 'marking') { closeFocus(); return PC.flushMarks().then(function () { _leave(fn); }); }
+    return _leave(fn);
+  };
+  window.addEventListener('beforeunload', function (e) {
+    if (PC.state.view !== 'marking') return;
+    var pending = Object.keys(Q).some(function (k) { return Q[k].busy || Q[k].next; }) || Object.keys(CT).some(function (k) { return CT[k]; });
+    if (pending) { flushComments(); e.preventDefault(); e.returnValue = ''; return ''; }
+  });
+
+  window.__MB.Marking = 'ok';
+})();
+</script>

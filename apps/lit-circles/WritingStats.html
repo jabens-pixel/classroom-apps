@@ -1,0 +1,664 @@
+<!-- ======================================================================
+     Literature Circles — WritingStats (writing-process stats for every writing box)
+     The same idea as the Macbeth unit: for each box a student writes in, record
+       - words in the box now,
+       - writing time (counted from the student's own edits: a pause longer than two
+         minutes starts a new sitting and adds nothing, so a tab left open counts for
+         nothing),
+       - pastes that went in (Journal / Hybrid boxes paste plain text) and how much of
+         the current text arrived by paste,
+       - paste attempts that were blocked (every other box blocks paste),
+       - text that was already there before tracking began (reported as unknown, never
+         as typed).
+     Stored on its own tab (WritingStats), one row per student per week, so it never
+     touches the saving of the writing itself. No keystroke log and no clipboard
+     history: the only text kept is a pasted stretch that is still in the box (it is
+     part of the student's work anyway), so the teacher's view can highlight it.
+
+     Rides along after BackendClient (LC_INCLUDE_WITH in Code.gs). Students see a small
+     line of stats under each box; the teacher sees the same per box on the marking
+     screen, plus a total for the step.
+     ====================================================================== -->
+<style id="lcWsStyles">
+.lc-ws{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:6px 0 4px;padding:0;font:600 12px/1.2 Roboto,Arial,sans-serif;color:#4b5563;letter-spacing:0;text-transform:none;white-space:normal}
+.lc-ws .lc-ws-pill{display:inline-flex;align-items:center;gap:5px;min-height:24px;margin:0;padding:3px 10px;border:1px solid #e3dccf;border-radius:999px;background:#faf7f0;color:#4b5563;font:600 12px/1.2 Roboto,Arial,sans-serif;white-space:nowrap;box-shadow:none}
+.lc-ws .lc-ws-pill b{font-weight:850;color:#17372b;font-variant-numeric:tabular-nums}
+.lc-ws .lc-ws-pill.lc-ws-time{background:#eef5f2;border-color:#cfe2d8;color:#1f4d3c}
+.lc-ws .lc-ws-pill.lc-ws-warn{background:#fbeceb;border-color:#e3b0ab;color:#8c1d17}
+.lc-ws .lc-ws-pill.lc-ws-warn b{color:#8c1d17}
+.lc-ws .lc-ws-pill.lc-ws-block{background:#fff6e2;border-color:#ecd59f;color:#6b4e0f}
+.lc-ws .lc-ws-pill.lc-ws-block b{color:#6b4e0f}
+.lc-ws .lc-ws-pill.lc-ws-clean{background:#eef6f0;border-color:#cfe5d6;color:#1e6b43}
+.lc-ws .lc-ws-pill.lc-ws-muted{background:#f3f2ee;border-color:#dddad2;color:#5d6470}
+.lc-ws-student{margin-top:6px}
+.lc-ws-note{margin:2px 0 10px;padding:0;color:#5d6470;font:500 12px/1.4 Roboto,Arial,sans-serif}
+.lc-ws-total{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin:0 0 10px;padding:8px 10px;border:1px solid #e3dccf;border-radius:10px;background:#fffdf8}
+.lc-ws-total>.lc-ws-label{font:800 11.5px/1 Roboto,Arial,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:#5d6470;margin-right:2px}
+.lc-ws-total .lc-ws{margin:0}
+.lc-ws-flag{margin:-4px 0 12px;color:#8c1d17;font:600 12px/1.4 Roboto,Arial,sans-serif}
+.lc-ws-flag.is-info{color:#5d6470}
+mark.lc-ws-paste{background:#ffe0e0;color:inherit;border-bottom:2px solid #d4676a;padding:0 1px;border-radius:2px}
+.lch-row-badges .lc-ws-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;border:1px solid #e3b0ab;background:#fbeceb;color:#8c1d17;font:800 11.5px/1.2 Roboto,Arial,sans-serif;white-space:nowrap}
+.lc-ws-boxlabel{display:block;margin:0 0 2px;color:#5d7368;font:700 11.5px/1.3 Roboto,Arial,sans-serif}
+</style>
+<script>
+window.__MB = window.__MB || {};
+window.__MB.WritingStats = 'loading';
+(function () {
+  'use strict';
+  var W = window;
+  if (W.LC_WSTATS) { W.__MB.WritingStats = 'ok'; return; } // included twice — keep the first copy
+
+  var PASTE_MIN_CHARS = 8;          // a pasted word or a fixed typo is not worth flagging (as Macbeth)
+  var WRITING_IDLE_MS = 2 * 60 * 1000;
+  var MAX_SPANS = 300;              // per box
+  var SNIP_MAX = 4000;              // characters of one pasted stretch kept (to find it again)
+  var SAVE_QUIET_MS = 4000;         // save this long after the last change…
+  var SAVE_MAX_WAIT_MS = 20000;     // …but never later than this while a student keeps typing
+  var STEPS = { s1: 'Step 1', s2: 'Step 2', s3: 'Step 3', s4: 'Step 4' };
+
+  var WS = W.LC_WSTATS = { version: 1, store: {}, email: '', dirty: {}, inFlight: false };
+
+  // ================================================================== shared helpers
+  function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  /** FNV-1a over the text, plus its length. Only used to check that stats and text still match. */
+  function hashText(s) {
+    s = String(s || '');
+    var h = 0x811c9dc5;
+    for (var i = 0; i < s.length; i++) { h ^= s.charCodeAt(i); h = (h + ((h << 1) + (h << 4) + (h << 7) + (h << 8) + (h << 24))) >>> 0; }
+    return s.length + ':' + ('0000000' + h.toString(16)).slice(-8);
+  }
+  function leadOf(raw) { raw = String(raw || ''); return raw.length - raw.replace(/^\s+/, '').length; }
+  /** Counted the same way as the writing checklists (Checklists.html), so the two never disagree. */
+  function wordCount(t) { return (String(t || '').match(/[A-Za-z0-9\u00C0-\u024F]+(?:['\u2019][A-Za-z]+)?/g) || []).length; }
+  function parseHtml(html) {
+    try { return new DOMParser().parseFromString('<div id="lcWsRoot">' + String(html || '') + '</div>', 'text/html').getElementById('lcWsRoot'); }
+    catch (e) { return null; }
+  }
+  /** The exact text of a rich box (what the student's editor reports as textContent). */
+  function htmlText(html) { var r = parseHtml(html); return r ? r.textContent : String(html || '').replace(/<[^>]*>/g, ''); }
+  /** Same, with a space at line / paragraph breaks — for counting words only. */
+  function htmlWordText(html) { return htmlText(String(html || '').replace(/<br\s*\/?>|<\/(div|p|li|h\d|blockquote)>/gi, ' $&')); }
+  function timeText(ms) {
+    ms = Math.max(0, Number(ms) || 0);
+    var min = Math.round(ms / 60000);
+    if (ms > 0 && min < 1) return '<1 min';
+    if (min < 60) return min + ' min';
+    var h = Math.floor(min / 60), rest = min % 60;
+    return h + ' h' + (rest ? ' ' + rest + ' min' : '');
+  }
+  function plural(n, word) { return n + ' ' + word + (n === 1 ? '' : 's'); }
+  function pill(value, label, cls, title) {
+    var v = value === '' || value == null ? '' : '<b>' + value + '</b>';
+    return '<span class="lc-ws-pill ' + (cls || '') + '"' + (title ? ' title="' + esc(title) + '"' : '') + '>' + v + (label ? '<span>' + label + '</span>' : '') + '</span>';
+  }
+  /** Writing time. When some of the text is older than the timing, the time is a minimum. */
+  function timePill(ms, lower, label, title) {
+    var under = (Number(ms) || 0) < 60000;
+    return pill((lower && !under ? '≥ ' : '') + esc(timeText(ms)), lower && under ? label + ' (since tracking began)' : label, 'lc-ws-time', title);
+  }
+  function isTimed(m) { return !!m && typeof m.activeMs === 'number'; }
+
+  /** Where the recorded spans sit in `text` (already trimmed). If the stats were saved for exactly
+   *  this text, the offsets are used as they are. If not (the writing changed somewhere the stats
+   *  didn't see), each pasted stretch is looked for by its own words; anything not found is dropped,
+   *  so nothing typed is ever shown as pasted. */
+  function locateSpans(meta, text) {
+    var out = [], spans = meta && Array.isArray(meta.spans) ? meta.spans : [];
+    if (!spans.length) return { spans: out, verified: true };
+    var verified = meta.hash === hashText(text), lead = Number(meta.lead) || 0, n = text.length;
+    if (verified) {
+      spans.forEach(function (sp) {
+        if (!sp || sp.length < 3) return;
+        var a = Math.max(0, (Number(sp[0]) || 0) - lead), b = Math.min(n, (Number(sp[1]) || 0) - lead), k = sp[2] === 'p' ? 'p' : 'u';
+        if (b > a) out.push([a, b, k]);
+      });
+    } else {
+      var taken = [];
+      spans.forEach(function (sp) {
+        if (!sp || sp[2] !== 'p' || typeof sp[3] !== 'string') return;
+        var snip = sp[3].trim();
+        if (snip.length < PASTE_MIN_CHARS) return;
+        var from = 0, at;
+        while ((at = text.indexOf(snip, from)) >= 0) {
+          var clash = taken.some(function (t) { return at < t[1] && at + snip.length > t[0]; });
+          if (!clash) { out.push([at, at + snip.length, 'p']); taken.push([at, at + snip.length]); break; }
+          from = at + 1;
+        }
+      });
+    }
+    out.sort(function (x, y) { return x[0] - y[0]; });
+    return { spans: out, verified: verified };
+  }
+
+  /** Everything the strips show, for one box. raw: the saved value (plain text, or the HTML of a
+   *  Journal / Hybrid box when isHtml). */
+  function boxSummary(meta, raw, isHtml) {
+    var plain = isHtml ? htmlText(raw) : String(raw == null ? '' : raw);
+    var text = plain.trim();
+    var words = wordCount(isHtml ? htmlWordText(raw) : text);
+    var loc = locateSpans(meta, text), pasted = 0, unknown = 0;
+    loc.spans.forEach(function (sp) { if (sp[2] === 'p') pasted += sp[1] - sp[0]; else unknown += sp[1] - sp[0]; });
+    var tracked = !!meta;
+    if (!tracked && text) unknown = text.length;
+    return {
+      words: words, total: text.length, text: text, pasted: pasted, unknown: unknown, spans: loc.spans, verified: loc.verified,
+      tracked: tracked, timed: isTimed(meta), activeMs: isTimed(meta) ? Math.max(0, Number(meta.activeMs) || 0) : 0,
+      sessions: tracked ? Number(meta.sessions) || 0 : 0, untimedChars: tracked ? Number(meta.untimedChars) || 0 : 0,
+      events: tracked ? Number(meta.events) || 0 : 0, blocked: tracked ? Number(meta.blocked) || 0 : 0
+    };
+  }
+  function timeTitle(ms, sessions, lower) {
+    return timeText(ms) + ' of active writing' + (sessions ? ' across ' + plural(sessions, 'sitting') : '') + '. ' +
+      'Counted from the student’s own edits; a pause longer than two minutes is not counted.' +
+      (lower ? ' Some of this text was written before timing began, so the real total is higher.' : '');
+  }
+
+  // ================================================================== teacher views
+  /** One line of pills under a box on the marking screen (words · writing time · paste). */
+  function teacherBoxStripHtml(meta, raw, isHtml) {
+    var s = boxSummary(meta, raw, isHtml);
+    if (!s.total && !s.events && !s.blocked && !s.timed) return '';
+    var chips = [pill(s.words, s.words === 1 ? 'word' : 'words')];
+    if (!s.tracked) {
+      chips.push(pill('', 'Not tracked', 'lc-ws-muted', 'Written before writing stats were added (or on a page that hadn’t been reloaded yet), so there is no time or paste record for this box. Its origin is unknown, not assumed typed.'));
+      return '<div class="lc-ws">' + chips.join('') + '</div>';
+    }
+    var lower = s.untimedChars > 0;
+    if (s.timed) chips.push(timePill(s.activeMs, lower, 'writing', timeTitle(s.activeMs, s.sessions, lower)));
+    if (s.events) chips.push(pill(s.events, s.events === 1 ? 'paste' : 'pastes', s.pasted ? 'lc-ws-warn' : '',
+      s.pasted ? 'Text was pasted into this box. The pasted part still in the box is highlighted.' : 'Text was pasted here earlier, but none of it is still in the box.'));
+    if (s.pasted) {
+      var pct = Math.round(s.pasted / Math.max(1, s.total) * 100);
+      chips.push(pill(pct + '%', 'pasted · ' + s.pasted + ' of ' + s.total + ' chars', 'lc-ws-warn', 'Characters in the current text that arrived by paste.'));
+    } else if (s.events && !s.verified) {
+      chips.push(pill('', 'pasted text not found now', 'lc-ws-muted', 'The writing changed after the stats were last saved, and the pasted text could not be found in it any more.'));
+    }
+    if (s.blocked) chips.push(pill(s.blocked, s.blocked === 1 ? 'paste blocked' : 'pastes blocked', 'lc-ws-block', 'Tried to paste (or drag text) into this box. Pasting is turned off here, so nothing went in.'));
+    if (!s.events && !s.blocked) chips.push(pill('', 'Typed — nothing pasted', 'lc-ws-clean'));
+    if (s.unknown) chips.push(pill(s.unknown, 'chars before tracking', 'lc-ws-muted', 'Text already in this box when writing stats began. Its origin is unknown, not assumed typed.'));
+    return '<div class="lc-ws">' + chips.join('') + '</div>';
+  }
+
+  /** Total for a step, shown above the student's work. boxes: [{ key, raw, html }]; writing: the
+   *  response's `writing` ({ boxes, clock }) from getLiteratureWeekAssessmentResponses. */
+  function teacherStepTotal(writing, boxes) {
+    var w = writing || {}, metas = w.boxes || {}, t = { words: 0, total: 0, pasted: 0, events: 0, blocked: 0, unknown: 0, ms: 0, sessions: 0, timed: false, lower: false, untracked: 0, tracked: 0 };
+    (boxes || []).forEach(function (b) {
+      var m = metas[b.key] || null, s = boxSummary(m, b.raw, b.html);
+      if (!s.total && !m) return;
+      t.words += s.words; t.total += s.total; t.pasted += s.pasted; t.events += s.events; t.blocked += s.blocked; t.unknown += s.tracked ? s.unknown : 0;
+      if (s.tracked) t.tracked++; else if (s.total) { t.untracked++; t.lower = true; }
+      if (s.timed) { t.timed = true; t.ms += s.activeMs; t.sessions += s.sessions; if (s.untimedChars) t.lower = true; }
+    });
+    // The step clock counts across boxes (moving to the next box isn't a new sitting).
+    var c = w.clock;
+    if (isTimed(c)) { t.timed = true; t.ms = Math.max(0, Number(c.activeMs) || 0); t.sessions = Number(c.sessions) || 0; }
+    return t;
+  }
+  function teacherStepTotalHtml(writing, boxes) {
+    var t = teacherStepTotal(writing, boxes);
+    if (!t.total && !t.events && !t.blocked && !t.timed) return '';
+    var chips = [pill(t.words, t.words === 1 ? 'word' : 'words')];
+    if (t.timed) chips.push(timePill(t.ms, t.lower, 'writing' + (t.sessions ? ' · ' + plural(t.sessions, 'sitting') : ''), timeTitle(t.ms, t.sessions, t.lower)));
+    else if (t.untracked) chips.push(pill('', 'Not timed', 'lc-ws-muted', 'Written before writing stats were added, so there is no writing time to show.'));
+    if (t.events) chips.push(pill(t.events, t.events === 1 ? 'paste' : 'pastes', t.pasted ? 'lc-ws-warn' : ''));
+    if (t.pasted) chips.push(pill(Math.round(t.pasted / Math.max(1, t.total) * 100) + '%', 'pasted · ' + t.pasted + ' of ' + t.total + ' chars', 'lc-ws-warn'));
+    if (t.blocked) chips.push(pill(t.blocked, t.blocked === 1 ? 'paste blocked' : 'pastes blocked', 'lc-ws-block', 'Paste attempts in boxes where pasting is turned off. Nothing went in.'));
+    if (!t.events && !t.blocked && t.tracked) chips.push(pill('', 'Typed — nothing pasted', 'lc-ws-clean'));
+    if (t.untracked) chips.push(pill(t.untracked, t.untracked === 1 ? 'box not tracked' : 'boxes not tracked', 'lc-ws-muted', 'Written before writing stats were added. Their origin is unknown, not assumed typed.'));
+    var note = '';
+    if (t.pasted) note = '<p class="lc-ws-flag">Pasted text is highlighted below. A paste is a process flag, not proof of copying — read it in context.</p>';
+    else if (t.events) note = '<p class="lc-ws-flag is-info">Text was pasted earlier, but none of it is in the current work.</p>';
+    return '<div class="lc-ws-total"><span class="lc-ws-label">Writing process</span><div class="lc-ws">' + chips.join('') + '</div></div>' + note;
+  }
+  function teacherPasteBadge(writing, boxes) {
+    var t = teacherStepTotal(writing, boxes);
+    if (!t.pasted) return '';
+    return '<span class="lc-ws-badge" title="Part of this work was pasted in. Worth a conversation, not a verdict.">📋 ' + Math.round(t.pasted / Math.max(1, t.total) * 100) + '% pasted</span>';
+  }
+
+  /** Plain-text box for the marking screen: the trimmed text, escaped, with pasted stretches marked. */
+  function teacherTextHtml(meta, raw) {
+    var text = String(raw == null ? '' : raw).trim();
+    var spans = locateSpans(meta, text).spans.filter(function (sp) { return sp[2] === 'p'; });
+    var out = '', at = 0;
+    function plain(s) { return esc(s).replace(/\n/g, '<br>'); }
+    spans.forEach(function (sp) {
+      var a = Math.max(at, sp[0]), b = Math.min(text.length, sp[1]);
+      if (b <= a) return;
+      if (a > at) out += plain(text.slice(at, a));
+      out += '<mark class="lc-ws-paste" title="Pasted into this box">' + plain(text.slice(a, b)) + '</mark>';
+      at = b;
+    });
+    return out + plain(text.slice(at));
+  }
+  /** Rich (Journal / Hybrid) box: marks the pasted stretches inside already-safe HTML. Returns the
+   *  HTML unchanged if the text can't be matched up exactly. */
+  function teacherRichHtml(meta, raw, safe) {
+    if (!meta || !Array.isArray(meta.spans) || !meta.spans.length) return safe;
+    var root = parseHtml(safe); if (!root) return safe;
+    var full = root.textContent, lead = leadOf(full), text = full.trim();
+    if (htmlText(raw).trim() !== text) return safe; // the safe copy dropped something: don't guess
+    var spans = locateSpans(meta, text).spans.filter(function (sp) { return sp[2] === 'p'; });
+    if (!spans.length) return safe;
+    var nodes = [], walker = root.ownerDocument.createTreeWalker(root, 4, null), n, pos = 0;
+    while ((n = walker.nextNode())) { nodes.push({ node: n, start: pos }); pos += n.nodeValue.length; }
+    nodes.forEach(function (it) {
+      var node = it.node, s0 = it.start - lead, len = node.nodeValue.length, cuts = [];
+      spans.forEach(function (sp) { var a = Math.max(0, sp[0] - s0), b = Math.min(len, sp[1] - s0); if (b > a) cuts.push([a, b]); });
+      if (!cuts.length) return;
+      var frag = root.ownerDocument.createDocumentFragment(), v = node.nodeValue, at = 0;
+      cuts.forEach(function (c) {
+        if (c[0] > at) frag.appendChild(root.ownerDocument.createTextNode(v.slice(at, c[0])));
+        var mk = root.ownerDocument.createElement('mark'); mk.className = 'lc-ws-paste'; mk.title = 'Pasted into this box';
+        mk.textContent = v.slice(c[0], c[1]); frag.appendChild(mk); at = c[1];
+      });
+      if (at < len) frag.appendChild(root.ownerDocument.createTextNode(v.slice(at)));
+      node.parentNode.replaceChild(frag, node);
+    });
+    return root.innerHTML;
+  }
+
+  /** The writing boxes of one step, in the order the marking screen shows them, with the saved
+   *  values. Box keys match the student page (see boxInfo below). */
+  function stepBoxes(stage, r, week) {
+    var out = [];
+    if (stage === 'submission') {
+      var w = r && r.work, data = (w && w.data) || {}, D = W.STRATEGY_DEFS || {};
+      if (!w) return out;
+      if (w.prepType === 'journal') out.push({ key: 's1.journalText', raw: data.journalText || '', html: true });
+      else if (w.prepType === 'hybrid') (data.hybridMoments || []).forEach(function (m, i) { out.push({ key: 's1.hybridMoment' + i, raw: m || '', html: true }); });
+      else (w.choices || []).forEach(function (k) {
+        var def = D[k], v = data[k] || {};
+        if (!def) return;
+        var areas = def.fields.filter(function (f) { return f.type === 'textarea' && !f.pasteAllowed; });
+        if (Array.isArray(v.items)) v.items.forEach(function (it, i) { areas.forEach(function (f) { out.push({ key: 's1.' + k + '__' + (def.fixedRows ? 'row' : 'item') + i + '__' + f.key, raw: (it || {})[f.key] || '' }); }); });
+        else areas.forEach(function (f) { out.push({ key: 's1.' + k + '__' + f.key, raw: v[f.key] || '' }); });
+      });
+    } else if (stage === 'preparation') {
+      var p = (r && r.plan) || {};
+      ['focus', 'evidence', 'question1', 'question2', 'open', 'explore', 'deepen', 'close', 'backup'].forEach(function (k) { out.push({ key: 's2.' + k, raw: p[k] || '' }); });
+    } else if (stage === 'peer') {
+      ((r && r.ratingsGiven) || []).forEach(function (x) {
+        var sid = String(x.toEmail || '').replace(/[^a-zA-Z0-9]/g, '_'), c = x.commentsByKey || {};
+        ['participation', 'leadership', 'activeEngagement'].forEach(function (k) { out.push({ key: 's3.' + sid + '.' + k, raw: c[k] || '', mate: x.to }); });
+      });
+    } else if (stage === 'reflection') {
+      var rf = r && r.reflection;
+      if (!rf) return out;
+      Object.keys(rf.answers || {}).forEach(function (k) { out.push({ key: 's4.' + k, raw: rf.answers[k] || '' }); });
+      out.push({ key: 's4.goal', raw: rf.goal || '' });
+    }
+    return out;
+  }
+  function metaFor(r, key) { var w = r && r.writing; return w && w.boxes ? w.boxes[key] || null : null; }
+
+  WS.teacher = {
+    boxStrip: function (r, key, raw, isHtml) { return teacherBoxStripHtml(metaFor(r, key), raw, isHtml); },
+    text: function (r, key, raw) { return teacherTextHtml(metaFor(r, key), raw); },
+    rich: function (r, key, raw, safe) { return teacherRichHtml(metaFor(r, key), raw, safe); },
+    stepTotal: function (stage, r) { return teacherStepTotalHtml(r && r.writing, stepBoxes(stage, r)); },
+    pasteBadge: function (stage, r) { return teacherPasteBadge(r && r.writing, stepBoxes(stage, r)); },
+    /** Peer step: one line per groupmate, all three comment boxes together. */
+    peerLine: function (r, toEmail) {
+      var sid = String(toEmail || '').replace(/[^a-zA-Z0-9]/g, '_');
+      var boxes = stepBoxes('peer', r).filter(function (b) { return b.key.indexOf('s3.' + sid + '.') === 0; });
+      var t = teacherStepTotal({ boxes: (r && r.writing && r.writing.boxes) || {} }, boxes);
+      if (!t.total && !t.events && !t.blocked && !t.timed) return '';
+      var chips = [pill(t.words, t.words === 1 ? 'word' : 'words')];
+      if (t.timed) chips.push(timePill(t.ms, t.lower, 'writing', timeTitle(t.ms, 0, t.lower)));
+      else if (t.untracked) chips.push(pill('', 'Not tracked', 'lc-ws-muted'));
+      if (t.events) chips.push(pill(t.events, t.events === 1 ? 'paste' : 'pastes', t.pasted ? 'lc-ws-warn' : ''));
+      if (t.blocked) chips.push(pill(t.blocked, t.blocked === 1 ? 'paste blocked' : 'pastes blocked', 'lc-ws-block'));
+      if (!t.events && !t.blocked && t.tracked) chips.push(pill('', 'Typed — nothing pasted', 'lc-ws-clean'));
+      return '<div class="lc-ws">' + chips.join('') + '</div>';
+    },
+    _summary: boxSummary, _boxes: stepBoxes
+  };
+
+  // ================================================================== student pages: which box is which
+  /** Key of a writing box, or null if it isn't one. Keys are the same as stepBoxes above. */
+  function boxInfo(el) {
+    if (!el || !el.id) return null;
+    var id = el.id, m, wk = Number(W.state && W.state.week) || 0;
+    if (el.tagName === 'TEXTAREA') {
+      if (el.getAttribute('data-paste-ok') === '1') return null; // research links: not writing
+      if ((m = /^f_(.+__.+)$/.exec(id))) return { key: 's1.' + m[1], step: 's1', wk: wk, rich: false };
+      if ((m = /^plan_(\w+)$/.exec(id))) return { key: 's2.' + m[1], step: 's2', wk: wk, rich: false };
+      if ((m = /^peerComment_(.+)_([A-Za-z]+)$/.exec(id))) return { key: 's3.' + m[1] + '.' + m[2], step: 's3', wk: wk, rich: false };
+      if ((m = /^refl_(\d)_(.+)$/.exec(id))) return { key: 's4.' + m[2], step: 's4', wk: Number(m[1]), rich: false };
+      if ((m = /^reflGoal_(\d)$/.exec(id))) return { key: 's4.goal', step: 's4', wk: Number(m[1]), rich: false };
+      return null;
+    }
+    if (el.getAttribute && el.getAttribute('contenteditable') === 'true') {
+      if (id === 'journalText') return { key: 's1.journalText', step: 's1', wk: wk, rich: true };
+      if ((m = /^hybridMoment(\d)$/.exec(id))) return { key: 's1.hybridMoment' + m[1], step: 's1', wk: wk, rich: true };
+    }
+    return null;
+  }
+  function boxOf(node) {
+    var el = node && (node.nodeType === 1 ? node : node.parentElement);
+    if (!el) return null;
+    if (el.tagName === 'TEXTAREA') return el;
+    return el.closest ? el.closest('[contenteditable="true"]') : null;
+  }
+  function elText(el) { return el.tagName === 'TEXTAREA' ? el.value : el.textContent; }
+  function me() { return String((W.state && W.state.email) || '').toLowerCase(); }
+  function isPreview() {
+    var b = (W.platform && W.platform.bootstrap) || {};
+    return (b.role === 'teacher' || b.role === 'admin') && !!me() && me() !== String(b.email || '').toLowerCase();
+  }
+  function studentPage() { return !!me() && !!W.platform && W.platform.mode === 'student'; }
+  /** Recording happens only for a student on their own work — never while a teacher views a student. */
+  function recording() { return studentPage() && !isPreview(); }
+
+  // ================================================================== store
+  function weekStore(wk) { return WS.store[wk] || (WS.store[wk] = { boxes: {}, clocks: {} }); }
+  function lsKey() { return 'lc_ws_' + WS.email; }
+  function lsRead() { try { var raw = W.localStorage.getItem(lsKey()); return raw ? JSON.parse(raw) : null; } catch (e) { return null; } }
+  var lsTimer = null;
+  function lsWriteSoon() {
+    if (lsTimer || !WS.email) return;
+    lsTimer = setTimeout(function () { lsTimer = null; try { W.localStorage.setItem(lsKey(), JSON.stringify({ v: 1, store: WS.store })); } catch (e) {} }, 800);
+  }
+  /** Keep whichever copy of each box is newer (another tab, another device, or this browser). */
+  function mergeIn(src, markDirtyIfNewer) {
+    if (!src || typeof src !== 'object') return;
+    Object.keys(src).forEach(function (wkKey) {
+      var wk = Number(wkKey); if (!(wk >= 1 && wk <= 4)) return;
+      var inc = src[wkKey] || {}, cur = weekStore(wk);
+      Object.keys(inc.boxes || {}).forEach(function (k) {
+        var m = inc.boxes[k], c = cur.boxes[k];
+        if (!m || typeof m !== 'object') return;
+        if (!c || (Number(m.at) || 0) > (Number(c.at) || 0)) {
+          cur.boxes[k] = m; delete trackers[wk + '|' + k];
+          if (markDirtyIfNewer) markDirty(wk, 'b', k);
+        }
+      });
+      Object.keys(inc.clocks || {}).forEach(function (k) {
+        var m = inc.clocks[k], c = cur.clocks[k];
+        if (!m || typeof m !== 'object') return;
+        if (!c || (Number(m.lastInputAt) || 0) > (Number(c.lastInputAt) || 0)) { cur.clocks[k] = m; if (markDirtyIfNewer) markDirty(wk, 'c', k); }
+      });
+    });
+  }
+  function resetFor(email) {
+    WS.store = {}; WS.dirty = {}; trackers = {}; WS.email = email;
+    clearTimeout(saveTimer); saveTimer = null; firstDirtyAt = 0;
+  }
+  WS.load = function (s) {
+    if (!s) return;
+    var em = String(s.email || '').toLowerCase();
+    if (em !== WS.email) resetFor(em);
+    mergeIn(s.writingStats || {}, false);
+    if (!isPreview()) {
+      var local = lsRead();
+      // Anything this browser recorded that the server doesn't have yet goes up on the next save.
+      if (local && local.store) mergeIn(local.store, true);
+      if (Object.keys(WS.dirty).length) scheduleSave();
+    }
+    paintSoon();
+  };
+  var _apply = W.applyLoadedStudentState;
+  if (typeof _apply === 'function') {
+    W.applyLoadedStudentState = function (s) {
+      try { WS.load(s); } catch (e) { if (W.console) console.warn('WritingStats load', e); }
+      return _apply.apply(this, arguments);
+    };
+  }
+
+  // ================================================================== saving
+  var saveTimer = null, firstDirtyAt = 0, retryAt = 0;
+  function markDirty(wk, kind, key) {
+    var d = WS.dirty[wk] || (WS.dirty[wk] = { b: {}, c: {} });
+    d[kind][key] = 1;
+  }
+  function scheduleSave() {
+    if (!firstDirtyAt) firstDirtyAt = Date.now();
+    var wait = Math.min(SAVE_QUIET_MS, Math.max(0, firstDirtyAt + SAVE_MAX_WAIT_MS - Date.now()));
+    if (retryAt > Date.now()) wait = Math.max(wait, retryAt - Date.now());
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushSave, wait);
+  }
+  function flushSave() {
+    saveTimer = null;
+    if (!recording() || WS.inFlight) { if (WS.inFlight) scheduleSave(); return; }
+    var wks = Object.keys(WS.dirty); if (!wks.length) { firstDirtyAt = 0; return; }
+    var wk = Number(wks[0]), d = WS.dirty[wk], ws = weekStore(wk), payload = { boxes: {}, clocks: {} };
+    Object.keys(d.b).forEach(function (k) { if (ws.boxes[k]) payload.boxes[k] = ws.boxes[k]; });
+    Object.keys(d.c).forEach(function (k) { if (ws.clocks[k]) payload.clocks[k] = ws.clocks[k]; });
+    delete WS.dirty[wk];
+    var run = W.google && W.google.script && W.google.script.run;
+    if (!run) { WS.dirty[wk] = d; return; }
+    firstDirtyAt = 0; // anything typed from now on waits for its own quiet moment
+    WS.inFlight = true;
+    var email = WS.email;
+    function done(ok) {
+      WS.inFlight = false;
+      if (!ok && WS.email === email) {
+        // put the marks back (merging with anything newer) and try again a little later
+        var nd = WS.dirty[wk] || (WS.dirty[wk] = { b: {}, c: {} });
+        Object.keys(d.b).forEach(function (k) { nd.b[k] = 1; }); Object.keys(d.c).forEach(function (k) { nd.c[k] = 1; });
+        retryAt = Date.now() + 30000;
+      } else retryAt = 0;
+      if (Object.keys(WS.dirty).length) scheduleSave();
+    }
+    try {
+      run.withSuccessHandler(function (res) { done(!res || res.ok !== false || res.skipped); })
+        .withFailureHandler(function () { done(false); })
+        .saveWritingStats(email, wk, payload);
+    } catch (e) { done(false); }
+  }
+  WS.flushNow = function () { clearTimeout(saveTimer); flushSave(); };
+  // Leaving the page: send what's waiting (best effort; the browser copy covers the rest).
+  W.addEventListener('pagehide', function () { if (Object.keys(WS.dirty).length) WS.flushNow(); });
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden' && Object.keys(WS.dirty).length) WS.flushNow(); });
+
+  // ================================================================== recording
+  var trackers = {};   // 'wk|key' -> { el, prev, origin[] }
+  var snap = null;     // text of a box right before an edit (beforeinput / paste)
+  var pend = null;     // a paste or drop on its way into a box
+
+  function originFromMeta(meta, text) {
+    var a = new Array(text.length);
+    if (!meta) { for (var i = 0; i < a.length; i++) a[i] = 'u'; return a; } // older writing: unknown, not typed
+    for (var j = 0; j < a.length; j++) a[j] = 't';
+    var t = text.trim(), lead = leadOf(text);
+    locateSpans(meta, t).spans.forEach(function (sp) { for (var x = sp[0] + lead; x < sp[1] + lead && x < a.length; x++) a[x] = sp[2]; });
+    return a;
+  }
+  function newMeta(text, now) {
+    return { v: 1, spans: [], events: 0, blocked: 0, activeMs: 0, sessions: 0, lastInputAt: 0, timeStartedAt: new Date(now).toISOString(), untimedChars: text.trim().length, len: 0, lead: 0, hash: '', at: now };
+  }
+  function trackerFor(info, el, baseText) {
+    var id = info.wk + '|' + info.key, t = trackers[id];
+    if (t) { t.el = el; return t; }
+    var ws = weekStore(info.wk), meta = ws.boxes[info.key] || null;
+    t = trackers[id] = { el: el, prev: baseText, origin: originFromMeta(meta, baseText) };
+    if (!meta) { ws.boxes[info.key] = newMeta(baseText, Date.now()); refreshMeta(info, t, Date.now()); }
+    return t;
+  }
+  function diff(a, b) {
+    var max = Math.min(a.length, b.length), p = 0, s = 0;
+    while (p < max && a.charCodeAt(p) === b.charCodeAt(p)) p++;
+    while (s < max - p && a.charCodeAt(a.length - 1 - s) === b.charCodeAt(b.length - 1 - s)) s++;
+    return { p: p, s: s, ins: b.length - s - p };
+  }
+  function applyEdit(origin, oldText, d, kind) {
+    var mid = new Array(Math.max(0, d.ins));
+    for (var i = 0; i < mid.length; i++) mid[i] = kind;
+    return origin.slice(0, d.p).concat(mid, origin.slice(oldText.length - d.s));
+  }
+  function tick(c, now) {
+    var gap = c.lastInputAt ? now - c.lastInputAt : Infinity;
+    if (!(gap <= WRITING_IDLE_MS)) c.sessions = (Number(c.sessions) || 0) + 1;
+    else if (gap > 0) c.activeMs = (Number(c.activeMs) || 0) + gap;
+    c.lastInputAt = now;
+  }
+  function refreshMeta(info, t, now) {
+    var meta = weekStore(info.wk).boxes[info.key], raw = t.prev, a = t.origin, spans = [], i = 0;
+    while (i < a.length && spans.length < MAX_SPANS) {
+      if (a[i] === 't') { i++; continue; }
+      var j = i; while (j < a.length && a[j] === a[i]) j++;
+      var sp = [i, j, a[i]];
+      if (a[i] === 'p') sp.push(raw.slice(i, Math.min(j, i + SNIP_MAX)));
+      spans.push(sp); i = j;
+    }
+    var text = raw.trim();
+    meta.spans = spans; meta.len = text.length; meta.lead = leadOf(raw); meta.hash = hashText(text); meta.at = now;
+  }
+
+  function onBeforeInput(e) {
+    if (!recording()) return;
+    var el = boxOf(e.target); if (!el || !boxInfo(el)) return;
+    snap = { el: el, text: elText(el), at: Date.now() };
+  }
+  function onInput(e) {
+    if (!recording()) return;
+    var el = boxOf(e.target), info = boxInfo(el); if (!info || !info.wk) return;
+    var now = Date.now(), next = elText(el);
+    var before = snap && snap.el === el && now - snap.at < 1500 ? snap.text : null; snap = null;
+    var t = trackerFor(info, el, before != null ? before : next);
+    if (before == null) before = t.prev;
+    // Changed without anyone typing (newer copy loaded, draft restored): origin unknown.
+    if (t.prev !== before) { t.origin = applyEdit(t.origin, t.prev, diff(t.prev, before), 'u'); t.prev = before; }
+    var d = diff(before, next), kind = 't', meta = weekStore(info.wk).boxes[info.key];
+    var it = e.inputType || '';
+    if (pend && pend.el === el && !pend.used) {
+      pend.used = true;
+      if (pend.own && info.step !== 's2') kind = pend.own.kind; // the student's own writing, moved
+      // (in the Step 2 plan pasting is allowed, and every paste is counted, own writing included)
+      else if (pend.len >= PASTE_MIN_CHARS && d.ins > 0) { kind = 'p'; meta.events = (Number(meta.events) || 0) + 1; }
+    } else if ((it === 'insertFromPaste' || it === 'insertFromDrop' || it === 'insertFromPasteAsQuotation') && d.ins >= PASTE_MIN_CHARS) {
+      kind = 'p'; meta.events = (Number(meta.events) || 0) + 1;
+    }
+    t.origin = applyEdit(t.origin, before, d, kind);
+    if (t.origin.length !== next.length) t.origin = originFromMeta(null, next); // safety net: never claim "typed"
+    t.prev = next;
+    tick(meta, now);
+    var ws = weekStore(info.wk), c = ws.clocks[info.step] || (ws.clocks[info.step] = { activeMs: 0, sessions: 0, lastInputAt: 0, timeStartedAt: new Date(now).toISOString() });
+    tick(c, now);
+    refreshMeta(info, t, now);
+    markDirty(info.wk, 'b', info.key); markDirty(info.wk, 'c', info.step);
+    scheduleSave(); lsWriteSoon();
+    paintBox(el, info);
+  }
+  // The student's own writing moved from one box (or one spot) to another is not "pasted": a copy
+  // or cut taken from a writing box is remembered, with how much of it had itself been pasted.
+  var lastCopy = null, internalDrag = false;
+  function normWs(s) { return String(s || '').replace(/\s+/g, ''); }
+  function selectionKinds(el, info) {
+    var t = trackerFor(info, el, elText(el)), a = 0, b = 0;
+    if (el.tagName === 'TEXTAREA') { a = el.selectionStart || 0; b = el.selectionEnd || 0; }
+    else {
+      var sel = W.getSelection && W.getSelection(); if (!sel || !sel.rangeCount) return null;
+      var r = sel.getRangeAt(0), pre = document.createRange();
+      pre.selectNodeContents(el); pre.setEnd(r.startContainer, r.startOffset);
+      a = pre.toString().length; b = a + r.toString().length;
+    }
+    var k = t.origin.slice(a, b);
+    return k.length ? k.filter(function (x) { return x === 'p'; }).length / k.length : 0;
+  }
+  function onCopy(e) {
+    if (!recording()) return;
+    var el = boxOf(e.target), info = boxInfo(el), text = '';
+    if (el && el.tagName === 'TEXTAREA') text = el.value.slice(el.selectionStart || 0, el.selectionEnd || 0);
+    else { var sel = W.getSelection && W.getSelection(); text = sel ? String(sel) : ''; if (sel && sel.anchorNode) { el = boxOf(sel.anchorNode); info = boxInfo(el); } }
+    if (!text) { lastCopy = null; return; }
+    var frac = 0; try { frac = info && info.wk ? selectionKinds(el, info) : 0; } catch (err) { frac = 0; }
+    lastCopy = info ? { norm: normWs(text), pFrac: frac } : null;
+  }
+  function onPasteOrDrop(e) {
+    if (!recording()) return;
+    var el = boxOf(e.target), info = boxInfo(el); if (!info || !info.wk) return;
+    var text = '';
+    try { text = e.type === 'paste' ? ((e.clipboardData || W.clipboardData).getData('text') || '') : ((e.dataTransfer && e.dataTransfer.getData('text')) || ''); } catch (err) { text = ''; }
+    var own = e.type === 'paste' ? !!(lastCopy && text && normWs(text) === lastCopy.norm) : internalDrag;
+    var p = pend = { el: el, len: text.length, used: false, own: own ? { kind: e.type === 'paste' && lastCopy.pFrac >= 0.5 ? 'p' : 't' } : null };
+    snap = { el: el, text: elText(el), at: Date.now() };
+    trackerFor(info, el, snap.text);
+    // After the page's own handlers have run: nothing went in and the page stopped it -> blocked.
+    setTimeout(function () {
+      if (pend === p) pend = null;
+      if (p.used || p.own || !e.defaultPrevented || !p.len || !recording()) return;
+      var meta = weekStore(info.wk).boxes[info.key]; if (!meta) return;
+      meta.blocked = (Number(meta.blocked) || 0) + 1; meta.at = Date.now();
+      markDirty(info.wk, 'b', info.key); scheduleSave(); lsWriteSoon();
+      paintBox(el, info);
+    }, 0);
+  }
+  // Capture on window runs before the page's own paste / drop guards (which are on document).
+  W.addEventListener('beforeinput', onBeforeInput, true);
+  W.addEventListener('input', onInput, true);
+  W.addEventListener('paste', onPasteOrDrop, true);
+  W.addEventListener('drop', onPasteOrDrop, true);
+  W.addEventListener('copy', onCopy, true);
+  W.addEventListener('cut', onCopy, true);
+  W.addEventListener('dragstart', function (e) { internalDrag = !!boxInfo(boxOf(e.target)); }, true);
+  W.addEventListener('dragend', function () { internalDrag = false; }, true);
+
+  // ================================================================== student strips
+  function studentStripHtml(info, el) {
+    var meta = (WS.store[info.wk] && WS.store[info.wk].boxes[info.key]) || null;
+    var raw = info.rich ? el.innerHTML : el.value, s = boxSummary(meta, raw, info.rich);
+    var chips = [pill(s.words, s.words === 1 ? 'word' : 'words')];
+    if (s.timed && (s.activeMs || s.sessions)) chips.push(timePill(s.activeMs, s.untimedChars > 0, 'writing', 'Time spent writing in this box. Pauses longer than two minutes don’t count.' + (s.untimedChars ? ' Writing from before this was recorded isn’t included.' : '')));
+    if (s.pasted) chips.push(pill(Math.round(s.pasted / Math.max(1, s.total) * 100) + '%', 'pasted', 'lc-ws-warn', 'How much of this box was pasted in.'));
+    if (s.blocked) chips.push(pill(s.blocked, s.blocked === 1 ? 'paste blocked' : 'pastes blocked', 'lc-ws-block', 'Pasting is turned off in this box. Type your response in your own words.'));
+    return chips.join('');
+  }
+  function stripFor(el) {
+    var sib = el.nextElementSibling;
+    while (sib && sib.classList && sib.classList.contains('paste-note')) sib = sib.nextElementSibling;
+    return sib && sib.getAttribute && sib.getAttribute('data-ws-for') === el.id ? sib : null;
+  }
+  function paintBox(el, info) {
+    if (!el.parentNode) return;
+    var strip = stripFor(el);
+    if (!strip) {
+      strip = document.createElement('div');
+      strip.className = 'lc-ws lc-ws-student';
+      strip.setAttribute('data-ws-for', el.id);
+      strip.setAttribute('aria-live', 'off');
+      el.parentNode.insertBefore(strip, el.nextSibling);
+    }
+    var html = studentStripHtml(info, el);
+    if (strip.innerHTML !== html) strip.innerHTML = html;
+  }
+  function paintAll() {
+    paintQueued = false;
+    if (!studentPage()) return;
+    var app = document.getElementById('app'); if (!app) return;
+    var first = null;
+    app.querySelectorAll('textarea[id],[contenteditable="true"][id]').forEach(function (el) {
+      var info = boxInfo(el); if (!info) return;
+      paintBox(el, info);
+      if (!first) first = stripFor(el);
+    });
+    if (first && !app.querySelector('.lc-ws-note')) {
+      var note = document.createElement('p');
+      note.className = 'lc-ws-note';
+      note.textContent = 'Word count, writing time and pastes are recorded for each box and visible to your teacher.';
+      first.parentNode.insertBefore(note, first.nextSibling);
+    }
+  }
+  var paintQueued = false;
+  function paintSoon() { if (paintQueued) return; paintQueued = true; setTimeout(paintAll, 30); }
+  WS.paintSoon = paintSoon;
+  try {
+    new MutationObserver(function (list) {
+      // ignore our own strips; anything else that adds nodes may have added a writing box
+      for (var i = 0; i < list.length; i++) {
+        var added = list[i].addedNodes;
+        for (var j = 0; j < added.length; j++) {
+          var n = added[j];
+          if (n.nodeType === 1 && !(n.classList && (n.classList.contains('lc-ws') || n.classList.contains('lc-ws-note') || n.classList.contains('lc-ws-pill')))) { paintSoon(); return; }
+        }
+      }
+    }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+  } catch (e) {}
+
+  W.__MB.WritingStats = 'ok';
+})();
+</script>

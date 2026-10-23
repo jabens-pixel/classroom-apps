@@ -1,0 +1,487 @@
+<script>
+window.__MB = window.__MB || {}; __MB.WritingWorkshop = 'started';
+
+// Part 2 of the unit: moving from reading short stories to writing one.
+// Mirrors the Craft Analysis Essay's step-flow pattern (essayNav/essay in
+// AppLogic.html). Deliberately NOT one stage per story element (dynamic
+// lead / rising action / climax / conclusion each as a separate writing
+// checkpoint) -- those are relationships between parts of one continuous
+// piece, not standalone chunks, so splitting drafting into four gated
+// submissions risked producing technically-complete but disjointed drafts.
+// Instead the four craft concepts live as a reference "toolkit" inside
+// Drafting (used while writing) and come back as a checklist inside
+// Revision (used to strengthen a finished draft) -- see draftingStage()
+// and revisionStage() below.
+const WRITING_STEPS = [
+  ["prewriting", "1. Prewriting"],
+  ["drafting", "2. Drafting"],
+  ["revision", "3. Revision"],
+  ["final", "4. Final Draft"],
+];
+
+const REVISION_CHECKLIST = [
+  ["lead", "Lead", "Does the opening begin in a moment, image, action, or line that creates immediate interest?"],
+  ["stakes", "Rising action", "Does each complication raise the stakes instead of repeating the same problem?"],
+  ["character", "Character", "Do choices, reactions, and dialogue reveal what the character wants and fears?"],
+  ["setting", "Setting", "Does the setting shape mood, conflict, or what the character can do?"],
+  ["climax", "Climax & ending", "Does the climax grow naturally from the conflict, and does the ending show what changed?"],
+  ["theme", "Theme", "Can the reader feel an idea underneath the plot without the story explaining the lesson directly?"],
+];
+
+// Maps a nav step id to the release key stageReleased()/state.releasedWritingStages
+// uses -- every step matches its own name except "final", which is keyed
+// "finalDraft" everywhere else (Code.gs's WRITING_ASSIGN_KEYS, the Grading
+// Hub) since "final" alone reads ambiguously outside this one nav array.
+const WRITING_STEP_RELEASE_KEY = { prewriting: "prewriting", drafting: "drafting", revision: "revision", final: "finalDraft" };
+
+function writingNav(active) {
+  const meta = {
+    prewriting: ["pathPlan", "Prewriting", "Explore your ideas"],
+    drafting: ["pathDraft", "Rough Draft", "Get the story down"],
+    revision: ["pathRevise", "Revision", "Make it stronger"],
+    final: ["pathPublish", "Final Draft", "Share your best work"],
+  };
+  return `<div class="writing-steps workshop-stage-grid">${WRITING_STEPS.map(([id]) => {
+    let locked = !stageReleased(WRITING_STEP_RELEASE_KEY[id]);
+    let m = meta[id];
+    let icon = typeof studioAsset_ === "function" ? studioAsset_(m[0]) : "";
+    let due = id === "prewriting" ? "" : (typeof assignmentDueChipHtml_ === "function" ? assignmentDueChipHtml_(id === "final" ? "finalDraft" : "stage", id === "final" ? "finalDraft" : id) : "");
+    return `<button class="stepbtn workshop-stage-card ${active === id ? "active" : ""} ${locked ? "locked" : ""}" data-wstep="${id}">${icon ? `<img src="${esc(icon)}" alt="">` : ""}<span class="workshop-step-copy"><strong>${m[1]}</strong><small>${m[2]}</small>${due}</span>${locked ? '<span class="workshop-lock">🔒</span>' : ""}</button>`;
+  }).join("")}</div>`;
+}
+
+// Kept in case a future stage needs a placeholder again; nothing currently
+// calls it since Drafting/Revision/Final Draft all have real content.
+function comingSoonStage(label) {
+  return `<div class="card"><h3>${esc(label)}</h3><p>This stage is coming soon -- your teacher hasn't added its activities yet. Check back later, or use the Prewriting stage to keep developing your character, setting, and story idea in the meantime.</p></div>`;
+}
+
+function wordCount(text) {
+  return (text || "").trim().split(/\s+/).filter(Boolean).length;
+}
+
+function draftingStage() {
+  let words = wordCount(state.writing.draftText);
+  return `<div class="card assignment-card">
+    <div class="assignment-flags"><span class="assignment-kicker">Graded Assignment · 7 points</span>${assignmentStatusChipHtml_("stage", "drafting", {started:!!String(state.writing.draftText||"").trim(), done:isSubmitted_("stage","drafting")})}</div>
+    <div class="assignment-title-row"><h3>Drafting</h3><div class="stage-title-actions">${typeof assignmentDueChipHtml_ === "function" ? assignmentDueChipHtml_("stage", "drafting") : ""}${typeof focusButtonHtml_ === "function" ? focusButtonHtml_("writing", "Focus Writing") : ""}${rubricButtonHtml("written", "View Rubric", "writingStage:drafting")}</div></div>
+    <p>Write your whole story here, start to finish -- in one sitting if you can. Use everything you built in Prewriting (your character, your setting, your "what if," and the point of view you chose), and use the craft toolkit below as a reference while you write, not as separate steps to complete one at a time.</p>
+    <details class="recap-box">
+      <summary><strong>Craft toolkit: the shape of a story</strong></summary>
+      <ul>
+        <li><strong>Dynamic lead</strong> -- open with motion, not setup. Drop the reader into a moment already happening: an action, a line of dialogue, a striking image, a question the rest of the story will answer. Avoid opening with backstory or a description of the weather -- get your character doing or saying something first.</li>
+        <li><strong>Rising action</strong> -- once your "what if" is in motion, keep raising the stakes. Each new complication should make the problem harder to solve or the choice harder to make, not just repeat the same obstacle.</li>
+        <li><strong>Climax</strong> -- the moment the built-up tension finally breaks: a decision, a confrontation, a discovery. It should grow directly out of everything that came before it, not arrive out of nowhere.</li>
+        <li><strong>Falling action &amp; conclusion</strong> -- show what's different now that the climax has happened. Resolve your "what if" -- or make it clear you're leaving it open on purpose -- and let your last lines carry your theme.</li>
+      </ul>
+    </details>
+    ${typeof draftNotesStudentPanelHtml_ === "function" ? draftNotesStudentPanelHtml_() : ""}
+    <div class="field" style="margin-top:14px">
+      <label><strong>Your rough draft</strong></label>
+      <textarea id="draftText" class="writingbox" style="min-height:420px" placeholder="Start writing your short story here...">${esc(state.writing.draftText)}</textarea>
+      <p class="toolbar-note" id="draftWordCount">${words} word${words === 1 ? "" : "s"}</p>
+      ${typeof writingProcessStripHtml_ === "function" ? writingProcessStripHtml_("drafting") : ""}
+      ${submitButtonHtml_("stage", "drafting")}
+    </div>
+  </div>
+  ${typeof myWritingStageGradeBox === "function" ? myWritingStageGradeBox("drafting") : ""}`;
+}
+
+function revisionStage() {
+  let draft = state.writing.draftText || "";
+  let hasDraft = !!draft.trim();
+  if (hasDraft && !state.writing.revisionInitializedAt) {
+    state.writing.revisionBase = draft;
+    state.writing.revisionText = draft;
+    state.writing.revisionInitializedAt = new Date().toISOString();
+    if (typeof save === "function") save();
+  }
+  let base = state.writing.revisionBase || draft;
+  let revised = state.writing.revisionText || "";
+  let checklist = state.writing.revisionChecklist || {};
+  let checklistComments = state.writing.revisionChecklistComments || {};
+  let doneCount = REVISION_CHECKLIST.filter((x) => checklist[x[0]]).length;
+  return `<div class="card assignment-card revision-assignment">
+    <div class="assignment-flags"><span class="assignment-kicker">Graded Assignment · 7 points</span>${assignmentStatusChipHtml_("stage", "revision", {started:!!String(state.writing.revisionText||"").trim(), done:isSubmitted_("stage","revision")})}</div>
+    <div class="assignment-title-row"><h3>Revision</h3><div class="stage-title-actions">${typeof assignmentDueChipHtml_ === "function" ? assignmentDueChipHtml_("stage", "revision") : ""}${typeof focusButtonHtml_ === "function" ? focusButtonHtml_("writing", "Focused Revision") : ""}${rubricButtonHtml("written", "View Rubric", "writingStage:revision")}</div></div>
+    <p>Revise the rough draft directly below. Your original Drafting version is preserved as a snapshot, so both you and your teacher can see what changed.</p>
+    ${hasDraft ? `<div class="revision-workspace">
+      <div class="revision-editor-pane">
+        <div class="revision-pane-head"><div><strong>Revised draft</strong><small>${wordCount(revised)} words · original rough draft preserved</small></div></div>
+        <textarea id="revisionText" class="writingbox revision-writingbox" placeholder="Revise your rough draft here...">${esc(revised)}</textarea>
+        <p class="toolbar-note" id="revisionWordCount">${wordCount(revised)} word${wordCount(revised) === 1 ? "" : "s"}</p>
+        ${typeof writingProcessStripHtml_ === "function" ? writingProcessStripHtml_("revision") : ""}
+        ${practiceRecorderHtml_()}
+        ${submitButtonHtml_("stage", "revision")}
+        <details class="revision-diff"><summary><strong>Show changes from rough draft</strong></summary><p class="toolbar-note">Changed sentences are grouped as <strong>Original</strong> and <strong>Revised</strong> so you can see meaningful revision moves without every individual word flashing red and blue.</p><div class="revision-diff-key"><span class="diff-key-del">Original wording</span><span class="diff-key-add">Revised wording</span></div><div class="revision-diff-body">${typeof revisionDiffHtml_ === "function" ? revisionDiffHtml_(base, revised) : ""}</div></details>
+      </div>
+      <aside class="revision-checklist-panel">
+        <div class="revision-checklist-head">
+          <div class="revision-checklist-title"><span class="eyebrow">Revision checklist</span><small>Review each craft move, check it off, and jot a quick note about what you changed or still need to fix.</small></div>
+          <strong id="revisionChecklistCount" class="revision-checklist-count">${doneCount}/${REVISION_CHECKLIST.length}</strong>
+        </div>
+        <div class="revision-checklist-list">${REVISION_CHECKLIST.map((x, i) => `<div class="revision-check-row ${checklist[x[0]] ? "is-reviewed" : ""}">
+          <label class="revision-check-label">
+            <input type="checkbox" class="revisionChecklistItem" data-check="${x[0]}" ${checklist[x[0]] ? "checked" : ""}>
+            <span class="revision-check-copy"><span class="revision-check-number">${i + 1}</span><span><strong>${esc(x[1])}</strong><small>${esc(x[2])}</small></span></span>
+          </label>
+          <div class="revision-note-wrap ${checklistComments[x[0]] ? "has-note" : ""}"><span class="revision-note-label">Revision note <em>optional</em></span><textarea class="revisionChecklistComment" data-check="${x[0]}" placeholder="What did you change, or what will you check next?">${esc(checklistComments[x[0]] || "")}</textarea></div>
+        </div>`).join("")}</div>
+      </aside>
+    </div>` : `<p class="toolbar-note">You haven't written a rough draft yet. Complete Drafting first.</p>`}
+  </div>
+  ${aiFeedbackCard()}
+  ${typeof myWritingStageGradeBox === "function" ? myWritingStageGradeBox("revision") : ""}`;
+}
+
+// Local/offline default -- shown when no class backend is connected, or the
+// signed-in user isn't a student in an active class. BackendClient.html
+// overrides this once both of those are true, adding the real "Get AI feedback"
+// button and result box (see SETUP_BACKEND.md for the one-time Gemini API
+// key setup that feature needs on the teacher's end).
+function aiFeedbackCard() {
+  return `<div class="card"><h3>AI Revision Coach <span class="pill">Optional</span></h3><p>Once you have a rough draft, the coach can give rubric-aligned revision feedback without writing the story for you.</p><p class="toolbar-note">This needs your class connected to the school backend. Sign in and join your class to use it.</p></div>`;
+}
+
+function finalDraftStage() {
+  if (!String(state.writing.finalText || "").trim() && String(state.writing.revisionText || "").trim()) { state.writing.finalText = state.writing.revisionText; if (typeof save === "function") save(); }
+  let words = wordCount(state.writing.finalText);
+  return `<div class="card assignment-card final-assignment">
+    <div class="assignment-flags"><span class="assignment-kicker">Major Assignment · 28 points</span>${assignmentStatusChipHtml_("finalDraft", "finalDraft", {started:!!String(state.writing.finalText||"").trim(), done:isSubmitted_("finalDraft","finalDraft")})}</div>
+    <div class="assignment-title-row"><h3>Final Draft</h3><div class="stage-title-actions">${typeof assignmentDueChipHtml_ === "function" ? assignmentDueChipHtml_("finalDraft", "finalDraft") : ""}${typeof focusButtonHtml_ === "function" ? focusButtonHtml_("writing", "Focus Writing") : ""}${rubricButtonHtml("story", "View Full Rubric")}</div></div>
+    <p>Your revised draft is carried forward here automatically. Make any final proofreading changes, then submit this version for the Plot / Character Development / Setting / Theme rubric.</p>
+    <div class="field">
+      <label><strong>Your final draft</strong></label>
+      <textarea id="finalText" class="writingbox" style="min-height:420px" placeholder="Paste your final, polished short story here...">${esc(state.writing.finalText)}</textarea>
+      <p class="toolbar-note" id="finalWordCount">${words} word${words === 1 ? "" : "s"}</p>
+      ${typeof writingProcessStripHtml_ === "function" ? writingProcessStripHtml_("finalDraft", {transferFromRevision: String(state.writing.finalText || "").trim() === String(state.writing.revisionText || "").trim() && !!String(state.writing.revisionText || "").trim()}) : ""}
+      ${submitButtonHtml_("finalDraft", "finalDraft")}
+    </div>
+    <div class="field" style="margin-top:14px">
+      <label><strong>What's the one craft move you're most proud of in this final draft?</strong></label>
+      <textarea id="finalReflection" class="writingbox short" placeholder="Your answer...">${esc(state.writing.finalReflection)}</textarea>
+    </div>
+  </div>
+  ${typeof myStoryRubricGradeCard === "function" ? myStoryRubricGradeCard() : ""}
+  ${storyRubricSelfEvalHtml()}`;
+}
+
+// Full reference table for the Final Draft rubric -- every level of every
+// criterion, so a student (or teacher) can see the whole scale at once.
+function storyRubricTableHtml() {
+  return `<div class="rubric-wrap"><table class="rubric"><thead><tr><th>Criteria</th><th colspan="5">Levels, strongest to weakest</th></tr></thead><tbody>${STORY_RUBRIC_ORDER.map((key) => {
+    let c = STORY_RUBRIC[key];
+    return `<tr><td class="crit">${esc(c.label)}</td>${c.levels.map((l) => `<td><strong>${l.points} pts</strong><br>${esc(l.text)}</td>`).join("")}</tr>`;
+  }).join("")}</tbody></table></div>`;
+}
+
+// Student self-assessment on the Final Draft rubric -- purely a reflection
+// (not used to compute the grade; the teacher's own scoring in the Teacher
+// Dashboard is what counts). Mirrors the Craft Analysis Essay's
+// selfEvalStep() in AppLogic.html, but the criteria come from STORY_RUBRIC
+// here instead of the essay's RUBRIC, and levels differ in count and text.
+// Deliberately uses its OWN class names (storyRubricSelfBand /
+// storyRubricSelfComment) rather than reusing .self-band/.selfComment --
+// those already have a bind() handler in AppLogic.html that writes into
+// state.essay.selfEval, which would fire alongside this one if the class
+// names collided.
+function storyRubricSelfEvalHtml() {
+  let selfEval = state.writing.finalSelfEval || {};
+  let selfComments = state.writing.finalSelfComments || {};
+  let sections = STORY_RUBRIC_ORDER.map((key) => {
+    let c = STORY_RUBRIC[key];
+    let selectedIdx = selfEval[key];
+    let selectedLevel = selectedIdx !== undefined && selectedIdx !== "" ? c.levels[selectedIdx] : null;
+    return `<section class="self-criterion"><div class="self-criterion-head"><div><strong>${esc(c.label)}</strong><br><small>Choose the description that most closely matches your story.</small></div>${selectedLevel ? `<span class="pill">Selected: ${selectedLevel.points} pts</span>` : '<span class="pill">Not selected</span>'}</div><div class="storyRubricBandGrid">${c.levels
+      .map(
+        (l, i) =>
+          `<button type="button" class="storyRubricSelfBand ${String(selectedIdx) === String(i) ? "selected" : ""}" data-crit="${key}" data-band="${i}"><strong>${l.points} pts</strong>${esc(l.text)}</button>`,
+      )
+      .join("")}</div><div class="self-comment-wrap"><label><strong>Your ${esc(c.label)} reflection</strong></label><textarea class="storyRubricSelfComment" data-crit="${key}" placeholder="Explain why you chose this level. Identify a specific strength and/or something you'd revise.">${esc(selfComments[key] || "")}</textarea></div></section>`;
+  }).join("");
+  let doneCount = STORY_RUBRIC_ORDER.filter((key) => selfEval[key] !== undefined && selfEval[key] !== "").length;
+  return `<div class="card"><h3>Self-Assessment</h3><p>Read back through your final draft and click the rubric description that best matches your own story for each criterion, then explain your choice below it. This is a reflection, not your grade -- it's a chance to see your story the way your teacher will before they score it.</p>${sections}<div class="self-summary"><strong>Self-assessment status:</strong> ${doneCount}/${STORY_RUBRIC_ORDER.length} criteria selected.</div><h4 style="margin-top:18px">Full Short Story Rubric</h4>${storyRubricTableHtml()}</div>`;
+}
+
+function prewritingStage() {
+  return `
+    <div class="card">
+      <h3>Prewriting</h3>
+      <p>Before you write a single line of your short story, you need a character worth following, a setting that shapes what happens to them, and a spark of an idea. Work through the activities below in order.</p>
+    </div>
+
+    <div class="card">
+      <h3>Warm-Up</h3>
+      <p>Start with something quick and low-stakes to get your imagination moving.</p>
+      ${resourceCard(["Activity", "Zombie Apocalypse Warm-Up", "A quick creative warm-up: plan your survival before you plan your story."], "pre:zombie")}
+      <p style="margin-top:10px"><a target="_blank" rel="noopener" href="https://www.unigo.com/scholarships/our-scholarships/zombie-apocalypse-scholarship">See the original Zombie Apocalypse Scholarship prompt ↗</a></p>
+    </div>
+
+    <div class="card">
+      <h3>Setting</h3>
+      <p>Every story needs a world for its character to move through. Watch the video, then build yours.</p>
+      ${resourceCard(["Video", "Setting (Flocabulary)", "https://youtu.be/30CPmgVQNks?si=oXJScIjfX6nf1vEa"])}
+      ${resourceCard(["Activity", "Setting Lab", "Answer these guided questions to build the world your story happens in."], "pre:setting")}
+    </div>
+
+    <div class="card">
+      <h3>Character</h3>
+      <p>A short story lives or dies on its character. Watch the video below, look over the two reference lists, then fill out the Character Lab for your protagonist -- and your antagonist, if your story has one.</p>
+      ${resourceCard(["Video", "Developing Characters", "https://www.youtube.com/watch?v=4BxfV1sBRJs"])}
+      <details class="recap-box">
+        <summary><strong>Ways to develop a character (9 techniques)</strong></summary>
+        <ol>
+          <li><strong>Reflection</strong> -- whether the narrative voice is first (I) or third (he, she, or they), tell often and everywhere what your character is thinking and feeling.</li>
+          <li><strong>Dialogue</strong> -- get your character talking to reveal who they are.</li>
+          <li><strong>Action</strong> -- get your character moving around, doing things both little and big to show what they are like.</li>
+          <li><strong>Flashback</strong> -- recall events from the past that show why your character is behaving this way.</li>
+          <li><strong>Reaction</strong> -- show how your character responds to the actions, words, or ideas of another character.</li>
+          <li><strong>Other Character</strong> -- use other characters to contrast your character.</li>
+          <li><strong>Quirks</strong> -- imagine the habits, interests, skills, hobbies, goals, fears, tastes and preferences, daydreams and nightmares that will flesh out your character as a living, breathing person.</li>
+          <li><strong>Intimate Setting</strong> -- create your character's bedroom and fill it with the stuff of their life that reveals parts of the past and present.</li>
+          <li><strong>Beloved object or pet</strong> -- give your character something to love that reveals their private self or previous history. Maybe even have your character speak to a pet or object that is special.</li>
+        </ol>
+      </details>
+      <details class="recap-box">
+        <summary><strong>How to develop a strong character (12 things to consider)</strong></summary>
+        <ol>
+          <li><strong>Understand your story's purpose</strong> -- know what your character is doing in this particular story before you decide who they are.</li>
+          <li><strong>Build a character profile</strong> -- gather the basic facts (age, appearance, background) in one place so they stay consistent.</li>
+          <li><strong>Give them a distinct personality</strong> -- specific traits, habits, and quirks make a character memorable rather than generic.</li>
+          <li><strong>Add backstory</strong> -- decide what happened before page one, even if the reader only sees hints of it.</li>
+          <li><strong>Establish goals and motivation</strong> -- know what your character wants and why, since that's what drives the plot.</li>
+          <li><strong>Create conflict and relationships</strong> -- other characters should pull against or complicate what your character wants.</li>
+          <li><strong>Craft dialogue and voice</strong> -- how a character speaks should be as distinct as how they look.</li>
+          <li><strong>Include physical description</strong> -- give the reader just enough to picture the character, tied to details that matter.</li>
+          <li><strong>Plan a character arc</strong> -- decide how this character will be different (or stubbornly the same) by the story's end.</li>
+          <li><strong>Show, don't tell</strong> -- reveal personality through action and choice rather than stating traits outright.</li>
+          <li><strong>Limit your cast</strong> -- a short story usually only has room to develop one or two characters fully.</li>
+          <li><strong>Watch for stereotypes</strong> -- notice if a character is leaning on a cliche, and look for a way to subvert or complicate it.</li>
+        </ol>
+      </details>
+      ${resourceCard(["Activity", "Character Lab: Protagonist", "Build your protagonist using the Character Lab questions."], "pre:character")}
+      ${gradedActivityAssigned_("pre:character") ? resourceCard(["Activity", "Character Lab: Antagonist (if applicable)", "Build your antagonist the same way -- skip this if your conflict isn't against a clear antagonist."]) : ""}
+    </div>
+
+    <div class="card">
+      <h3>The "What If"</h3>
+      <p><strong>First, watch all three animated short films below.</strong> For each film, identify the central <em>What If</em> (the problem that puts the story in motion), when that problem is introduced, and how it is resolved.</p>
+      <p class="toolbar-note">As you watch, notice the pattern: strong short stories usually introduce their central problem very near the beginning. Your own reader should understand the core "What If" early enough that the rest of the story can build from it.</p>
+      ${resourceCard(["Video", "Animated Short Film 1", "https://www.youtube.com/watch?v=Lz3KYrPQaN0"])}
+      ${resourceCard(["Video", "Animated Short Film 2", "https://www.youtube.com/watch?v=LVLoc6FrLi0"])}
+      ${resourceCard(["Video", "Animated Short Film 3", "https://www.youtube.com/watch?v=5L4DQfVIcdg"])}
+      ${resourceCard(["Activity", "What If Lab", "Analyze the What If/problem in all three films, when each is introduced, and how each is resolved."], "pre:whatif")}
+      <details class="recap-box">
+        <summary><strong>Developing your own "what if" (steps to try)</strong></summary>
+        <ol>
+          <li><strong>Nail down your story's focus</strong> -- what's it really about, and what feeling or idea do you want a reader to leave with?</li>
+          <li><strong>Decide who's at the center of it</strong> -- your protagonist's wants and personality should connect directly to the problem you introduce.</li>
+          <li><strong>Choose the kind of conflict</strong> -- external (an obstacle, a mystery, a confrontation) or internal (a hard choice, a moral struggle) -- and let that choice drive the story.</li>
+          <li><strong>Interrogate your character</strong> -- what could trip them up? What do they want badly enough to risk something for? What are they hiding or avoiding?</li>
+          <li><strong>Turn a possibility into a real "what if"</strong> -- one specific hypothetical situation your character gets dropped into.</li>
+          <li><strong>Follow the ripple effects</strong> -- how does this problem reshape what your character does, where the story is set, and what happens next?</li>
+          <li><strong>Give your problem some company</strong> -- supporting characters whose own goals either help or complicate it.</li>
+          <li><strong>Build a world that fits the problem</strong> -- a setting and mood that make the stakes feel real.</li>
+          <li><strong>Sketch the shape of the plot</strong> -- introduction, rising action, climax, resolution -- all built around that one problem.</li>
+          <li><strong>Keep your own rules straight</strong> -- however strange or ordinary your premise is, stay consistent with its internal logic once you've set it.</li>
+          <li><strong>Ask what it's really about</strong> -- what larger idea or feeling does this problem let you explore?</li>
+          <li><strong>Don't marry your first idea</strong> -- try a few variations of the problem before committing to the one that creates the most tension.</li>
+        </ol>
+      </details>
+    </div>
+
+    ${discussionReleased("whatif") ? whatIfDiscussion() + myDiscussionGradeBox("whatif") : discussionClosedNote("whatif")}
+
+    ${discussionReleased("moviepitch") ? moviePitchDiscussion() + myDiscussionGradeBox("moviepitch") : discussionClosedNote("moviepitch")}
+
+    <div class="card">
+      <h3>Point of View</h3>
+      <p>One last decision before you start writing: whose eyes will your story be told through, and how much is that narrator allowed to know? Look over the reference below, watch the video, then try writing the same small moment three different ways.</p>
+      <details class="recap-box">
+        <summary><strong>First person vs. third person</strong></summary>
+        <ul>
+          <li><strong>First person</strong> -- the narrator is a character inside the story, referring to themselves as "I" (or "we"). The reader only knows what that character knows, sees, and feels -- intimate and immediate, but with a built-in blind spot: nothing the narrator doesn't personally witness or understand can appear on the page.</li>
+          <li><strong>Third person limited</strong> -- the narrator stands outside the story, using "he," "she," or "they," but the narration still stays anchored to one character's thoughts and feelings. A little more distance than first person, but it still only reveals that one character's inner world.</li>
+          <li><strong>Third person omniscient</strong> -- the narrator stands outside the story and can move freely between characters, revealing thoughts or facts that no single character knows. Trades some intimacy for a wider view of the story.</li>
+          <li><strong>Second person</strong> (worth knowing it exists) -- narrated as "you." Rare in short fiction, usually saved for a specific, unsettling effect.</li>
+        </ul>
+      </details>
+      ${resourceCard(["Video", "Point of View (Flocabulary)", "https://www.flocabulary.com/unit/point-of-view/"])}
+      ${resourceCard(["Activity", "Point of View Practice", "Write the same small moment three different ways -- first person, third person limited, and third person omniscient."], "pre:pov")}
+    </div>
+
+    <div class="card">
+      <h3>Prewriting Checkpoint</h3>
+      <p>Each highlighted activity above is its own 7-point assignment scored with the Written Response rubric. Your What If and Movie Pitch discussions are graded separately with the Discussion rubric.</p>
+      <p class="toolbar-note">If your teacher has not assigned one of the activities, it will not appear as a graded item.</p>
+    </div>
+  `;
+}
+
+// Renders one discussion post plus any comments/replies filed against it
+// (replies are just posts whose parentId points back to this one). Shared by
+// every discussion board this app has (What If, Movie Pitch, and any future
+// one) -- commentBoxClass/commentBtnClass keep each board's "post a comment"
+// controls from colliding with another board's when bind() wires them up.
+function discussionPostHtml(p, replies, commentBoxClass, commentBtnClass) {
+  return `<div class="discussion-post" data-postid="${esc(p.id)}"><strong>${esc(p.name || "Student")}</strong><p style="white-space:pre-wrap">${esc(p.text)}</p><small>Posted ${esc(p.date)}</small>${
+    replies.length
+      ? `<div style="margin:10px 0 0 18px;display:grid;gap:8px">${replies.map((r) => `<div class="discussion-post"><strong>${esc(r.name || "Student")}</strong><p style="white-space:pre-wrap">${esc(r.text)}</p><small>${esc(r.date)}</small></div>`).join("")}</div>`
+      : ""
+  }<div style="margin-top:10px"><textarea class="writingbox short ${commentBoxClass}" data-postid="${esc(p.id)}" placeholder="Add a comment..."></textarea><button class="btn ${commentBtnClass}" data-postid="${esc(p.id)}" style="margin-top:6px">Post Comment</button></div></div>`;
+}
+function whatIfPostHtml(p, replies) { return discussionPostHtml(p, replies, "whatIfCommentBox", "postWhatIfComment"); }
+function moviePitchPostHtml(p, replies) { return discussionPostHtml(p, replies, "moviePitchCommentBox", "postMoviePitchComment"); }
+
+// Local-device-only version, used when no class backend is connected (see
+// SETUP_BACKEND.md). BackendClient.html overrides this global function with
+// a class-backed version once a student is signed in and enrolled, the same
+// way it overrides essay's discussion() for the Thesis Discussion.
+function whatIfDiscussion() {
+  let posts = state.writing.whatIfPosts || [];
+  let topPosts = posts.filter((p) => !p.parentId);
+  let repliesFor = (id) => posts.filter((p) => p.parentId === id);
+  return `<div class="card assignment-card"><div class="assignment-kicker">Graded Discussion</div><div class="assignment-title-row"><h3>What If - Story Idea Discussion</h3>${rubricButtonHtml("discussion", "View Rubric", "discussion:whatif")}</div><p>Post 3 possible "What If" story ideas. Put the central problem right up front in each idea, just as the animated shorts did. Then comment on at least two classmates' ideas: which one would you most want to read, and what makes that problem immediately interesting?</p><textarea id="whatIfDraft" class="writingbox short" placeholder="Write your 3 'what if' statements here..."></textarea><button class="btn primary" id="postWhatIf" style="margin-top:8px">Post to Class Discussion</button><p class="toolbar-note">In this prototype, posts are saved on this device. When the class backend is connected, these posts and comments are shared across the class.</p>${topPosts.length ? topPosts.map((p) => whatIfPostHtml(p, repliesFor(p.id))).join("") : "<p>No one has posted yet.</p>"}</div>`;
+}
+
+// Same local-device-only pattern as whatIfDiscussion() above; BackendClient.html
+// overrides this one too once a student is signed in and enrolled.
+function moviePitchDiscussion() {
+  let posts = state.writing.moviePitchPosts || [];
+  let topPosts = posts.filter((p) => !p.parentId);
+  let repliesFor = (id) => posts.filter((p) => p.parentId === id);
+  return `<div class="card assignment-card"><div class="assignment-kicker">Graded Discussion</div><div class="assignment-title-row"><h3>Movie Pitch Discussion</h3>${rubricButtonHtml("discussion", "View Rubric", "discussion:moviepitch")}</div><p><strong>Choose your strongest "What If" idea from the Story Idea Discussion.</strong> Now imagine that idea as a movie trailer. Write a 1-2 paragraph trailer-style pitch that opens with the central problem, introduces the main character and setting, builds tension without giving away everything, and leaves the audience wanting to see what happens next. Your trailer concept should grow directly from the What If you chose.</p><p>After posting your pitch, respond to at least one other student's movie pitch. Your feedback should be meaningful and specific -- not random or surface-level. Consider:</p><ul><li>🎥 Would this make a strong short story or movie? Why or why not?</li><li>🌎 Comment on how effectively the author developed the setting, characters, or climax.</li><li>💡 Offer one suggestion for improving an element of the story -- for example, a sharper climax, stronger motivation for a character, or more tension in the conflict.</li></ul><p class="toolbar-note">The depth, thoughtfulness, and insight of your responses will be a major part of your grade.</p><textarea id="moviePitchDraft" class="writingbox short" placeholder="Write your movie pitch here..."></textarea><button class="btn primary" id="postMoviePitch" style="margin-top:8px">Post to Class Discussion</button><p class="toolbar-note">In this prototype, posts are saved on this device. When the class backend is connected, these posts and comments are shared across the class.</p>${topPosts.length ? topPosts.map((p) => moviePitchPostHtml(p, repliesFor(p.id))).join("") : "<p>No one has posted yet.</p>"}</div>`;
+}
+
+function writingWorkshop() {
+  let step = state.writing.step || "prewriting";
+  let content =
+    step === "prewriting" ? prewritingStage()
+    : step === "drafting" ? draftingStage()
+    : step === "revision" ? revisionStage()
+    : finalDraftStage();
+  let quote = typeof studioAsset_ === "function" ? studioAsset_("quoteCardV2") : "";
+  return `<div class="writing-workshop-shell"><div class="sectionhead writing-workshop-head"><div><div class="pill">Writing Workshop</div><h2>Turn your ideas into a story.</h2><p>Plan with purpose. Draft with momentum. Revise like a writer.</p></div>${quote ? `<img class="workshop-quote-art" src="${esc(quote)}" alt="">` : ""}</div>${writingNav(step)}${content}</div>`;
+}
+
+// ---- v33: "Read it aloud" practice recorder (Revision step) --------------
+// Opens a pop-up recorder hosted outside Apps Script (the app's own pages
+// can't use the microphone). The pop-up asks for the story; BackendClient
+// answers with the revised draft. Practice only: nothing is saved.
+function practiceRecorderHtml_() {
+  let b = typeof window !== "undefined" ? window.SHORTSTORY_BACKEND : null;
+  let url = b && b.practiceRecorderUrl;
+  if (!url) return "";
+  return `<div class="practice-recorder-box"><button type="button" class="btn practiceRecorderBtn">🎙 Read it aloud &amp; listen</button><span class="practice-recorder-note">Record yourself reading your revised draft, then play it back to hear what to fix. Practice only: nothing is saved or sent to your teacher.</span></div>`;
+}
+
+// ---- v31: the teacher's highlight comments on a rough draft --------------
+// Shared by the teacher's marking screens (BackendClient) and the student's
+// Drafting page. Pure functions: no state, no server calls.
+//
+// A note was made against the draft as the teacher saw it: start/end offsets
+// plus the quoted words and ~40 characters either side. If the student has
+// edited since, the words are found again (the closest match whose
+// surroundings agree best); if they're gone, the note is still listed, with
+// the words it was on.
+function draftNoteAnchor_(text, note) {
+  text = String(text || "");
+  let q = String((note && note.quote) || "");
+  if (!q) return { found: false };
+  let s = Number(note.start) || 0;
+  if (text.slice(s, s + q.length) === q) return { found: true, start: s, end: s + q.length };
+  let pre = String(note.prefix || ""), suf = String(note.suffix || "");
+  let best = null, idx = text.indexOf(q);
+  while (idx !== -1) {
+    let a = 0; while (a < pre.length && idx - 1 - a >= 0 && text[idx - 1 - a] === pre[pre.length - 1 - a]) a++;
+    let b = 0; while (b < suf.length && idx + q.length + b < text.length && text[idx + q.length + b] === suf[b]) b++;
+    let score = a + b - Math.abs(idx - s) / 100000;
+    if (!best || score > best.score) best = { score: score, idx: idx };
+    idx = text.indexOf(q, idx + 1);
+  }
+  return best ? { found: true, start: best.idx, end: best.idx + q.length, moved: true } : { found: false };
+}
+// Notes placed on the text, numbered top to bottom; notes whose words are
+// gone come last.
+function draftNotesLayout_(text, notes) {
+  let placed = (notes || []).map((n) => Object.assign({ note: n }, draftNoteAnchor_(text, n)));
+  let found = placed.filter((p) => p.found).sort((a, b) => a.start - b.start || a.end - b.end);
+  let lost = placed.filter((p) => !p.found);
+  return found.concat(lost).map((p, i) => Object.assign(p, { n: i + 1 }));
+}
+// The text as HTML with <mark>s for the notes. Splitting it at note edges
+// (and at read-aloud sentence edges, when chunks are given) keeps the
+// rendered text exactly equal to the original, so a selection made in it
+// maps straight back to character offsets.
+function annotatedTextHtml_(text, layout, opts) {
+  text = String(text || "");
+  opts = opts || {};
+  let enc = typeof storyHtml_ === "function" ? storyHtml_ : esc;
+  let ranges = (layout || []).filter((p) => p.found && p.end > p.start).map((p) => ({ id: p.note.noteId, n: p.n, start: p.start, end: p.end, done: !!p.note.doneAt }));
+  let chunks = opts.chunks && opts.chunks.length ? opts.chunks : [text];
+  let out = "", pos = 0, numbered = {};
+  chunks.forEach((c, ci) => {
+    let cs = pos, ce = pos + c.length;
+    pos = ce;
+    let cuts = [cs, ce];
+    ranges.forEach((r) => { if (r.start > cs && r.start < ce) cuts.push(r.start); if (r.end > cs && r.end < ce) cuts.push(r.end); });
+    cuts = Array.from(new Set(cuts)).sort((a, b) => a - b);
+    let inner = "";
+    for (let i = 0; i < cuts.length - 1; i++) {
+      let a = cuts[i], b = cuts[i + 1], piece = text.slice(a, b);
+      let cover = ranges.filter((r) => r.start <= a && r.end >= b);
+      if (!cover.length) { inner += enc(piece); continue; }
+      let first = cover.filter((r) => !numbered[r.id]);
+      first.forEach((r) => { numbered[r.id] = 1; });
+      let cls = "dn-mark" + (cover.length > 1 ? " dn-multi" : "") + (cover.every((r) => r.done) ? " dn-done" : "");
+      inner += `<mark class="${cls}" data-notes="${cover.map((r) => esc(r.id)).join(" ")}"${first.length ? ` data-n="${first.map((r) => r.n).join(",")}"` : ""}>${enc(piece)}</mark>`;
+    }
+    out += opts.chunks ? `<span class="ra-chunk${opts.onIdx === ci ? " ra-on" : ""}" data-ra-i="${ci}">${inner}</span>` : inner;
+  });
+  return out;
+}
+function draftNoteQuoteSnippet_(q, max) {
+  q = String(q || "").replace(/\s+/g, " ").trim();
+  max = max || 90;
+  return q.length > max ? q.slice(0, max - 1).replace(/\s+\S*$/, "") + "…" : q;
+}
+// One list of notes. role "teacher" adds Edit/Delete; "student" adds Done;
+// "readonly" adds nothing.
+function draftNotesListHtml_(layout, role, email) {
+  let em = esc(email || "");
+  return `<ol class="dn-items">${(layout || []).map((p) => {
+    let n = p.note, id = esc(n.noteId), done = !!n.doneAt;
+    let quote = p.found
+      ? `<q class="dn-quote">${esc(draftNoteQuoteSnippet_(n.quote))}</q>`
+      : `<span class="dn-lost">The words this note was on have changed: <q class="dn-quote">${esc(draftNoteQuoteSnippet_(n.quote))}</q></span>`;
+    let meta = "";
+    if (role === "teacher") meta = `<div class="dn-meta">${done ? `<span class="dn-done-chip">✓ Student marked this done</span>` : ""}<button type="button" class="dn-link dnEditBtn" data-note="${id}" data-email="${em}">Edit</button><button type="button" class="dn-link dnDeleteBtn" data-note="${id}" data-email="${em}">Delete</button></div>`;
+    else if (role === "student") meta = `<div class="dn-meta"><button type="button" class="dn-done-btn dnDoneBtn ${done ? "is-done" : ""}" data-note="${id}" aria-pressed="${done ? "true" : "false"}">${done ? "✓ Done" : "Mark done"}</button></div>`;
+    else if (done) meta = `<div class="dn-meta"><span class="dn-done-chip">✓ Done</span></div>`;
+    return `<li class="dn-item${done ? " is-done" : ""}${p.found ? "" : " is-lost"}" data-note="${id}"><span class="dn-num">${p.n}</span><div class="dn-body">${quote}<div class="dn-comment" data-note="${id}">${esc(n.comment)}</div>${meta}</div></li>`;
+  }).join("")}</ol>`;
+}
+// The student's own notes: Drafting page panel and Grades & Feedback.
+function myDraftNotes_() {
+  let b = typeof window !== "undefined" ? window.SHORTSTORY_BACKEND : null;
+  return b && b.enabled && Array.isArray(b.myDraftNotes) ? b.myDraftNotes : [];
+}
+function draftNotesStudentPanelHtml_() {
+  let notes = myDraftNotes_();
+  if (!notes.length) return "";
+  let text = String((state.writing && state.writing.draftText) || "");
+  let layout = draftNotesLayout_(text, notes);
+  let done = notes.filter((n) => n.doneAt).length;
+  return `<details class="dn-student-panel" id="dnStudentPanel" open><summary><span class="dn-student-title">Your teacher's notes on your rough draft</span><span class="dn-student-count">${done} of ${notes.length} done</span></summary>
+    <p class="dn-student-help">Highlighted words have a note. Use the notes as you revise, and mark each one done when you've dealt with it. Marking a note done doesn't change your grade.</p>
+    <div class="dn-student-grid"><div class="dn-student-text">${annotatedTextHtml_(text, layout)}</div><div class="dn-list">${draftNotesListHtml_(layout, "student")}</div></div></details>`;
+}
+function draftNotesGradeCenterHtml_() {
+  let notes = myDraftNotes_();
+  if (!notes.length) return "";
+  let layout = draftNotesLayout_(String((state.writing && state.writing.draftText) || ""), notes);
+  return `<div class="dn-gradecenter"><strong>Notes on your draft (${notes.length})</strong>${draftNotesListHtml_(layout, "readonly")}</div>`;
+}
+
+__MB.WritingWorkshop = 'ok';
+</script>

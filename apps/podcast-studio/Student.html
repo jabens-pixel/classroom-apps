@@ -1,0 +1,778 @@
+<script>
+// ============================================================================
+// Student pages: classes → home (your show, this week, the Listening Library, all weeks) → a week's
+// steps: lessons (read/watch), fill-in work (logs, plans, scripts, Canva links), the parts quiz,
+// discussions. Every box autosaves (SaveGuard) and long boxes record writing stats.
+// ============================================================================
+(function () {
+  var S = PC.S = { home: null, item: null, loading: false };
+  PC.act = PC.act || {};
+  var A = PC.act;
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-act]'); if (!el || !A[el.dataset.act]) return;
+    if (el.tagName === 'A' && !el.getAttribute('target')) e.preventDefault();
+    A[el.dataset.act](el, e);
+  });
+  function esc(s) { return PC.esc(s); }
+  function asArg() { return PC.state.as || ''; }
+  function readOnly() { return !!(S.home && S.home.me && S.home.me.readOnly); }
+  function me() { return (S.home && S.home.me) || {}; }
+  // ---------------------------------------------------------------- classes
+  PC.views.classes = function (app) {
+    var b = PC.boot, list = (b.studentClasses || []).slice();
+    var teaching = PC.boot.role !== 'student' ? (b.classes || []) : [];
+    var h = '<section class="pc-card"><h1>Your classes</h1>';
+    if (teaching.length) h += '<p class="pc-muted">You’re a teacher, so the Student view opens your own practice copy of a class: what students see, saved under your account.</p>';
+    var all = teaching.map(function (c) { return Object.assign({ teacherSelf: true }, c); }).concat(list);
+    h += all.length ? '<div class="pc-class-list">' + all.map(function (c) {
+      return '<button type="button" class="pc-class-pick" data-act="pickClass" data-class="' + esc(c.classId) + '"><span class="pc-class-pick-name">' + esc(c.className) + (c.period ? ' <small>Period ' + esc(c.period) + '</small>' : '') + '</span>' +
+        '<span class="pc-class-pick-book">Podcast Studio</span>' + (c.teacherSelf ? '<span class="pc-chip">Your class</span>' : '') + '</button>';
+    }).join('') + '</div>' : '<p>You haven’t joined a class yet.</p>';
+    h += '</section><section class="pc-card"><h2>Join a class</h2><p class="pc-muted">Type the class code from your teacher and your real name.</p>' +
+      '<form class="pc-join" id="pcJoin"><label class="pc-field"><span>Class code</span><input id="joinCode" class="pc-input pc-code-input" autocomplete="off" maxlength="8" required></label>' +
+      '<label class="pc-field"><span>First name</span><input id="joinFirst" class="pc-input" autocomplete="given-name" maxlength="40" required></label>' +
+      '<label class="pc-field"><span>Last name</span><input id="joinLast" class="pc-input" autocomplete="family-name" maxlength="40" required></label>' +
+      '<button type="submit" class="pc-btn primary">Join</button><p class="pc-form-msg" id="joinMsg" role="alert"></p></form></section>';
+    app.innerHTML = h;
+    PC.byId('pcJoin').onsubmit = function (e) {
+      e.preventDefault(); var btn = this.querySelector('button'); btn.disabled = true; PC.byId('joinMsg').textContent = '';
+      PC.rpc('joinClass', { code: PC.byId('joinCode').value, firstName: PC.byId('joinFirst').value, lastName: PC.byId('joinLast').value }, { retry: true }).then(function (r) {
+        PC.boot.studentClasses = r.classes; PC.state.classId = r.classId; PC.store.set('pcClass_' + PC.boot.email, r.classId); PC.go('home');
+      }).catch(function (err) { btn.disabled = false; PC.byId('joinMsg').textContent = err.message; });
+    };
+  };
+  A.pickClass = function (el) { PC.state.classId = el.dataset.class; PC.state.as = ''; PC.store.set('pcClass_' + PC.boot.email, el.dataset.class); PC.go('home'); };
+
+  // ---------------------------------------------------------------- shared bits
+  function ribbon() {
+    var m = me();
+    if (PC.state.as) return '<div class="pc-ribbon' + (m.readOnly ? '' : ' is-demo') + '"><span>' + (m.readOnly ? 'Viewing <b>' + esc(m.name) + '</b>’s work · read-only' : 'Using demo student <b>' + esc(m.name) + '</b> · saves work') + '</span><button type="button" class="pc-btn small" data-act="backToDashboard">← Back to dashboard</button></div>';
+    if (m.teacherSelf) return '<div class="pc-ribbon is-preview"><span>Student view of your own class. Hidden weeks and items show here for you, marked “Hidden from students”.</span></div>';
+    return '';
+  }
+  A.backToDashboard = function () { PC.leave(function () { PC.state.role = 'teacher'; PC.state.as = ''; PC.go('dashboard'); }); };
+  function unitOf(n) { return (S.home && S.home.units || []).filter(function (u) { return u.n === Number(n); })[0]; }
+  function actOf(u, id) { return u ? (u.activities || []).filter(function (a) { return a.id === id; })[0] : null; }
+  function itemStatus(u, a) {
+    var key = 'w' + u.n + '_' + a.id, st = (S.home.status || {})[key] || {}, g = (S.home.grades || {})[key];
+    if (a.form === 'lesson') return { cls: 'none', text: 'Read & watch' };
+    if (g && (g.excluded || (g.score !== null && g.score !== undefined))) return { cls: 'graded', text: g.excluded ? 'Left out of grade' : 'Graded' };
+    if (a.form === 'quiz' && st.state === 'submitted') return { cls: 'graded', text: 'Scored' };
+    if (a.form === 'discussion' && st.state === 'submitted') return { cls: 'in', text: (st.posts ? 'Posted' : '') + (st.replies ? (st.posts ? ' · ' : '') + PC.plural(st.replies, 'reply', 'replies') : '') };
+    if (st.state === 'submitted') return { cls: 'in', text: st.edited ? 'Turned in · edited' : 'Turned in' };
+    if (st.state === 'draft') return { cls: 'progress', text: 'In progress' };
+    return { cls: 'none', text: 'Not started yet' };
+  }
+  function libEpisode(id) { return ((S.home && S.home.library) || []).filter(function (e) { return e.id === id; })[0]; }
+  function canvaLink(k) { return ((S.home && S.home.canva) || {})[k] || ''; }
+  function canvaBtn(k, label) {
+    var u = canvaLink(k);
+    var local = '<button type="button" class="pc-btn pc-canva-btn" data-act="studioResource" data-resource="'+esc(k)+'">'+(k === 'cover' ? 'Open cover maker' : 'Open run-sheet starter')+'</button>';
+    return local + (u ? '<a class="pc-btn pc-canva-btn" href="'+esc(u)+'" target="_blank" rel="noopener">'+esc(label)+' ↗</a>' : '');
+  }
+  function downloadResource(blob, name) {
+    var url = URL.createObjectURL(blob), a = document.createElement('a'); a.href = url; a.download = name;
+    document.body.appendChild(a); a.click(); setTimeout(function () { URL.revokeObjectURL(url); a.remove(); }, 5000);
+  }
+  var RUN_EXAMPLE = [
+    ['0:00–0:25','Cold open','A vivid guest moment or scene that raises the central question.'],
+    ['0:25–1:00','Introduce the show','Name the show, topic and question; introduce the guest or other voice.'],
+    ['1:00–2:15','Build the context','Explain the background with a checked detail from your research.'],
+    ['2:15–4:15','Another voice','Interview, recorded response, co-host perspective or guest performance; follow the strongest answer.'],
+    ['4:15–6:30','Explore and explain','Connect what you heard to your research; develop the story or consider another perspective.'],
+    ['6:30–7:35','Bring it together','Answer the central question and leave listeners with a clear insight.'],
+    ['7:35–8:00','Close and credit','Credit people, sources and music; give a purposeful sign-off.']
+  ];
+  function runTable(blank) {
+    return '<table class="pc-resource-table"><thead><tr><th>Time</th><th>Segment</th><th>Words / action / sound</th></tr></thead><tbody>'+RUN_EXAMPLE.map(function(r){return '<tr>'+r.map(function(x){return '<td>'+ (blank ? '&nbsp;' : esc(x)) +'</td>';}).join('')+'</tr>';}).join('')+'</tbody></table>';
+  }
+  function coverCanvas(title, subtitle) {
+    var c=document.createElement('canvas');c.width=c.height=1600;var x=c.getContext('2d');
+    x.fillStyle='#376c61';x.fillRect(0,0,1600,1600);x.strokeStyle='#f5e8c9';x.lineWidth=8;x.strokeRect(45,45,1510,1510);x.lineWidth=2;x.strokeRect(64,64,1472,1472);
+    x.fillStyle='#272822';x.fillRect(85,92,1430,125);x.fillStyle='#f5e8c9';x.font='36px "Public Sans", sans-serif';x.textAlign='center';x.fillText('AN ORIGINAL PODCAST',800,172);
+    // Original record emblem and radiating sound marks.
+    x.fillStyle='#272822';x.beginPath();x.arc(800,650,325,0,Math.PI*2);x.fill();
+    [295,265,235,205].forEach(function(r){x.strokeStyle='#659d8c';x.lineWidth=3;x.beginPath();x.arc(800,650,r,0,Math.PI*2);x.stroke();});
+    x.fillStyle='#e6b653';x.beginPath();x.arc(800,650,110,0,Math.PI*2);x.fill();x.fillStyle='#272822';x.beginPath();x.arc(800,650,18,0,Math.PI*2);x.fill();
+    for(var side=-1;side<=1;side+=2){x.fillStyle='#f5e8c9';x.beginPath();x.moveTo(800+side*400,430);x.lineTo(800+side*600,280);x.lineTo(800+side*545,420);x.lineTo(800+side*640,400);x.lineTo(800+side*415,590);x.lineTo(800+side*485,435);x.closePath();x.fill();}
+    x.fillStyle='#f5e8c9';x.fillRect(85,1030,1430,390);x.fillStyle='#272822';
+    title=(title||'YOUR SHOW').toUpperCase();var size=150,lines=[];
+    function wrap(){lines=[];var line='';title.split(/\s+/).forEach(function(w){var test=line?line+' '+w:w;if(x.measureText(test).width>1300&&line){lines.push(line);line=w;}else line=test;});if(line)lines.push(line);}
+    do{x.font='800 '+size+'px "Barlow Condensed", Impact, sans-serif';wrap();if(lines.length<=2&&lines.every(function(t){return x.measureText(t).width<=1300;}))break;size-=4;}while(size>24);
+    var start=1220-(lines.length-1)*size*.54;lines.forEach(function(line,i){x.fillText(line,800,start+i*size*1.08);});
+    x.fillStyle='#f5e8c9';var subsize=36;do{x.font=subsize+'px "Public Sans", sans-serif';if(x.measureText(subtitle).width<=1360)break;subsize-=2;}while(subsize>12);x.fillText(subtitle||'Stories worth listening to.',800,1492);return c;
+  }
+  A.studioResource = function(el) {
+    var k=el.dataset.resource;
+    if(k==='runsheet') {
+      PC.modal('<h2 id="pcModalTitle">The eight-minute run sheet</h2><p>A starting structure, not a script to copy. Crews extend the substantive segments for a longer episode. Adjust the timing to fit your story.</p>'+runTable(false)+'<p>Write your own plan in the saved Run sheet table on <b>Script &amp; Run Sheet</b>. The download includes this example and a printable blank.</p><div class="pc-row"><button type="button" class="pc-btn primary" id="pcRunDownload">Download printable starter</button><button type="button" class="pc-btn" onclick="PC.closeModal()">Close</button></div>');
+      PC.byId('pcRunDownload').onclick=function(){var html='<!doctype html><html lang="en"><meta charset="utf-8"><title>Podcast Studio — Run sheet</title><style>body{font:16px Georgia;margin:40px;color:#272822}h1{border-bottom:5px solid #376c61;padding-bottom:15px}table{border-collapse:collapse;width:100%;margin:24px 0}th,td{border:1px solid #888;padding:14px;text-align:left}th{background:#eee}section{break-before:page}section td{height:65px}button{padding:12px}@media print{button{display:none}}</style><button onclick="window.print()">Print / Save as PDF</button><h1>Podcast Studio · Run sheet</h1><p>Solo: 8 minutes. Crews: longer, with a meaningful contribution from everyone.</p>'+runTable(false)+'<section><h1>Your episode plan</h1><p>Show: ____________________ &nbsp; Episode: ____________________</p><p>Central question: ____________________________________________________</p>'+runTable(true)+'<p>Other voice and permission: __________________________________________</p><p>Sources / credits: __________________________________________________</p></section></html>';downloadResource(new Blob([html],{type:'text/html'}),'Podcast-Studio-Run-Sheet.html');};
+      return;
+    }
+    var titleField=document.querySelector('[data-field="coverTitle"]'),subField=document.querySelector('[data-field="coverSubtitle"]');
+    var show=(S.home&&S.home.show)||{};
+    var title=(titleField&&titleField.value)||show.name||'Your Show',sub=(subField&&subField.value)||show.tagline||'Stories worth listening to.';
+    PC.modal('<h2 id="pcModalTitle">Vintage cover maker</h2><p>Set your cover title and tagline in the saved fields on <b>Cover Art</b>, then reopen this maker. Your show name is used if those fields are blank.</p><div id="pcCoverPreview" class="pc-cover-preview"></div><p>Download the square PNG and upload it into your Canva episode. This is finished cover artwork; add separate text or other elements in Canva if you want to develop it further.</p><div class="pc-row"><button type="button" class="pc-btn primary" id="pcCoverDownload" disabled>Preparing cover…</button><a class="pc-btn" href="https://www.canva.com/" target="_blank" rel="noopener">Open Canva ↗</a><button type="button" class="pc-btn" onclick="PC.closeModal()">Close</button></div>');
+    var mount=PC.byId('pcCoverPreview'),button=PC.byId('pcCoverDownload');
+    Promise.resolve(document.fonts ? document.fonts.ready : null).then(function(){if(!mount.isConnected)return;var c=coverCanvas(title,sub);c.setAttribute('role','img');c.setAttribute('aria-label',title+' podcast cover');mount.appendChild(c);button.disabled=false;button.textContent='Download cover PNG';button.onclick=function(){c.toBlob(function(blob){if(blob)downloadResource(blob,'Podcast-Studio-Cover.png');else PC.toast('The cover could not be downloaded. Please try again.','error');},'image/png');};});
+  };
+
+  var CANVA_LABEL = { cover: 'Cover art template in Canva', runsheet: 'Run sheet template in Canva' };
+
+  function loadHome(cb) {
+    S.loading = true;
+    PC.rpc('getStudentHome', { classId: PC.state.classId, as: asArg() }, { retry: true }).then(function (r) { S.home = r; S.loading = false; cb(null, r); })
+      .catch(function (e) { S.loading = false; cb(e); });
+  }
+
+  // ---------------------------------------------------------------- home
+  function heroHtml(h) {
+    var sh = h.show;
+    return '<section class="pc-card pc-hero pc-studio-hero"><div class="pc-hero-copy"><div class="pc-eyebrow">' + esc(h.klass.className) + (h.klass.period ? ' · Period ' + esc(h.klass.period) : '') + '</div><h1 class="pc-unit-title">' + ((h.unitTitle || 'Podcast Studio') === 'Podcast Studio' ? '<span>Podcast</span><span>Studio</span>' : esc(h.unitTitle)) + '</h1>' +
+      '<p class="pc-hero-note">Listen like a producer. Plan your own show.<br>Record it and build it in Canva.</p><p class="pc-duration-note">Solo: 8 minutes · Crews: longer episodes</p></div><div class="pc-broadcast-art pc-art-mic" aria-hidden="true"></div>' +
+      '<div class="pc-myshow"><span class="pc-eyebrow">Your show</span>' + (sh ? '<b>' + esc(sh.name) + '</b>' + (sh.tagline ? '<span class="pc-show-tagline">' + esc(sh.tagline) + '</span>' : '') + (sh.crew ? '<span class="pc-show-crew">' + esc(sh.crew === 'Crew' ? 'Crew' + (sh.members ? ': ' + sh.members : '') : 'Solo') + '</span>' : '') : '<b>Your story starts here.</b><span class="pc-show-tagline">Name your show in Week 2.</span>') + '</div></section>';
+  }
+  function currentUnit(h) { var open = (h.units || []).filter(function (u) { return u.anyOpen; }); return open[open.length - 1] || null; }
+  function unitCardHtml(h, u) {
+    var art = {1:'headphones',2:'notebook',3:'mic'}[u.n] || 'mic';
+    var copy = {1:'Explore great podcasts. Notice what makes them work.',2:'Develop your idea. Plan your episode. Write a strong script.',3:'Record your audio. Build your episode in Canva. Publish it.'};
+    var done = u.activities.filter(function(a) { var st = itemStatus(u,a); var grade = (h.grades || {})['w' + u.n + '_' + a.id]; return !(grade && grade.excluded) && (st.cls === 'in' || st.cls === 'graded'); }).length;
+    return '<article class="pc-week-card pc-week-' + u.n + '"><div class="pc-week-poster"><div class="pc-week-head"><span class="pc-eyebrow">' + esc(u.label) + '</span><h3>' + esc(u.title || u.label) + '</h3></div>' +
+      '<div class="pc-week-art pc-art-' + art + '" aria-hidden="true"></div><p class="pc-week-copy">' + esc(copy[u.n] || u.summary || '') + '</p>' +
+      '<button type="button" class="pc-btn primary pc-week-open" data-act="openWeek" data-week="' + u.n + '">Open ' + esc(u.label) + ' →</button></div>' +
+      '<details class="pc-week-progress"><summary>Activities &amp; progress <span>' + done + ' / ' + u.activities.filter(function(a){return a.form !== 'lesson';}).length + ' completed</span></summary>' +
+      (u.eq ? '<p class="pc-eq-mini">' + esc(u.eq) + '</p>' : '') + '<ul class="pc-week-items">' + u.activities.map(function (a) {
+        if (!u.open[a.id] && !me().teacherSelf) return '<li class="is-locked"><span>' + esc(a.icon + ' ' + a.title) + '</span><em>🔒 Not open yet</em></li>';
+        var st = itemStatus(u, a);
+        return '<li class="is-' + st.cls + '"><span>' + esc(a.icon + ' ' + a.title) + '</span><em>' + esc(st.text) + (u.due[a.id] ? ' · due ' + esc(PC.fmtDate(u.due[a.id])) : '') + (!u.open[a.id] ? ' · hidden from students' : '') + '</em></li>';
+      }).join('') + '</ul></details></article>';
+  }
+  function libraryHtml(lib, opts) {
+    opts = opts || {};
+    return '<div class="pc-lib">' + (lib || []).map(function (e) {
+      if (opts.compact) return '<article class="pc-lib-item pc-lib-compact"><div class="pc-lib-top"><span class="pc-lib-format">' + esc(e.format) + '</span><span class="pc-lib-len">' + esc(e.length) + '</span></div><h4><a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.title) + ' ↗</a></h4><div class="pc-lib-show">' + esc(e.show) + '</div>' + (e.note ? '<p class="pc-lib-note">' + esc(e.note) + '</p>' : '') + '<details class="pc-listening-notes"><summary>Listening notes</summary><p class="pc-lib-craft"><b>Listen for:</b> ' + esc(e.craft) + '</p><p class="pc-small">' + esc(e.why) + '</p>' + (e.alt ? '<p class="pc-small"><a href="' + esc(e.alt) + '" target="_blank" rel="noopener">Another place to listen ↗</a></p>' : '') + '</details></article>';
+      return '<article class="pc-lib-item"><div class="pc-lib-top"><span class="pc-lib-format">' + esc(e.format) + '</span><span class="pc-lib-len">' + esc(e.length) + '</span></div>' +
+        '<h4><a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.title) + ' ↗</a></h4><div class="pc-lib-show">' + esc(e.show) + '</div>' +
+        '<p class="pc-lib-craft"><b>Listen for:</b> ' + esc(e.craft) + '</p><p class="pc-small">' + esc(e.why) + '</p>' +
+        (e.note ? '<p class="pc-lib-note">' + esc(e.note) + '</p>' : '') + (e.alt ? '<p class="pc-small"><a href="' + esc(e.alt) + '" target="_blank" rel="noopener">Another place to listen ↗</a></p>' : '') + '</article>';
+    }).join('') + '</div>';
+  }
+  PC.libraryHtml = libraryHtml;
+  PC.views.home = function (app) {
+    if (!PC.state.classId) return PC.go('classes');
+    app.innerHTML = '<section class="pc-card pc-skeleton"><p>Opening Podcast Studio…</p></section>';
+    loadHome(function (err, h) {
+      if (err) return PC.fail(app, err);
+      if (PC.state.view !== 'home') return;
+      var out = ribbon() + '<div class="pc-crumbs"><button type="button" class="pc-link" data-act="toClasses">← Your classes</button><span>' + esc(h.klass.className) + '</span></div>' + heroHtml(h);
+      var cur = currentUnit(h);
+      if (cur) out += '<section class="pc-now"><h2>This week</h2><p>' + esc(cur.label) + ' — ' + esc(cur.title) + '</p><button type="button" class="pc-btn primary" data-act="openWeek" data-week="' + cur.n + '">Open ' + esc(cur.label) + ' →</button></section>';
+      var res = h.resume;
+      if (res && res.view === 'week' && h.units.some(function (u) { return u.n === res.week; })) {
+        var ru = unitOf(res.week), ra = actOf(ru, res.step);
+        if (ra) out += '<button type="button" class="pc-resume" data-act="openWeek" data-week="' + res.week + '" data-step="' + esc(res.step) + '"><span>Pick up where you left off</span><b>' + esc(ru.label) + ' · ' + esc(ra.title) + ' →</b></button>';
+      }
+      out += '<section class="pc-home-weeks" aria-label="All weeks">';
+      if (!h.units.length) out += '<p>Your teacher hasn’t opened Week 1 yet.</p>';
+      out += '<div class="pc-weeks">' + h.units.map(function (u) { return unitCardHtml(h, u); }).join('') + '</div></section>';
+      out += '<details class="pc-card pc-fold pc-home-library" id="pcLibFold"' + (PC.store.get('pcLibOpen', true) ? ' open' : '') + '><summary><span class="pc-record" aria-hidden="true"></span><h2>Listening Library</h2><span class="pc-muted">Real episodes to study. Each one opens on the show’s own site.</span></summary>' + libraryHtml(h.library, {compact:true}) + '</details>';
+      app.innerHTML = out;
+      var lf = PC.byId('pcLibFold'); if (lf) lf.addEventListener('toggle', function () { PC.store.set('pcLibOpen', lf.open); });
+    });
+  };
+  A.toClasses = function () { PC.leave(function () { PC.state.classId = ''; PC.go('classes'); }); };
+  A.openWeek = function (el) {
+    PC.leave(function () {
+      var u = unitOf(el.dataset.week), first = u ? u.activities.filter(function (a) { return u.open[a.id] || me().teacherSelf; })[0] : null;
+      PC.go('week', { week: Number(el.dataset.week), step: el.dataset.step || (first ? first.id : '') });
+    });
+  };
+
+  // Original, code-native broadcast illustrations. Decorative; adjacent labels name every action.
+  function vintageStepIcon(id) {
+    var paper = '#f7ebce', ink = '#292923', teal = '#68a79a', gold = '#e6b653';
+    var art = {
+      intro: '<path fill="P" d="M16 23q22-8 44 2 22-10 44-2v61q-22-5-44 3-22-8-44-3z"/><path d="M60 25v62M24 34l25 2M24 42l25 2M24 50l13 1M72 65l24-3M72 73l24-3"/><rect x="76" y="29" width="17" height="28" rx="8" fill="T"/><path d="M72 43v5q0 15 13 15t13-15v-5M85 63v8M78 72h14M80 35h8M80 41h8M80 47h8"/>',
+      anatomy: '<path d="M26 24L81 9M39 22v-7"/><rect x="15" y="25" width="91" height="59" rx="5" fill="P"/><rect x="22" y="33" width="45" height="43" rx="3" fill="T"/><path d="M28 39h33M28 45h33M28 51h33M28 57h33M28 63h33M28 69h33"/><rect x="75" y="34" width="23" height="11" fill="G"/><path d="M79 38v3M84 37v5M89 38v3M94 37v5"/><circle cx="86" cy="62" r="10" fill="G"/><path d="M86 62l5-5M24 85v5M96 85v5"/>',
+      partsquiz: '<rect x="27" y="15" width="66" height="76" rx="3" fill="P"/><path fill="T" d="M45 11h30v14H45z"/><path d="M38 38l4 4 8-9M57 39h24M38 56l4 4 8-9M57 57h24M38 74l4 4 8-9M57 75h24"/><path d="M33 86h51"/>',
+      listen1: '<path fill="P" d="M20 58V47a40 40 0 0180 0v11H90V47a30 30 0 00-60 0v11z"/><rect x="14" y="47" width="24" height="34" rx="8" fill="T"/><rect x="82" y="47" width="24" height="34" rx="8" fill="T"/><path d="M21 53v21M29 53v21M90 53v21M98 53v21M94 81v8q0 10-20 8"/><path fill="P" d="M43 47h33v43H43z"/><path d="M49 59h21M49 67h21M49 75h15"/>',
+      listen2: '<path fill="P" d="M20 58V47a40 40 0 0180 0v11H90V47a30 30 0 00-60 0v11z"/><rect x="14" y="47" width="24" height="34" rx="8" fill="T"/><rect x="82" y="47" width="24" height="34" rx="8" fill="T"/><path d="M21 53v21M29 53v21M90 53v21M98 53v21M94 81v8q0 10-20 8"/><path fill="G" d="M45 43h31v41H45z"/><path fill="P" d="M40 49h31v41H40z"/><path d="M46 60h18M46 68h18M46 76h12"/>',
+      goodpod: '<path fill="P" d="M15 20h65v44H43L27 77V64H15z"/><path fill="T" d="M82 37h23v43H91l-1 11-16-11H53V68"/><path d="M26 33h43M26 43h43M26 53h25M83 50h12M83 60h12M69 72h26"/>',
+      planning: '<path fill="P" d="M18 20l27-9 28 9 29-9v72l-29 10-28-10-27 10z"/><path d="M45 11v72M73 20v73"/><path stroke-dasharray="3 5" d="M29 68q-7-30 23-23t34-17"/><circle cx="30" cy="69" r="5" fill="T"/><path fill="G" d="M83 18l11 15-11 15-11-15z"/><path d="M80 32l3 4 5-7"/>',
+      concept: '<path fill="G" d="M39 54a27 27 0 1142 0l-9 13H48z"/><path fill="P" d="M47 67h26v16H47z"/><path d="M48 73h24M48 79h24M52 86h16M55 65V49l-8-7M65 65V49l8-7M54 48h13M60 3v7M17 32l9 3M94 35l9-3M25 10l7 7M89 17l7-7"/>',
+      pitch: '<path fill="T" d="M20 39h24l54-22v59L44 57H20z"/><ellipse cx="98" cy="47" rx="8" ry="30" fill="P"/><path fill="G" d="M34 58l10 31h14L48 58"/><path d="M25 45h13M25 51h13M63 34v28M77 29v38M109 27l6-5M110 46h7M109 66l6 5"/>',
+      process: '<rect x="41" y="12" width="38" height="22" rx="2" fill="G"/><rect x="12" y="64" width="39" height="23" rx="2" fill="P"/><rect x="70" y="64" width="39" height="23" rx="2" fill="T"/><path d="M60 34v15M31 64V49h59v15M48 21h24M22 73h19M80 73h19M55 43l5 6 5-6M26 57l5 7 5-7M85 57l5 7 5-7"/>',
+      scripting: '<path fill="P" d="M33 9h54v45H33z"/><path d="M42 19h35M42 27h35M42 35h23"/><rect x="23" y="46" width="74" height="22" rx="5" fill="T"/><path fill="T" d="M24 61h72l12 29H12z"/><path fill="P" d="M27 68h66l5 15H22z"/><path d="M32 73h2M43 73h2M54 73h2M65 73h2M76 73h2M87 73h2M28 79h2M39 79h2M50 79h2M61 79h2M72 79h2M83 79h2M35 87h50M17 51h6M97 51h7"/>',
+      script: '<path fill="P" d="M27 12h62v79H27z"/><path d="M36 24h44M36 33h44M36 42h44M36 51h44M47 21v57M36 61h10M53 61h13"/><circle cx="85" cy="75" r="21" fill="G"/><path d="M85 60v15l10 5M80 51h10M85 51v4"/>',
+      recording: '<rect x="43" y="9" width="34" height="51" rx="17" fill="P"/><path d="M51 21h18M49 29h22M49 37h22M51 45h18"/><path fill="T" d="M32 40h6v9q0 24 22 24t22-24v-9h6v12q0 26-25 27v12h17v6H40v-6h17V79Q32 78 32 52z"/><path d="M20 25l8 4M18 45h8M93 28l8-4M95 45h8"/>',
+      cover: '<path fill="T" d="M16 16h81v75H16z"/><path fill="P" d="M25 25h63v56H25z"/><circle cx="57" cy="49" r="18" fill="G"/><circle cx="57" cy="49" r="7" fill="T"/><path d="M34 72h45M33 29h28"/><path fill="G" d="M96 35l10 4-19 49-12 8 2-15z"/><path d="M77 81l10 7M99 44l-15 38"/>',
+      episode: '<circle cx="60" cy="51" r="41" fill="P"/><circle cx="60" cy="51" r="34" fill="T"/><circle cx="60" cy="51" r="28"/><circle cx="60" cy="51" r="22"/><circle cx="60" cy="51" r="13" fill="G"/><circle cx="60" cy="51" r="3" fill="P"/><path d="M33 28l8 6M79 70l8 6M29 34l7 5M84 63l8 5"/>',
+      party: '<path fill="P" d="M32 53V34a28 28 0 0156 0v19H78V34a18 18 0 00-36 0v19z"/><rect x="27" y="39" width="18" height="25" rx="6" fill="T"/><rect x="76" y="39" width="18" height="25" rx="6" fill="T"/><circle cx="38" cy="76" r="9" fill="G"/><circle cx="81" cy="76" r="9" fill="G"/><path fill="P" d="M20 98q0-17 18-17t18 17M63 98q0-17 18-17t18 17"/><path d="M12 38l8 3M15 19l7 6M101 22l6-7M103 40l9-2"/>',
+      reflect: '<path fill="P" d="M21 27h67v65H21z"/><path d="M31 41h34M31 51h34M31 61h21M31 77h39"/><path fill="T" d="M77 14l15 7-20 47-16 13 1-20z"/><path d="M62 64l7 3M65 60l17-39"/><path d="M24 16Q40 1 57 13M49 6l8 7-10 3"/> '
+    };
+    var body = art[id] || art.recording;
+    body = body.replace(/fill="P"/g, 'fill="'+paper+'"').replace(/fill="T"/g, 'fill="'+teal+'"').replace(/fill="G"/g, 'fill="'+gold+'"');
+    return '<svg viewBox="0 0 120 104" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="'+ink+'" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round">'+body+'</g></svg>';
+  }
+  function stepHeading(a) { return '<h2 class="pc-activity-title"><span class="pc-activity-icon" aria-hidden="true">'+vintageStepIcon(a.id)+'</span><span>'+esc(a.title)+'</span></h2>'; }
+
+  // ---------------------------------------------------------------- a week
+  var resumeT = null;
+  function saveResume() {
+    if (readOnly()) return; clearTimeout(resumeT);
+    var resume = { classId: PC.state.classId, as: asArg(), route: { view: 'week', week: PC.state.week, step: PC.state.step } };
+    resumeT = setTimeout(function () { PC.rpc('saveResume', resume).catch(function () {}); }, 1500);
+  }
+  PC.views.week = function (app) {
+    if (!S.home || S.home.klass.classId !== PC.state.classId) {
+      app.innerHTML = '<section class="pc-card pc-skeleton"><p>Opening…</p></section>';
+      return loadHome(function (err) { if (err) return PC.fail(app, err); if (PC.state.view === 'week') PC.views.week(app); });
+    }
+    var u = unitOf(PC.state.week);
+    if (!u) { app.innerHTML = ribbon() + '<section class="pc-card"><h1>That isn’t open</h1><p><button class="pc-btn" data-act="toHome">← Back</button></p></section>'; return; }
+    var steps = u.activities.map(function (a) { return { k: a.id, label: a.title, icon: a.icon, act: a }; });
+    var step = steps.some(function (x) { return x.k === PC.state.step; }) ? PC.state.step : steps[0].k;
+    PC.state.step = step; saveResume();
+    var nav = '<nav class="pc-steps pc-broadcast-steps pc-week-' + u.n + '" style="--n:' + steps.length + '" aria-label="' + esc(u.label) + ' activities">' + steps.map(function (s, i) {
+      var a = s.act, open = u.open[a.id] || me().teacherSelf, st = itemStatus(u, a);
+      var cls = 'pc-step' + (s.k === step ? ' is-on' : '') + (!open ? ' is-locked' : '') + ' st-' + st.cls + (a.form === 'lesson' ? ' is-lesson' : '');
+      var kind = a.form === 'lesson' ? 'Lesson' : a.form === 'quiz' ? 'Check' : a.form === 'discussion' ? 'Discussion' : 'Assignment';
+      var stateLabel = !open ? 'Not open yet' : !u.open[a.id] ? 'Teacher preview' : st.cls !== 'none' ? st.text : a.form === 'lesson' ? 'Read & watch' : 'Not started yet';
+      return '<button type="button" class="' + cls + '" data-act="toStep" data-step="' + esc(s.k) + '"' + (s.k === step ? ' aria-current="step"' : '') + ' title="' + esc(s.label + ' — ' + stateLabel) + '"><span class="pc-step-meta"><span class="pc-step-order">' + ('0' + (i + 1)).slice(-2) + '</span><span>' + esc(kind) + '</span></span><span class="pc-step-illustration" aria-hidden="true">' + vintageStepIcon(a.id) + '</span><span class="pc-step-label">' + esc(s.label) + '</span><span class="pc-step-state">' + (s.k === step ? '<span class="pc-current-label">Now open</span><span aria-hidden="true"> · </span>' : '') + esc(stateLabel) + '</span></button>';
+    }).join('') + '</nav>';
+    app.innerHTML = ribbon() + '<div class="pc-crumbs"><button type="button" class="pc-link" data-act="toHome">← All weeks</button><span>Podcast Studio</span></div>' +
+      '<header class="pc-week-banner pc-broadcast-banner pc-week-' + u.n + '"><div class="pc-chapter-copy"><div class="pc-chapter-kicker"><span>' + esc(u.label) + '</span><span>Podcast Studio / Production guide</span></div><h1>' + esc(u.title || u.label) + '</h1>' +
+      (u.summary ? '<p class="pc-week-sum">' + esc(u.summary) + '</p>' : '') + '</div><div class="pc-chapter-art pc-art-' + ({1:'headphones',2:'notebook',3:'mic'}[u.n] || 'mic') + '" aria-hidden="true"></div>' + (u.eq ? '<div class="pc-chapter-question"><span>Essential question</span><p>' + esc(u.eq) + '</p></div>' : '') + '</header>' + nav + '<div id="pcStep" class="pc-step-body"></div>';
+    var body = PC.byId('pcStep'), a = actOf(u, step);
+    if (!u.open[a.id] && !me().teacherSelf) { PC.guard.close(); body.innerHTML = '<section class="pc-card"><h2>Not open yet</h2><p>Your teacher hasn’t opened “' + esc(a.title) + '” yet. Anything you already wrote is kept.</p></section>'; return; }
+    var idx = steps.map(function (s) { return s.k; }).indexOf(step), next = steps[idx + 1] || null;
+    (STEP_VIEWS[a.form] || STEP_VIEWS.fields)(body, u, a, next);
+  };
+  A.toHome = function () { PC.leave(function () { PC.go('home'); }); };
+  A.toStep = function (el) { PC.leave(function () { PC.go('week', { step: el.dataset.step }); }); };
+  function nextBtn(next) { return next ? '<div class="pc-next"><button type="button" class="pc-btn primary" data-act="toStep" data-step="' + esc(next.k) + '">Next: ' + esc(next.label) + ' →</button></div>' : '<div class="pc-next"><button type="button" class="pc-btn" data-act="toHome">← All weeks</button></div>'; }
+
+  function gradedHead(u, a, extra) {
+    var st = itemStatus(u, a), type;
+    if (u.noGrade[a.id]) type = 'Not graded this time';
+    else if (a.gradeType === 'auto') type = a.points + ' pts · scores itself';
+    else if (a.gradeType === 'rubric') type = a.points + ' pts · scored on a 7-level rubric';
+    else if (a.gradeType === 'criteria') type = a.points + ' pts · scored on the Final Episode rubric';
+    else type = a.points + ' pts';
+    return '<div class="pc-graded-head"><span class="pc-graded-badge">Graded assignment · ' + esc(type) + '</span><span class="pc-status pc-status-' + st.cls + '">' + esc(st.text) + '</span>' +
+      (u.due[a.id] ? '<span class="pc-due">Due ' + esc(PC.fmtDate(u.due[a.id], true)) + '</span>' : '') + (!u.open[a.id] ? '<span class="pc-chip is-warn">Hidden from students</span>' : '') + (extra || '') + '</div>';
+  }
+  function feedbackHtml(item, a) {
+    var g = item.grade; if (!g) return '';
+    if (g.excluded) return '<div class="pc-feedback"><b>Your teacher left this out of your grade.</b></div>';
+    var crit = '';
+    if (a.gradeType === 'criteria' && g.criteria && Object.keys(g.criteria).length) crit = '<ul class="pc-crit-scores">' + (item.criteria || []).map(function (c) { var v = g.criteria[c.id]; return '<li><span>' + esc(c.label) + '</span><b>' + (v === undefined ? 'Not scored yet' : v + '/' + c.max) + '</b></li>'; }).join('') + '</ul>';
+    if (g.score === null || g.score === undefined) return (g.comment || crit) ? '<div class="pc-feedback"><h3>Feedback from your teacher</h3>' + crit + (g.comment ? '<p>' + esc(g.comment) + '</p>' : '') + (crit ? '<p class="pc-small pc-muted">Not graded yet: your teacher is still scoring part of the rubric.</p>' : '') + '</div>' : '';
+    var label = a.gradeType === 'rubric' ? ((item.rubric || []).filter(function (r) { return r.score === Math.round(g.score); })[0] || {}).label : a.gradeType === 'criteria' ? 'Final Episode' : (g.score >= a.points ? 'Complete' : g.score > 0 ? 'Partly complete' : 'Incomplete');
+    return '<div class="pc-feedback"><h3>Graded: ' + esc(label || '') + ' · ' + esc(g.score) + '/' + esc(a.points) + '</h3>' + crit + (g.comment ? '<p>' + esc(g.comment) + '</p>' : '') + '</div>';
+  }
+  PC.critTableHtml = function (crit) {
+    return '<div class="pc-table-wrap"><table class="pc-crit-table"><thead><tr><th>Criterion</th>' + crit[0].bands.map(function (b) { return '<th>' + b.score + ' pts</th>'; }).join('') + '</tr></thead><tbody>' +
+      crit.map(function (c) { return '<tr><th scope="row">' + esc(c.label) + (c.standards ? '<small>(' + esc(c.standards) + ')</small>' : '') + '<small>out of ' + c.max + '</small></th>' + c.bands.map(function (b) { return '<td>' + esc(b.text) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
+  };
+  function howScored(item) {
+    if (item.rubric) return '<details class="pc-howscored"><summary>How it’s scored (7 levels)</summary><ol class="pc-rubric-list">' + item.rubric.map(function (r) { return '<li><b>' + r.score + ' · ' + esc(r.label) + '</b> ' + esc(r.text) + '</li>'; }).join('') + '</ol></details>';
+    if (item.criteria) return '<details class="pc-howscored" open><summary>How it’s scored: the Final Episode rubric</summary>' + PC.critTableHtml(item.criteria) + '</details>';
+    if (item.complete) return '<details class="pc-howscored"><summary>How it’s scored</summary><p><b>Complete:</b> ' + esc(item.complete.complete) + '</p><p><b>Incomplete:</b> ' + esc(item.complete.incomplete) + '</p></details>';
+    return '';
+  }
+  function promptHtml(a) { return a.prompt ? '<div class="pc-prompt">' + esc(a.prompt) + '</div>' : ''; }
+
+  var STEP_VIEWS = {};
+
+  // ---------- Lessons (read & watch; nothing to turn in) ----------
+  function sectionHtml(sec) {
+    var h = '<section class="pc-lesson-sec">' + (sec.h ? '<h3>' + esc(sec.h) + '</h3>' : '') + (sec.sub ? '<p class="pc-lesson-sub">' + esc(sec.sub) + '</p>' : '');
+    if (sec.video) h += '<div class="pc-video"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(sec.video.id) + '" title="' + esc(sec.video.title) + '" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>' +
+      '<p class="pc-small"><a href="' + esc(sec.video.url) + '" target="_blank" rel="noopener">Open the video on YouTube ↗</a> <span class="pc-muted">(if it doesn’t play here)</span></p>';
+    (sec.p || []).forEach(function (t) { h += '<p>' + esc(t) + '</p>'; });
+    if (sec.list) h += '<ul class="pc-lesson-list">' + sec.list.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
+    if (sec.steps) h += '<ol class="pc-lesson-steps">' + sec.steps.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ol>';
+    if (sec.cards) h += '<div class="pc-lesson-cards">' + sec.cards.map(function (c) { return '<article><h4>' + esc(c.h) + '</h4><p>' + esc(c.p) + '</p></article>'; }).join('') + '</div>';
+    if (sec.canva) h += '<div class="pc-row">' + canvaBtn(sec.canva, CANVA_LABEL[sec.canva] || 'Canva template') + '</div>';
+    return h + '</section>';
+  }
+  function partsHtml(parts) {
+    return '<div class="pc-parts">' + (parts || []).map(function (g) {
+      return '<section class="pc-parts-group"><h3>' + esc(g.group) + '</h3><dl>' + g.items.map(function (x) { return '<div><dt>' + esc(x.term) + '</dt><dd>' + esc(x.def) + '</dd></div>'; }).join('') + '</dl></section>';
+    }).join('') + '</div>';
+  }
+  STEP_VIEWS.lesson = function (body, u, a, next) {
+    PC.guard.close();
+    body.innerHTML = '<section class="pc-card pc-lesson"><div class="pc-practice">Read and watch: nothing to turn in here.</div>' + stepHeading(a) +
+      (a.sections || []).map(sectionHtml).join('') + (a.parts ? '<p class="pc-match-jump"><button type="button" class="pc-btn small" data-act="mgJump">🎯 Practice: Match the Parts ↓</button></p>' + partsHtml(S.home.parts) + mgHtml('lesson') : '') +
+      (a.id === 'intro' ? '<section class="pc-lesson-sec"><h3>🎧 The Listening Library</h3><p>These are the episodes for your listening logs. Pick ones that interest you.</p>' + libraryHtml(S.home.library) + '</section>' : '') +
+      nextBtn(next) + '</section>';
+  };
+
+  // ---------- loading one activity ----------
+  function loadItem(body, a, cb) {
+    body.innerHTML = '<section class="pc-card pc-skeleton"><p>Loading…</p></section>';
+    PC.rpc('getStudentItem', { classId: PC.state.classId, as: asArg(), week: PC.state.week, act: a.id }, { retry: true }).then(function (r) {
+      if (PC.state.view !== 'week' || PC.state.step !== a.id) return;
+      S.item = r; cb(r);
+    }).catch(function (e) { PC.fail(body, e); });
+  }
+  function saveBar(item, label) {
+    var ro = readOnly();
+    var sub = item.submittedAt ? '<span class="pc-turned">Turned in ' + esc(PC.fmtDate(item.submittedAt, true)) + '</span>' : '';
+    return '<div class="pc-savebar"><span id="pcSaveState" class="pc-save-state" aria-live="polite"></span>' + sub +
+      (ro ? '' : '<button type="button" class="pc-btn primary" id="pcTurnIn" data-act="turnIn">' + (item.submittedAt ? 'Turn in again' : 'Turn in ' + esc(label)) + '</button>') + '</div>' +
+      '<p class="pc-small pc-muted" id="pcEditedNote"' + (item.submittedAt && item.subFp && item.fp !== item.subFp ? '' : ' hidden') + '>You changed this after turning it in. Turn it in again to send the changes to your teacher.</p>' +
+      '<p class="pc-small pc-muted pc-recorded">Your writing saves by itself. Word count, writing time and pasted text are recorded and your teacher can see them.</p>';
+  }
+  function unreadable(body, what) { body.innerHTML = '<section class="pc-card pc-error"><h2>Your saved ' + esc(what) + ' couldn’t be read</h2><p>Nothing was saved over it. Tell your teacher so they can bring back a backup.</p></section>'; }
+  function openGuard(u, a, item, data, readForm, setForm) {
+    return PC.guard.open({ classId: PC.state.classId, as: asArg(), email: me().email, week: u.n, act: a.id, key: item.key, data: data, base: item.updatedAt || item.loadedAt, submittedAt: item.submittedAt, readOnly: readOnly(),
+      readForm: readForm, setForm: setForm, onSaved: onSavedHook });
+  }
+  A.turnIn = function (el) {
+    if (el.disabled) return;
+    var miss = S.fieldsMissing ? S.fieldsMissing() : [];
+    if (miss.length && !confirm('Still missing: ' + miss.join(', ') + '.\n\nTurn it in anyway? You can turn it in again later.')) return;
+    el.disabled = true; var old = el.textContent; el.textContent = 'Turning in…';
+    PC.guard.submit().then(function (r) {
+      el.disabled = false;
+      if (r && r.ok) {
+        el.textContent = 'Turn in again';
+        var d = PC.guard.current(); if (d) { S.item.submittedAt = d.submittedAt; S.item.subFp = d.subFp; S.item.fp = d.fp; }
+        var key = 'w' + PC.state.week + '_' + PC.state.step; S.home.status[key] = Object.assign({}, S.home.status[key] || {}, { state: 'submitted', edited: false, submittedAt: d && d.submittedAt });
+        var n = PC.byId('pcEditedNote'); if (n) n.hidden = true;
+        var t = document.querySelector('.pc-turned');
+        if (!t) { var ss = PC.byId('pcSaveState'); if (ss) { ss.insertAdjacentHTML('afterend', '<span class="pc-turned"></span>'); t = document.querySelector('.pc-turned'); } }
+        if (t && d) t.textContent = 'Turned in ' + PC.fmtDate(d.submittedAt, true);
+        PC.toast('Turned in. Your teacher can see it now.', 'ok');
+      } else { el.textContent = old; if (r && r.error) PC.toast(r.error, 'error'); }
+    });
+  };
+  function onSavedHook(res, submit) {
+    if (!S.item) return;
+    var n = PC.byId('pcEditedNote');
+    if (n) n.hidden = !(S.item.submittedAt || submit) || submit || (res.subFp && res.fp === res.subFp);
+  }
+
+  // ---------- Fill-in work: logs, plans, scripts, Canva links ----------
+  // One renderer for every form; the fields come from PodcastData (kind: long, short, link, choice,
+  // episode, rows; showIf hides a field until another field has that answer).
+  function fieldShown(fd, vals) { return !fd.showIf || String(vals[fd.showIf.field] || '') === fd.showIf.eq; }
+  function episodeRowsHtml(fd, rows, ro) {
+    var list = Array.isArray(rows) && rows.length ? rows.slice() : [];
+    while (list.length < Math.max(1, fd.min || 1)) list.push({});
+    var examples={t:'e.g. 0:00–0:25',seg:'e.g. Cold open',what:'What will listeners hear or learn in this part?',sound:'e.g. Guest clip, room sound, music — or voice only'};
+    return '<div class="pc-rows pc-segment-grid" data-rows="runsheet">'+list.map(function(r){
+      return '<div class="pc-rowline pc-segment-card"><div class="pc-segment-head"><span class="pc-segment-number" aria-hidden="true"></span><b>Episode segment</b><span class="pc-segment-tag">RUN SHEET</span></div>'+fd.cols.map(function(c){return '<label class="pc-segment-field pc-segment-'+esc(c.id)+'"><span>'+esc(c.id==='t'?'Start → end':c.id==='seg'?'Give this part a name':c.id==='what'?'What happens here?':'What will we hear?')+'</span>'+(c.id==='what'||c.id==='sound'?'<textarea rows="3"':'<input type="text"')+' class="pc-input pc-cell" data-col="'+esc(c.id)+'" placeholder="'+esc(examples[c.id])+'"'+(ro?' readonly':'')+(c.id==='what'||c.id==='sound'?'>'+esc(r[c.id]||'')+'</textarea>':' value="'+esc(r[c.id]||'')+'">')+'</label>';}).join('')+(ro?'':'<button type="button" class="pc-segment-remove" data-act="rowRemove" aria-label="Remove this episode segment">Remove segment</button>')+'</div>';
+    }).join('')+'</div>'+(ro?'':'<button type="button" class="pc-btn pc-add-segment" data-act="rowAdd" data-rows="runsheet">+ Add another segment</button>');
+  }
+  function plannerIntro() {
+    return '<div class="pc-planner-brief"><div><span class="pc-eyebrow">FROM IDEA TO AIR</span><h3>Build an episode worth hearing.</h3><p>Map the moments. Write for the ear. Give every sound a purpose.</p></div><div class="pc-planner-target"><b>08:00</b><span>Solo episode<br>Longer for a crew</span></div></div><ol class="pc-planner-path"><li><b>01</b><span>Map your segments</span></li><li><b>02</b><span>Write your script</span></li><li><b>03</b><span>Plan your sound</span></li></ol><p class="pc-planner-note">Time a rehearsal, including guest clips and transitions. Each crew member submits their own script and identifies the parts they wrote.</p>';
+  }
+  function plannerField(fd, vals, ro) {
+    var headings={runsheet:['01','Map the episode','Give each segment a clear purpose. Start with at least five.'],text:['02','Write for the ear','Write your opening and closing in full. For a conversation, use clear talking points in the middle.'],bites:['03','Give the sound a purpose','Plan the guest clips, atmosphere and music you will actually use.']},h=headings[fd.id];
+    var guide=fd.id==='runsheet'?'<details class="pc-segment-guide"><summary>Need a starting shape?</summary><div><span>Hook</span><span>Introduce the question</span><span>Bring in another voice</span><span>Explore the evidence</span><span>Land the ending</span></div><p>These are suggestions. Name and time the segments to suit your show. Use the printable starter for a full eight-minute example.</p></details>':'';
+    return (h?'<section class="pc-planner-section"><header><span>'+h[0]+'</span><div><h3>'+h[1]+'</h3><p>'+h[2]+'</p></div></header>'+guide:'')+fieldHtml(fd,vals,ro)+(h?'</section>':'');
+  }
+
+  function rowsHtml(fd, rows, ro) {
+    if (fd.id === 'runsheet') return episodeRowsHtml(fd, rows, ro);
+    var list = Array.isArray(rows) && rows.length ? rows.slice() : [];
+    while (list.length < Math.max(1, fd.min || 1)) list.push({});
+    return '<div class="pc-rows" data-rows="' + esc(fd.id) + '"><div class="pc-rows-head" aria-hidden="true">' + fd.cols.map(function (c) { return '<span class="pc-col-' + (c.w || 'md') + '">' + esc(c.label) + '</span>'; }).join('') + '<span class="pc-col-x"></span></div>' +
+      list.map(function (r, i) {
+        return '<div class="pc-rowline">' + fd.cols.map(function (c) {
+          var v = r[c.id] || '', lg = c.w === 'lg';
+          return '<label class="pc-col-' + (c.w || 'md') + '"><span class="pc-sr">' + esc(c.label) + ' ' + (i + 1) + '</span>' + (lg ? '<textarea class="pc-input pc-cell" rows="2" data-col="' + esc(c.id) + '" placeholder="' + esc(i === 0 && c.ph ? 'e.g. ' + c.ph : c.label) + '"' + (ro ? ' readonly' : '') + '>' + esc(v) + '</textarea>' : '<input class="pc-input pc-cell" data-col="' + esc(c.id) + '" value="' + esc(v) + '" placeholder="' + esc(i === 0 && c.ph ? 'e.g. ' + c.ph : c.label) + '"' + (ro ? ' readonly' : '') + '>') + '</label>';
+        }).join('') + (ro ? '<span class="pc-col-x"></span>' : '<button type="button" class="pc-icon-btn pc-col-x" data-act="rowRemove" aria-label="Remove row ' + (i + 1) + '">✕</button>') + '</div>';
+      }).join('') + '</div>' + (ro ? '' : '<button type="button" class="pc-btn small ghost" data-act="rowAdd" data-rows="' + esc(fd.id) + '">+ Add a row</button>');
+  }
+  function episodeHtml(fd, v, ro) {
+    var lib = S.home.library || [], known = lib.some(function (e) { return e.id === v; }), other = v && !known;
+    return '<select id="fld_' + esc(fd.id) + '" class="pc-input pc-fval" data-field="' + esc(fd.id) + '"' + (ro ? ' disabled' : '') + '><option value="">Choose an episode…</option>' + lib.map(function (e) { return '<option value="' + esc(e.id) + '"' + (v === e.id ? ' selected' : '') + '>' + esc(e.show + ': ' + e.title + ' (' + e.format + ')') + '</option>'; }).join('') +
+      '<option value="__other"' + (other ? ' selected' : '') + '>Another episode (your teacher approved it)</option></select>' +
+      '<input class="pc-input pc-ep-other" data-for="' + esc(fd.id) + '" placeholder="Show, episode title and link" value="' + esc(other ? v : '') + '"' + (other ? '' : ' hidden') + (ro ? ' readonly' : '') + '>' +
+      '<div class="pc-ep-pick" data-for="' + esc(fd.id) + '">' + (known ? epCardMini(libEpisode(v)) : '') + '</div>';
+  }
+  function epCardMini(e) { return e ? '<p class="pc-small"><a href="' + esc(e.url) + '" target="_blank" rel="noopener">Listen: ' + esc(e.title) + ' ↗</a> · ' + esc(e.length) + ' · listen for ' + esc(e.craft.toLowerCase()) + '</p>' : ''; }
+  function fieldHtml(fd, vals, ro) {
+    var v = vals[fd.id], req = fd.required ? ' <span class="pc-req" title="Needed to turn in">*</span>' : '';
+    var lab = '<span class="pc-flabel">' + esc(fd.label) + req + '</span>' + (fd.hint ? '<span class="pc-fhint">' + esc(fd.hint) + '</span>' : '');
+    var inner;
+    if (fd.kind === 'rows') inner = (typeof v === 'string' && v.trim() ? '<div class="pc-old-text"><span class="pc-fhint">What you wrote here before this became a table (kept):</span><p>' + esc(v) + '</p></div>' : '') + rowsHtml(fd, v, ro);
+    else if (fd.kind === 'long') inner = (fd.focus && !ro ? '<div class="pc-focusbar"><button type="button" class="pc-btn small" data-act="focusMode" data-field="' + esc(fd.id) + '">⤢ Write in focus mode</button><button type="button" class="pc-btn small ghost pc-focus-exit" data-act="focusExit">✕ Exit focus</button></div>' : '') +
+      '<textarea id="fld_' + esc(fd.id) + '" class="pc-input pc-fval' + (fd.focus ? ' pc-writing' : '') + '" data-field="' + esc(fd.id) + '" data-stat-box="' + esc(fd.id) + '" rows="' + (fd.rows || 5) + '"' + (ro ? ' readonly' : '') + '>' + esc(v || '') + '</textarea><div class="pc-fmeta" data-meta="' + esc(fd.id) + '"></div>';
+    else if (fd.kind === 'choice') inner = '<div class="pc-choice-row" role="radiogroup" aria-label="' + esc(fd.label) + '">' + fd.options.concat(v && fd.options.indexOf(v) < 0 ? [v] : []).map(function (o) { return '<label class="pc-radio' + (v === o ? ' is-on' : '') + '"><input type="radio" class="pc-fval" name="f_' + esc(fd.id) + '" data-field="' + esc(fd.id) + '" value="' + esc(o) + '"' + (v === o ? ' checked' : '') + (ro ? ' disabled' : '') + '><span>' + esc(o) + '</span></label>'; }).join('') + '</div>';
+    else if (fd.kind === 'episode') inner = episodeHtml(fd, v || '', ro);
+    else if (fd.kind === 'link') inner = '<div class="pc-linkrow"><input type="url" id="fld_' + esc(fd.id) + '" class="pc-input pc-fval" data-field="' + esc(fd.id) + '" placeholder="https://www.canva.com/design/…/view" value="' + esc(v || '') + '"' + (ro ? ' readonly' : '') + '><a class="pc-btn small" data-open="' + esc(fd.id) + '" target="_blank" rel="noopener" href="' + esc(/^https?:\/\//i.test(v || '') ? v : '#') + '"' + (/^https?:\/\//i.test(v || '') ? '' : ' hidden') + '>Open ↗</a></div>' + (fd.canva ? '<p class="pc-small pc-muted">In Canva: <b>Share → View-only link → Copy</b>, then paste it here. Open it in a private window to check it works.</p>' : '');
+    else inner = '<input id="fld_' + esc(fd.id) + '" class="pc-input pc-fval" data-field="' + esc(fd.id) + '" maxlength="400" value="' + esc(v || '') + '"' + (ro ? ' readonly' : '') + '>';
+    return '<div class="pc-fld pc-fld-' + esc(fd.kind) + '" data-fid="' + esc(fd.id) + '"' + (fieldShown(fd, vals) ? '' : ' hidden') + '>' + (fd.kind === 'rows' || fd.kind === 'choice' ? '<div class="pc-flabel-wrap">' + lab + '</div>' : '<label class="pc-flabel-wrap" for="fld_' + esc(fd.id) + '">' + lab + '</label>') + inner + '</div>';
+  }
+  function readFields(a) {
+    var f = {};
+    (a.fields || []).forEach(function (fd) {
+      var box = document.querySelector('.pc-fld[data-fid="' + fd.id + '"]');
+      if (!box) { if (S.fieldsData && S.fieldsData[fd.id] !== undefined) f[fd.id] = S.fieldsData[fd.id]; return; }
+      if (fd.kind === 'rows') {
+        var old = S.fieldsData && S.fieldsData[fd.id];
+        f[fd.id] = Array.prototype.map.call(box.querySelectorAll('.pc-rowline'), function (line) { var o = {}; line.querySelectorAll('.pc-cell').forEach(function (c) { o[c.dataset.col] = c.value; }); return o; })
+          .filter(function (o) { return Object.keys(o).some(function (k) { return String(o[k]).trim(); }); });
+        if (!f[fd.id].length && typeof old === 'string' && old.trim()) f[fd.id] = old;   // never drop earlier writing
+      } else if (fd.kind === 'choice') { var on = box.querySelector('.pc-fval:checked'); f[fd.id] = on ? on.value : ''; }
+      else if (fd.kind === 'episode') { var sel = box.querySelector('select').value; f[fd.id] = sel === '__other' ? box.querySelector('.pc-ep-other').value : sel; }
+      else { var el = box.querySelector('.pc-fval'); f[fd.id] = el ? el.value : ''; }
+    });
+    // Anything saved under a field this form doesn't draw any more is kept as it was.
+    Object.keys(S.fieldsData || {}).forEach(function (k) { if (f[k] === undefined) f[k] = S.fieldsData[k]; });
+    return { f: f };
+  }
+  function missingOf(a, f) {
+    var miss = [];
+    (a.fields || []).forEach(function (fd) {
+      if (!fieldShown(fd, f)) return;
+      var v = f[fd.id];
+      if (fd.kind === 'rows') { var n = (v || []).length; if (fd.min && n < fd.min) miss.push(fd.label + ' (' + n + ' of ' + fd.min + ' rows)'); }
+      else if (fd.required && !String(v || '').trim()) miss.push(fd.label);
+      if (fd.minWords && PC.words(v) < fd.minWords) miss.push(fd.label + ' (' + PC.words(v) + ' of ' + fd.minWords + ' words)');
+    });
+    return miss;
+  }
+  function checklistHtml(a, f) {
+    var items = [];
+    (a.fields || []).forEach(function (fd) {
+      if (!fieldShown(fd, f) || fd.optional) return;
+      var v = f[fd.id], ok, text;
+      if (fd.kind === 'rows') { var n = (v || []).length; ok = n >= (fd.min || 1); text = fd.label.replace(/^\d+\.\s*/, '') + ': ' + n + (fd.min ? ' of ' + fd.min + ' rows' : n === 1 ? ' row' : ' rows'); }
+      else if (fd.kind === 'long') { var w = PC.words(v); ok = fd.minWords ? w >= fd.minWords : w > 0; text = fd.label + ': ' + PC.plural(w, 'word') + (fd.minWords ? ' of ' + fd.minWords : ''); }
+      else { ok = !!String(v || '').trim(); text = fd.label; }
+      items.push({ ok: ok, text: text });
+    });
+    return '<h3>Checklist</h3><ul>' + items.map(function (i) { return '<li class="' + (i.ok ? 'is-ok' : '') + '"><span aria-hidden="true">' + (i.ok ? '✓' : '○') + '</span>' + esc(i.text) + '</li>'; }).join('') + '</ul><p class="pc-small pc-muted">The checklist counts what it can see. It can’t judge how strong your thinking is; the rubric is about that.</p>';
+  }
+  function assignmentHtml(pa) {
+    if (!pa) return '';
+    return '<details class="pc-assignment" open><summary>' + esc(pa.title) + '</summary><h4>Overview</h4>' + pa.overview.map(function (p) { return '<p>' + esc(p) + '</p>'; }).join('') +
+      '<h4>Your Task</h4><ol>' + pa.task.map(function (t) { return '<li><b>' + esc(t.h) + '</b><ul>' + t.list.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></li>'; }).join('') + '</ol>' +
+      '<h4>Tips for Success</h4><ul>' + pa.tips.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ul></details>';
+  }
+  STEP_VIEWS.fields = function (body, u, a, next) {
+    loadItem(body, a, function (item) {
+      var ro = readOnly();
+      if (item.unreadable) return unreadable(body, a.title);
+      var data = item.data || {}, vals = Object.assign({}, data.f || {});
+      S.fieldsData = vals;
+      var canvaKey = a.id === 'cover' ? 'cover' : a.id === 'script' ? 'runsheet' : '';
+      body.innerHTML = '<section class="pc-card pc-fields-card' + (a.id === 'script' ? ' pc-episode-planner' : '') + '">' + gradedHead(u, a) + stepHeading(a) + (a.assignment ? assignmentHtml(S.home.processAssignment) : '') + (a.id === 'script' ? plannerIntro() : promptHtml(a)) +
+        (canvaKey ? '<div class="pc-row">' + canvaBtn(canvaKey, CANVA_LABEL[canvaKey]) + '</div>' : '') + howScored(item) +
+        feedbackHtml(item, a) + '<div id="pcOffer" class="pc-offer" hidden></div>' +
+        '<div class="pc-write-wrap" id="pcWriteWrap"><aside class="pc-write-side"><div class="pc-checklist" id="pcChecklist"></div></aside>' +
+        '<div class="pc-write-main" id="pcForm">' + (a.fields || []).map(function (fd) { return a.id === 'script' ? plannerField(fd, vals, ro) : fieldHtml(fd, vals, ro); }).join('') + '</div></div>' +
+        saveBar(item, a.title) + nextBtn(next) + '</section>';
+      var root = body.querySelector('.pc-fields-card');
+      var read = function () { return readFields(a); };
+      var refresh = function () {
+        var f = read().f;
+        (a.fields || []).forEach(function (fd) { var el = root.querySelector('.pc-fld[data-fid="' + fd.id + '"]'); if (el) el.hidden = !fieldShown(fd, f); });
+        var cl = PC.byId('pcChecklist'); if (cl) cl.innerHTML = checklistHtml(a, f);
+        root.querySelectorAll('.pc-fmeta').forEach(function (m) { var id = m.dataset.meta; m.innerHTML = '<span class="pc-wordcount">' + PC.plural(PC.words(f[id]), 'word') + '</span>' + PC.stats.chipsHtml(PC.stats.get(id) || (item.stats || {})[id], f[id]); });
+        root.querySelectorAll('.pc-radio').forEach(function (r) { r.classList.toggle('is-on', !!r.querySelector('input:checked')); });
+        root.querySelectorAll('[data-open]').forEach(function (b) {
+          var v = String(f[b.dataset.open] || '').trim(), ok = /^https?:\/\//i.test(v); b.hidden = !ok; if (ok) b.href = v;
+          var fld = b.closest('.pc-fld'), warn = fld && fld.querySelector('.pc-link-warn');
+          if (v && !ok && fld && !warn) b.parentNode.insertAdjacentHTML('afterend', '<p class="pc-link-warn" role="status">That doesn’t look like a link yet. In Canva: Share → View-only link → Copy, then paste it here.</p>');
+          if ((ok || !v) && warn) warn.remove();
+        });
+        root.querySelectorAll('.pc-ep-pick').forEach(function (p) { var v = f[p.dataset.for]; p.innerHTML = epCardMini(libEpisode(v)); });
+      };
+      S.fieldsMissing = function () { return missingOf(a, read().f); };
+      openGuard(u, a, item, read(), read, function (d) {
+        S.fieldsData = Object.assign({}, (d && d.f) || {});
+        PC.byId('pcForm').innerHTML = (a.fields || []).map(function (fd) { return fieldHtml(fd, S.fieldsData, ro); }).join('');
+        if (!ro) PC.byId('pcForm').querySelectorAll('[data-stat-box]').forEach(function (x) { PC.stats.bind(x); });   // keep the live counters
+        refresh();
+      });
+      PC.stats.attach(root, { classId: PC.state.classId, key: item.key, as: asArg(), readOnly: ro, initial: item.stats });
+      root.addEventListener('input', function (e) { if (e.target.closest('#pcForm')) { PC.guard.changed(); refresh(); } });
+      root.addEventListener('change', function (e) {
+        if (!e.target.closest('#pcForm')) return;
+        if (e.target.tagName === 'SELECT') { var other = e.target.parentNode.querySelector('.pc-ep-other'); if (other) { other.hidden = e.target.value !== '__other'; if (!other.hidden) other.focus(); } }
+        PC.guard.changed(); refresh();
+      });
+      refresh();
+      if (PC.store.get('pcFocusPref', false) && !ro && (a.fields || []).some(function (fd) { return fd.focus; })) A.focusMode();
+    });
+  };
+  A.rowAdd = function (el) {
+    var box = document.querySelector('.pc-rows[data-rows="' + el.dataset.rows + '"]'); if (!box) return;
+    if (box.querySelectorAll('.pc-rowline').length >= 40) return PC.toast('Up to 40 rows.');
+    var fd = actOf(unitOf(PC.state.week), PC.state.step).fields.filter(function (x) { return x.id === el.dataset.rows; })[0];
+    var tmp = document.createElement('div'); tmp.innerHTML = rowsHtml(Object.assign({}, fd, { min: 1 }), [{}], false);
+    var line = tmp.querySelector('.pc-rowline'); box.appendChild(line);
+    if (PC.stats) line.querySelectorAll('[data-stat-box]').forEach(function (x) { PC.stats.bind(x); });
+    var first = line.querySelector('.pc-cell'); if (first) first.focus();
+    PC.guard.changed(); box.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  A.rowRemove = function (el) {
+    var line = el.closest('.pc-rowline'), box = el.closest('.pc-rows');
+    var filled = Array.prototype.some.call(line.querySelectorAll('.pc-cell'), function (c) { return c.value.trim(); });
+    if (filled && !confirm('Remove this row?')) return;
+    if (box.querySelectorAll('.pc-rowline').length > 1) line.remove(); else line.querySelectorAll('.pc-cell').forEach(function (c) { c.value = ''; });
+    PC.guard.changed(); box.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  A.focusMode = function () { var w = PC.byId('pcWriteWrap'); if (!w) return; document.body.classList.add('pc-focus-on'); w.classList.add('is-focus'); PC.store.set('pcFocusPref', true); var t = w.querySelector('.pc-writing'); if (t) t.focus(); };
+  A.focusExit = function () { document.body.classList.remove('pc-focus-on'); var w = PC.byId('pcWriteWrap'); if (w) w.classList.remove('is-focus'); PC.store.set('pcFocusPref', false); };
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.body.classList.contains('pc-focus-on') && PC.byId('pcModal').hidden) A.focusExit(); });
+
+  // ---------- Match the Parts (practice: nothing is saved or scored) ----------
+  // A click-to-pair game built from the Anatomy of a Podcast glossary (S.home.parts), six terms a round.
+  // Terms a student missed come back first in the next round. Lives on the Anatomy page and, as
+  // "practice first", on the quiz. Only the page keeps it; it never calls the server.
+  var MG = { group: 'all', missed: {}, round: null, where: '' };
+  function mgTerms() {
+    var out = [];
+    ((S.home && S.home.parts) || []).forEach(function (g, gi) { g.items.forEach(function (x, i) { out.push({ id: gi + '_' + i, group: g.group, term: x.term, def: x.def }); }); });
+    return out;
+  }
+  function mgShuffle(arr) { var a = arr.slice(); for (var i = a.length - 1; i > 0; i--) { var j = Math.floor(Math.random() * (i + 1)), t = a[i]; a[i] = a[j]; a[j] = t; } return a; }
+  function mgNewRound() {
+    var all = mgTerms().filter(function (x) { return MG.group === 'all' || x.group === MG.group; });
+    var pick = mgShuffle(all.filter(function (x) { return MG.missed[x.id]; })).concat(mgShuffle(all.filter(function (x) { return !MG.missed[x.id]; }))).slice(0, Math.min(6, all.length));
+    MG.round = { terms: mgShuffle(pick), defs: mgShuffle(pick), matched: {}, misses: 0, sel: { term: '', def: '' }, start: Date.now(), secs: 0, msg: '', bad: {} };
+  }
+  function mgTime(s) { return Math.floor(s / 60) + ':' + ('0' + (s % 60)).slice(-2); }
+  function mgHtml(where) {
+    if (!MG.round || MG.where !== where) { MG.where = where; mgNewRound(); }
+    var R = MG.round, n = R.terms.length, got = Object.keys(R.matched).length, done = got === n && n > 0;
+    var groups = ['all'].concat(((S.home && S.home.parts) || []).map(function (g) { return g.group; }));
+    var h = '<section class="pc-match" id="pcMatch" data-where="' + esc(where) + '" aria-labelledby="pcMatchTitle">' +
+      '<header class="pc-match-head"><div class="pc-match-copy"><span class="pc-match-kicker">Practice · not scored</span><h3 id="pcMatchTitle">Match the Parts</h3>' +
+      '<p>Choose a term, then the definition that fits it. Six at a time; any you miss come back in the next round.</p></div>' +
+      '<div class="pc-match-score" aria-live="polite"><span><b>' + got + '/' + n + '</b>matched</span><span><b>' + R.misses + '</b>' + (R.misses === 1 ? 'miss' : 'misses') + '</span></div></header>' +
+      '<div class="pc-match-filter" role="group" aria-label="Which parts to practice">' + groups.map(function (g) {
+        var on = MG.group === g; return '<button type="button" class="pc-match-chip' + (on ? ' is-on' : '') + '" data-act="mgGroup" data-group="' + esc(g) + '" aria-pressed="' + on + '">' + esc(g === 'all' ? 'All parts' : g) + '</button>';
+      }).join('') + '</div>';
+    if (done) {
+      h += '<div class="pc-match-done" role="status"><b>All ' + n + ' matched' + (R.misses ? ' with ' + PC.plural(R.misses, 'miss', 'misses') : ' with no misses') + ' in ' + mgTime(R.secs) + '.</b>' +
+        '<span>' + (R.misses ? 'The ones you missed will come back first. Another round?' : 'Nice work. Try another round, or another group of parts.') + '</span>' +
+        '<div class="pc-row"><button type="button" class="pc-btn" data-act="mgNew">↻ New round</button>' +
+        (where === 'quiz' ? '<button type="button" class="pc-btn primary" data-act="quizStart">I’m ready, start the check →</button>' : '') + '</div></div>';
+    }
+    h += '<div class="pc-match-board"><div class="pc-match-col"><h4>Terms</h4><div class="pc-match-terms">' + R.terms.map(function (x) {
+      var m = !!R.matched[x.id], on = R.sel.term === x.id;
+      return '<button type="button" class="pc-mterm' + (m ? ' is-matched' : '') + (on ? ' is-on' : '') + (R.bad[x.id] ? ' is-bad' : '') + '" data-act="mgPick" data-side="term" data-id="' + esc(x.id) + '" aria-pressed="' + on + '"' + (m ? ' disabled' : '') + '>' + (m ? '<span aria-hidden="true">✓</span>' : '') + esc(x.term) + '</button>';
+    }).join('') + '</div></div><div class="pc-match-col"><h4>Definitions</h4><ol class="pc-match-defs">' + R.defs.map(function (x) {
+      var m = !!R.matched[x.id], on = R.sel.def === x.id;
+      return '<li><button type="button" class="pc-mdef' + (m ? ' is-matched' : '') + (on ? ' is-on' : '') + (R.bad['d' + x.id] ? ' is-bad' : '') + '" data-act="mgPick" data-side="def" data-id="' + esc(x.id) + '" aria-pressed="' + on + '"' + (m ? ' disabled' : '') + '>' +
+        (m ? '<span class="pc-mdef-term">✓ ' + esc(x.term) + '</span>' : '') + '<span class="pc-mdef-text">' + esc(x.def) + '</span></button></li>';
+    }).join('') + '</ol></div></div><p class="pc-match-msg" aria-live="polite">' + esc(R.msg) + '</p></section>';
+    return h;
+  }
+  function mgRedraw(focus) {
+    var box = PC.byId('pcMatch'); if (!box) return;
+    var where = box.dataset.where, tmp = document.createElement('div'); tmp.innerHTML = mgHtml(where);
+    box.replaceWith(tmp.firstChild);
+    var f = focus && document.querySelector('#pcMatch [data-side="' + focus.side + '"][data-id="' + focus.id + '"]:not(:disabled)');
+    if (!f) f = focus && document.querySelector('#pcMatch [data-side="' + focus.side + '"]:not(:disabled)');
+    if (!f && focus) f = document.querySelector('#pcMatch .pc-match-done .pc-btn');
+    if (f) f.focus({ preventScroll: true });
+  }
+  A.mgPick = function (el) {
+    var R = MG.round; if (!R) return;
+    var side = el.dataset.side, id = el.dataset.id, other = side === 'term' ? 'def' : 'term';
+    R.bad = {}; R.msg = '';
+    R.sel[side] = R.sel[side] === id ? '' : id;
+    var focus = { side: R.sel[side] && !R.sel[other] ? other : side, id: id };
+    if (R.sel.term && R.sel.def) {
+      var t = R.sel.term, d = R.sel.def, term = R.terms.filter(function (x) { return x.id === t; })[0];
+      R.missedNow = R.missedNow || {};
+      if (t === d) { R.matched[t] = true; if (!R.missedNow[t]) delete MG.missed[t]; R.msg = '✓ ' + term.term; }
+      else { R.misses++; MG.missed[t] = MG.missed[d] = R.missedNow[t] = R.missedNow[d] = true; R.bad[t] = true; R.bad['d' + d] = true; R.msg = 'Not a match. Try again.'; }
+      R.sel = { term: '', def: '' };
+      if (Object.keys(R.matched).length === R.terms.length) { R.secs = Math.round((Date.now() - R.start) / 1000); R.msg = ''; }
+      focus = { side: 'term', id: t };
+    }
+    mgRedraw(focus);
+    if (Object.keys(R.bad).length) setTimeout(function () { if (MG.round !== R) return; R.bad = {}; document.querySelectorAll('#pcMatch .is-bad').forEach(function (x) { x.classList.remove('is-bad'); }); }, 750);
+  };
+  A.mgJump = function () { var m = PC.byId('pcMatch'); if (!m) return; m.scrollIntoView({ block: 'start', behavior: 'smooth' }); var f = m.querySelector('.pc-mterm:not(:disabled)'); if (f) f.focus({ preventScroll: true }); };
+  A.mgNew = function () { mgNewRound(); mgRedraw({ side: 'term', id: '' }); };
+  A.mgGroup = function (el) { MG.group = el.dataset.group; mgNewRound(); mgRedraw(); };
+
+  // ---------- Quiz (scores itself; a second try is allowed, the best try counts) ----------
+  var quizGo = {};   // tries this page has been told to start ("I'm ready")
+  STEP_VIEWS.quiz = function (body, u, a, next) {
+    PC.guard.close();
+    S.quizPractice = false;
+    loadItem(body, a, function (item) { S.quizDraw = function () { drawQuiz(body, u, a, next); }; S.quizDraw(); });
+  };
+  function quizKey() { return 'w' + PC.state.week + '_' + PC.state.step; }
+  function drawQuiz(body, u, a, next) {
+    var item = S.item, q = item.quiz, ro = readOnly();
+    var gate = !ro && !q.done && !q.started && !quizGo[quizKey() + '|' + q.tryN];
+    var h = '<section class="pc-card pc-quiz">' + gradedHead(u, a) + stepHeading(a) + promptHtml(a) +
+      '<p>' + PC.plural(q.questions.length, 'question') + '. Right on the first try = 1 point. Right on the second try = ½ point. You can take the check ' + (q.allowed === 2 ? 'twice' : q.allowed + ' times') + '; your best try counts.</p>' +
+      (item.grade && item.grade.excluded ? '<div class="pc-feedback"><b>Your teacher left this out of your grade.</b></div>' : '') + quizTriesHtml(q, ro);
+    if (gate) {
+      h += quizGateHtml(q) + '<div id="pcPracticeSlot">' + (S.quizPractice ? mgHtml('quiz') : '') + '</div>';
+    } else {
+      if (q.done) h += '<div id="pcPracticeSlot">' + (S.quizPractice ? mgHtml('quiz') : '') + '</div>';
+      h += '<p class="pc-quiz-progress" id="pcQuizProg">' + quizProgress(q) + '</p><ol class="pc-qlist">';
+      q.questions.forEach(function (x, i) { h += '<li class="pc-q" id="q_' + esc(x.id) + '">' + questionHtml(x, i, ro || q.done) + '</li>'; });
+      h += '</ol>';
+    }
+    body.innerHTML = h + nextBtn(next) + '</section>';
+  }
+  function quizTriesHtml(q, ro) {
+    var list = q.attempts.length > 1 || (q.attempts.length && !q.done) ? '<ul class="pc-tries">' + q.attempts.map(function (x) {
+      var best = q.score !== null && x.counted && x.score === q.score;
+      return '<li class="' + (x.counted ? '' : 'is-aside') + '"><span>Try ' + x.n + '</span><b>' + x.score + '/' + x.max + '</b>' + (!x.counted ? '<em>set aside by your teacher</em>' : best ? '<em>best · counts</em>' : '') + '</li>';
+    }).join('') + '</ul>' : '';
+    if (q.done) {
+      var h = '<div class="pc-quiz-result" id="pcQuizResult"><div class="pc-quiz-result-score"><span>Try ' + q.tryN + '</span><b>' + q.thisScore + '<small>/' + q.max + '</small></b></div><div class="pc-quiz-result-copy">';
+      if (!q.thisCounted) h += '<h3>Your teacher set this try aside.</h3><p>It doesn’t count toward your grade.</p>';
+      else if (q.score !== null && q.score > q.thisScore) h += '<h3>Your best try still counts: ' + q.score + ' of ' + q.max + '.</h3><p>A redo can only help your score, never lower it.</p>';
+      else h += '<h3>' + (q.tryN > 1 ? 'This try is your best, so it’s the one that counts.' : 'Check finished.') + '</h3><p>' + (q.score !== null ? 'Your score: ' + q.score + ' of ' + q.max + '.' : 'No try counts toward your grade right now.') + '</p>';
+      if (ro) { /* a teacher viewing: no buttons */ }
+      else if (q.canRedo) h += '<p>Want a better score? You can redo the check ' + (q.triesLeft === 1 ? 'one more time' : q.triesLeft + ' more times') + '. The questions and answers come in a new order. Your best try counts.</p>' +
+        '<div class="pc-row"><button type="button" class="pc-btn primary" data-act="quizRedo">↻ Redo the check</button><button type="button" class="pc-btn" data-act="quizPractice">' + (S.quizPractice ? 'Hide practice' : 'Practice matching first') + '</button></div>';
+      else h += '<p class="pc-muted">That was your last try. If you think you need another, ask your teacher.</p>';
+      return h + list + '</div></div>';
+    }
+    if (q.tryN > 1 && q.score !== null) return '<div class="pc-quiz-redo-note"><b>Try ' + q.tryN + '.</b> Your best so far is ' + q.score + ' of ' + q.max + ', and it still counts if this try comes out lower.' + list + '</div>';
+    return list ? '<div class="pc-quiz-redo-note"><b>Try ' + q.tryN + '.</b>' + list + '</div>' : '';
+  }
+  function quizGateHtml(q) {
+    return '<div class="pc-quiz-gate" id="pcQuizGate" role="region" aria-labelledby="pcGateTitle"><div class="pc-quiz-gate-copy"><span class="pc-match-kicker">Before you start</span>' +
+      '<h3 id="pcGateTitle">' + (q.tryN > 1 ? 'Ready for try ' + q.tryN + '?' : 'Are you ready for the check?') + '</h3>' +
+      '<p>This check counts toward your grade. Once you choose an answer, it’s recorded.</p>' +
+      '<p>Not sure you know the parts yet? Practice by matching each term to its definition first. Practice isn’t scored, and you can come back here any time.</p></div>' +
+      '<div class="pc-quiz-gate-actions"><button type="button" class="pc-btn primary" data-act="quizStart">I’m ready, start the check →</button>' +
+      '<button type="button" class="pc-btn" data-act="quizPractice" aria-expanded="' + !!S.quizPractice + '">' + (S.quizPractice ? 'Hide practice' : 'Not yet: let me practice') + '</button>' +
+      '<button type="button" class="pc-link" data-act="toStep" data-step="anatomy">Review Anatomy of a Podcast</button></div></div>';
+  }
+  A.quizStart = function () { if (!S.item || !S.item.quiz) return; quizGo[quizKey() + '|' + S.item.quiz.tryN] = true; S.quizPractice = false; S.quizDraw(); var l = document.querySelector('.pc-qlist'); if (l) { l.scrollIntoView({ block: 'start', behavior: 'smooth' }); var b = l.querySelector('.pc-choice:not(:disabled)'); if (b) b.focus({ preventScroll: true }); } };
+  A.quizPractice = function () {
+    S.quizPractice = !S.quizPractice; var slot = PC.byId('pcPracticeSlot'); if (!slot) return;
+    slot.innerHTML = S.quizPractice ? mgHtml('quiz') : '';
+    document.querySelectorAll('[data-act="quizPractice"]').forEach(function (b) { b.textContent = S.quizPractice ? 'Hide practice' : (b.closest('.pc-quiz-gate') ? 'Not yet: let me practice' : 'Practice matching first'); b.setAttribute('aria-expanded', S.quizPractice); });
+    if (S.quizPractice) { var m = PC.byId('pcMatch'); m.scrollIntoView({ block: 'start', behavior: 'smooth' }); var f = m.querySelector('.pc-mterm'); if (f) f.focus({ preventScroll: true }); }
+  };
+  var redoing = false;
+  A.quizRedo = function (el) {
+    if (redoing || !S.item || !S.item.quiz) return; redoing = true; el.disabled = true;
+    var q = S.item.quiz;
+    PC.rpc('redoQuiz', { classId: PC.state.classId, as: asArg(), week: PC.state.week, act: PC.state.step, base: q.tryN }, { retry: true }).then(function (r) {
+      redoing = false; S.item.quiz = r.quiz; S.quizPractice = false; S.quizDraw();
+      var g = PC.byId('pcQuizGate') || document.querySelector('.pc-qlist'); if (g) g.scrollIntoView({ block: 'start', behavior: 'smooth' });
+    }).catch(function (e) { redoing = false; el.disabled = false; PC.toast(e.message, 'error'); });
+  };
+  function quizProgress(q) {
+    var done = q.questions.filter(function (x) { return x.state !== 'open'; }).length;
+    var pts = q.questions.reduce(function (s, x) { return s + (Number(x.points) || 0); }, 0);
+    return done === q.questions.length ? '<b>Try ' + q.tryN + ' finished:</b> ' + pts + ' of ' + q.questions.length + ' points' : (q.tryN > 1 ? 'Try ' + q.tryN + ' · ' : '') + done + ' of ' + q.questions.length + ' answered';
+  }
+  function questionHtml(x, i, ro) {
+    var closed = x.state !== 'open', L = 'ABCDEFGH', ansPos = -1;
+    var h = '<p class="pc-q-text"><span class="pc-q-n">' + (i + 1) + '</span>' + esc(x.q) + '</p><div class="pc-choices" role="group" aria-label="Choices for question ' + (i + 1) + '">';
+    x.choices.forEach(function (c, j) {
+      var tried = (x.tries || []).indexOf(c.i) >= 0, right = closed && x.answer === c.i;
+      if (closed && x.answer === c.i) ansPos = j;
+      var cls = 'pc-choice' + (right ? ' is-right' : tried ? ' is-wrong' : '');
+      h += '<button type="button" class="' + cls + '" data-act="answer" data-q="' + esc(x.id) + '" data-pick="' + c.i + '"' + (closed || tried || ro ? ' disabled' : '') + '><span class="pc-choice-l">' + L.charAt(j) + '</span><span>' + esc(c.t) + '</span>' + (right ? '<span class="pc-choice-mark">✓</span>' : tried ? '<span class="pc-choice-mark">✗</span>' : '') + '</button>';
+    });
+    h += '</div>';
+    if (x.state === 'right') h += '<p class="pc-q-result is-right">' + (x.points === 1 ? 'Right on the first try: 1 point.' : 'Right on the second try: ½ point.') + (x.why ? ' ' + esc(x.why) : '') + '</p>';
+    else if (x.state === 'missed') h += '<p class="pc-q-result is-missed">Not this time. The answer is ' + L.charAt(ansPos) + '.' + (x.why ? ' ' + esc(x.why) : '') + '</p>';
+    else if ((x.tries || []).length) h += '<p class="pc-q-result is-try">Not quite. Look back at Anatomy of a Podcast and try once more.</p>';
+    return h;
+  }
+  var answering = {};
+  A.answer = function (el) {
+    var qid = el.dataset.q; if (answering[qid]) return; answering[qid] = true;
+    var q0 = S.item.quiz, li = PC.byId('q_' + qid); li.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+    PC.rpc('answerQuiz', { classId: PC.state.classId, as: asArg(), week: PC.state.week, act: PC.state.step, qid: qid, pick: Number(el.dataset.pick), tryN: q0.tryN }, { retry: true }).then(function (r) {
+      answering[qid] = false;
+      if (S.item.quiz !== q0) return;
+      if (r.stale) { PC.toast('This check changed in another tab. Here’s the latest.', 'ok'); PC.rpc('getStudentItem', { classId: PC.state.classId, as: asArg(), week: PC.state.week, act: PC.state.step }, { retry: true }).then(function (it) { if (S.item && S.item.quiz === q0) { S.item = it; S.quizDraw(); } }); return; }
+      var q = S.item.quiz, x = q.questions.filter(function (y) { return y.id === qid; })[0], i = q.questions.indexOf(x);
+      if (r.tries) x.tries = r.tries; if (r.state) x.state = r.state; if (r.points !== undefined) x.points = r.points; if (r.answer !== undefined) { x.answer = r.answer; x.why = r.why; }
+      q.started = true;
+      li.innerHTML = questionHtml(x, i, false);
+      PC.byId('pcQuizProg').innerHTML = quizProgress(q);
+      if (r.finished) {
+        var key = quizKey();
+        q.done = true; q.thisScore = r.score; q.thisCounted = true; q.score = r.best; q.canRedo = !!r.canRedo; q.triesLeft = r.triesLeft || 0;
+        q.attempts.push({ n: q.tryN, score: r.score, max: r.max, at: new Date().toISOString(), counted: true });
+        S.home.status[key] = { state: 'submitted', score: r.best, max: r.max };
+        PC.toast('Check finished: ' + r.score + ' of ' + r.max + ' points.' + (r.best !== r.score ? ' Your best try (' + r.best + ') counts.' : ''), 'ok');
+        S.quizDraw();
+        var res = PC.byId('pcQuizResult'); if (res) res.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      }
+    }).catch(function (e) { answering[qid] = false; PC.toast(e.message, 'error'); li.querySelectorAll('button').forEach(function (b) { if (!b.classList.contains('is-wrong')) b.disabled = false; }); });
+  };
+
+  // ---------- Discussion ----------
+  function draftKey(parentId) { return 'pcd|' + me().email + '|' + PC.state.classId + '|w' + PC.state.week + '|' + PC.state.step + '|' + (parentId || 'top'); }
+  STEP_VIEWS.discussion = function (body, u, a, next) {
+    PC.guard.close();
+    loadItem(body, a, function (item) { drawDiscussion(body, u, a, item, next); });
+  };
+  function linkify(text) {
+    return esc(text).replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"]/g, function (m) { return '<a href="' + m + '" target="_blank" rel="noopener">' + m + '</a>'; });
+  }
+  function drawDiscussion(body, u, a, item, next) {
+    var d = item.discussion, ro = readOnly(), posts = d.posts || [];
+    var top = posts.filter(function (p) { return !p.parentId; }), replies = posts.filter(function (p) { return p.parentId; });
+    var h = '<section class="pc-card pc-discuss">' + gradedHead(u, a) + stepHeading(a) + promptHtml(a) +
+      (item.complete ? '<details class="pc-howscored"><summary>How it’s scored</summary><p><b>Complete:</b> ' + esc(item.complete.complete) + '</p><p><b>Incomplete:</b> ' + esc(item.complete.incomplete) + '</p></details>' : '') +
+      feedbackHtml(item, a);
+    if (!top.some(function (p) { return p.mine; }) && !ro) {
+      h += '<div class="pc-compose"><label class="pc-field"><span>Your post</span><textarea id="pcPostText" class="pc-input" rows="5" maxlength="8000">' + esc(PC.store.get(draftKey(''), '')) + '</textarea></label>' +
+        '<div class="pc-row"><button type="button" class="pc-btn primary" data-act="post">Post</button><span class="pc-small pc-muted">Post first. Then you’ll see your classmates’ posts and can reply.</span></div></div>';
+    }
+    if (!d.unlocked) h += '<p class="pc-locked-note">' + PC.plural(d.count || 0, 'classmate has', 'classmates have') + ' posted. Their posts appear once you post yours.</p>';
+    h += '<div class="pc-thread">' + top.map(function (p) {
+      var rs = replies.filter(function (r) { return r.parentId === p.id; });
+      return '<article class="pc-post' + (p.mine ? ' is-mine' : '') + '" data-id="' + esc(p.id) + '"><header><b>' + esc(p.mine ? 'You' : p.name) + '</b><time>' + esc(PC.fmtDate(p.createdAt, true)) + (p.editedAt ? ' · edited' : '') + '</time>' + (p.mine && !ro ? '<button type="button" class="pc-link" data-act="editPost" data-id="' + esc(p.id) + '">Edit</button>' : '') + '</header>' +
+        '<div class="pc-post-text">' + linkify(p.text) + '</div>' +
+        (rs.length ? '<div class="pc-replies">' + rs.map(function (r) { return '<div class="pc-reply' + (r.mine ? ' is-mine' : '') + '" data-id="' + esc(r.id) + '"><header><b>' + esc(r.mine ? 'You' : r.name) + '</b><time>' + esc(PC.fmtDate(r.createdAt, true)) + (r.editedAt ? ' · edited' : '') + '</time>' + (r.mine && !ro ? '<button type="button" class="pc-link" data-act="editPost" data-id="' + esc(r.id) + '">Edit</button>' : '') + '</header><div class="pc-post-text">' + linkify(r.text) + '</div></div>'; }).join('') + '</div>' : '') +
+        (d.unlocked && !ro ? '<div class="pc-reply-box" data-parent="' + esc(p.id) + '"><textarea class="pc-input pc-reply-text" rows="2" maxlength="8000" placeholder="Reply" aria-label="Reply to ' + esc(p.mine ? 'your post' : p.name) + '">' + esc(PC.store.get(draftKey(p.id), '')) + '</textarea><button type="button" class="pc-btn small" data-act="reply" data-parent="' + esc(p.id) + '">Reply</button></div>' : '') + '</article>';
+    }).join('') + '</div>' + nextBtn(next) + '</section>';
+    body.innerHTML = h;
+    // Half-written posts and replies are kept on this device and warn before leaving.
+    body.querySelectorAll('#pcPostText, .pc-reply-text').forEach(function (t) {
+      t.addEventListener('input', function () { var k = draftKey(t.id === 'pcPostText' ? '' : t.closest('.pc-reply-box').dataset.parent); if (t.value.trim()) PC.store.set(k, t.value); else PC.store.del(k); });
+    });
+    PC.guard.registerExtra('discussion', function () { return Array.prototype.some.call(document.querySelectorAll('#pcPostText, .pc-reply-text'), function (t) { return t.value.trim(); }); });
+  }
+  function redrawDiscussion() { var u = unitOf(PC.state.week), a = actOf(u, PC.state.step), steps = u.activities, i = steps.indexOf(a), n = steps[i + 1]; drawDiscussion(PC.byId('pcStep'), u, a, S.item, n ? { k: n.id, label: n.title } : null); }
+  function sendPost(text, parentId, btn) {
+    if (!text.trim()) { PC.toast('Write something first.'); return; }
+    btn.disabled = true; var clientId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    PC.rpc('postDiscussion', { classId: PC.state.classId, as: asArg(), week: PC.state.week, act: PC.state.step, text: text, parentId: parentId || '', clientId: clientId }, { retry: true, timeoutMs: 45000 }).then(function (r) {
+      PC.store.del(draftKey(parentId)); S.item.discussion = r.discussion;
+      var key = 'w' + PC.state.week + '_' + PC.state.step, o = Object.assign({}, S.home.status[key] || {}, { state: 'submitted' });
+      if (parentId) o.replies = (o.replies || 0) + 1; else o.posts = (o.posts || 0) + 1; S.home.status[key] = o;
+      PC.guard.registerExtra('discussion', null);
+      redrawDiscussion();
+      PC.toast(parentId ? 'Reply posted.' : 'Posted. Now read your classmates’ posts and reply.', 'ok');
+    }).catch(function (e) { btn.disabled = false; PC.toast(e.message + ' Your writing is still here.', 'error'); });
+  }
+  A.post = function (el) { sendPost(PC.byId('pcPostText').value, '', el); };
+  A.reply = function (el) { var t = el.closest('.pc-reply-box').querySelector('textarea'); sendPost(t.value, el.dataset.parent, el); };
+  A.editPost = function (el) {
+    var id = el.dataset.id, p = (S.item.discussion.posts || []).filter(function (x) { return x.id === id; })[0]; if (!p) return;
+    PC.modal('<h2 id="pcModalTitle">Edit your post</h2><textarea id="pcEditText" class="pc-input" rows="7" maxlength="8000">' + esc(p.text) + '</textarea><div class="pc-row"><button type="button" class="pc-btn primary" id="pcEditSave">Save</button><button type="button" class="pc-btn" onclick="PC.closeModal()">Cancel</button></div>');
+    PC.byId('pcEditSave').onclick = function () {
+      var b = this; b.disabled = true;
+      PC.rpc('editDiscussion', { classId: PC.state.classId, as: asArg(), postId: id, text: PC.byId('pcEditText').value }, { retry: true }).then(function (r) {
+        PC.closeModal(); S.item.discussion = r.discussion; redrawDiscussion();
+      }).catch(function (e) { b.disabled = false; PC.toast(e.message, 'error'); });
+    };
+  };
+
+  window.__MB.Student = 'ok';
+})();
+</script>

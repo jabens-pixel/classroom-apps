@@ -1,0 +1,728 @@
+<script>
+// ============================================================================
+// Student pages: classes → home (the book, today's reading, the units) → a unit's steps: Read, then
+// each activity the teacher chose. The book is read in Sora or in the student's own copy.
+// ============================================================================
+(function () {
+  var S = NV.S = { home: null, item: null, evidence: null, loading: false };
+  NV.act = NV.act || {};
+  var A = NV.act;
+  document.addEventListener('click', function (e) {
+    var el = e.target.closest('[data-act]'); if (!el || !A[el.dataset.act]) return;
+    if (el.tagName === 'A' && !el.getAttribute('target')) e.preventDefault();
+    A[el.dataset.act](el, e);
+  });
+  function esc(s) { return NV.esc(s); }
+  function asArg() { return NV.state.as || ''; }
+  function readOnly() { return !!(S.home && S.home.me && S.home.me.readOnly); }
+  function me() { return (S.home && S.home.me) || {}; }
+  // ---------------------------------------------------------------- classes
+  NV.views.classes = function (app) {
+    var b = NV.boot, list = (b.studentClasses || []).slice();
+    var teaching = NV.boot.role !== 'student' ? (b.classes || []) : [];
+    var h = '<section class="nv-card"><h1>Your classes</h1>';
+    if (teaching.length) h += '<p class="nv-muted">You’re a teacher, so the Student view opens your own practice copy of a class: what students see, saved under your account.</p>';
+    var all = teaching.map(function (c) { return Object.assign({ teacherSelf: true }, c); }).concat(list);
+    h += all.length ? '<div class="nv-class-list">' + all.map(function (c) {
+      return '<button type="button" class="nv-class-pick" data-act="pickClass" data-class="' + esc(c.classId) + '"><span class="nv-class-pick-name">' + esc(c.className) + (c.period ? ' <small>Period ' + esc(c.period) + '</small>' : '') + '</span>' +
+        '<span class="nv-class-pick-book">' + (c.bookTitle ? esc(c.bookTitle) : 'No book yet') + '</span>' + (c.teacherSelf ? '<span class="nv-chip">Your class</span>' : '') + '</button>';
+    }).join('') + '</div>' : '<p>You haven’t joined a class yet.</p>';
+    h += '</section><section class="nv-card"><h2>Join a class</h2><p class="nv-muted">Type the class code from your teacher and your real name.</p>' +
+      '<form class="nv-join" id="nvJoin"><label class="nv-field"><span>Class code</span><input id="joinCode" class="nv-input nv-code-input" autocomplete="off" maxlength="8" required></label>' +
+      '<label class="nv-field"><span>First name</span><input id="joinFirst" class="nv-input" autocomplete="given-name" maxlength="40" required></label>' +
+      '<label class="nv-field"><span>Last name</span><input id="joinLast" class="nv-input" autocomplete="family-name" maxlength="40" required></label>' +
+      '<button type="submit" class="nv-btn primary">Join</button><p class="nv-form-msg" id="joinMsg" role="alert"></p></form></section>';
+    app.innerHTML = h;
+    NV.byId('nvJoin').onsubmit = function (e) {
+      e.preventDefault(); var btn = this.querySelector('button'); btn.disabled = true; NV.byId('joinMsg').textContent = '';
+      NV.rpc('joinClass', { code: NV.byId('joinCode').value, firstName: NV.byId('joinFirst').value, lastName: NV.byId('joinLast').value }, { retry: true }).then(function (r) {
+        NV.boot.studentClasses = r.classes; NV.state.classId = r.classId; NV.store.set('nvClass_' + NV.boot.email, r.classId); NV.go('home');
+      }).catch(function (err) { btn.disabled = false; NV.byId('joinMsg').textContent = err.message; });
+    };
+  };
+  A.pickClass = function (el) { NV.state.classId = el.dataset.class; NV.state.as = ''; NV.store.set('nvClass_' + NV.boot.email, el.dataset.class); NV.go('home'); };
+
+  // ---------------------------------------------------------------- shared bits
+  function ribbon() {
+    var m = me();
+    if (NV.state.as) return '<div class="nv-ribbon' + (m.readOnly ? '' : ' is-demo') + '"><span>' + (m.readOnly ? 'Viewing <b>' + esc(m.name) + '</b>’s work · read-only' : 'Using demo student <b>' + esc(m.name) + '</b> · saves work') + '</span><button type="button" class="nv-btn small" data-act="backToDashboard">← Back to dashboard</button></div>';
+    if (m.teacherSelf) return '<div class="nv-ribbon is-preview"><span>Student view of your own class. Hidden weeks and items show here for you, marked “Hidden from students”.</span></div>';
+    return '';
+  }
+  A.backToDashboard = function () { NV.leave(function () { NV.state.role = 'teacher'; NV.state.as = ''; NV.go('dashboard'); }); };
+  function accessBadge(book) {
+    var a = (S.home.access || {})[book.access] || { label: 'In Sora', note: '' };
+    return '<span class="nv-access nv-access-' + esc(book.access) + '" title="' + esc(a.note) + '">' + (book.access === 'always' ? '∞ ' : '') + esc(a.label) + '</span>';
+  }
+  function coverHtml(book, big) {
+    if (book.coverUrl) return '<img class="nv-cover' + (big ? ' is-big' : '') + '" src="' + esc(book.coverUrl) + '" alt="Cover of ' + esc(book.title) + '" referrerpolicy="no-referrer">';
+    // A typographic cover so the page never shows a broken image.
+    return '<div class="nv-cover nv-cover-type' + (big ? ' is-big' : '') + '" aria-hidden="true"><span>' + esc(book.title) + '</span><small>' + esc(book.author || '') + '</small></div>';
+  }
+  function swatch(color) { return '<span class="nv-swatch nv-hl-' + esc(color) + '" aria-hidden="true"></span>'; }
+  function keyChip(k) { return '<span class="nv-key-chip nv-hlbg-' + esc(k.color) + '">' + esc(NV.colorName[k.color] || k.color) + ' = <b>' + esc(k.label) + '</b></span>'; }
+
+  function unitWordLower() { return String((S.home && S.home.unitWord) || 'Week').toLowerCase(); }
+  function unitOf(n) { return (S.home && S.home.units || []).filter(function (u) { return u.n === Number(n); })[0]; }
+  function actOf(u, id) { return u ? (u.activities || []).filter(function (a) { return a.id === id; })[0] : null; }
+  function isSora() { return !S.home || S.home.source !== 'own'; }
+  function itemStatus(u, a) {
+    var key = 'w' + u.n + '_' + a.id, st = (S.home.status || {})[key] || {}, g = (S.home.grades || {})[key];
+    if (g && (g.excluded || (g.score !== null && g.score !== undefined))) return { cls: 'graded', text: g.excluded ? 'Left out of grade' : 'Graded' };
+    if (a.form === 'quiz' && st.state === 'submitted') return { cls: 'graded', text: 'Scored' };
+    if (st.state === 'submitted') return { cls: 'in', text: st.edited ? 'Turned in · edited' : 'Turned in' };
+    if (st.state === 'draft') return { cls: 'progress', text: 'In progress' };
+    return { cls: 'none', text: 'Not started yet' };
+  }
+  function readingLine(u) { var r = u.reading || {}; return r.label || ''; }
+  function soraButtons(book, small) {
+    if (!book.soraUrl) return '<span class="nv-chip is-warn">Your teacher hasn’t added the Sora link yet</span>';
+    return '<a class="nv-btn primary' + (small ? ' small' : '') + '" href="' + esc(book.soraUrl) + '" target="_blank" rel="noopener">Open in Sora ↗</a>' +
+      '<button type="button" class="nv-btn' + (small ? ' small' : '') + '" data-act="sideBySide" title="Opens Sora in its own window on the left half of the screen">⧉ Read side-by-side</button>' +
+      (book.audioUrl ? '<a class="nv-btn ghost' + (small ? ' small' : '') + '" href="' + esc(book.audioUrl) + '" target="_blank" rel="noopener">🎧 Audiobook ↗</a>' : '');
+  }
+  /** Sora can't be shown inside this page, so it opens in its own window on the left; this page works on the right. */
+  A.sideBySide = function () {
+    var book = S.home && S.home.book; if (!book || !book.soraUrl) return;
+    var sw = screen.availWidth || 1280, sh = screen.availHeight || 800, w = Math.round(sw * 0.56);
+    var win = null;
+    try { win = window.open(book.soraUrl, 'nvSora', 'popup=yes,width=' + w + ',height=' + sh + ',left=0,top=0'); } catch (e) {}
+    if (!win) { window.open(book.soraUrl, '_blank', 'noopener'); }
+    document.body.classList.add('nv-side');
+    NV.store.set('nvSide', true);
+    NV.toast('Sora is open on the left. On a Chromebook, press Alt + ] to snap this window to the right.');
+  };
+  A.sideOff = function () { document.body.classList.remove('nv-side'); NV.store.set('nvSide', false); };
+  if (NV.store.get('nvSide', false)) document.body.classList.add('nv-side');
+
+  function loadHome(cb) {
+    S.loading = true;
+    NV.rpc('getStudentHome', { classId: NV.state.classId, as: asArg() }, { retry: true }).then(function (r) { S.home = r; S.loading = false; cb(null, r); })
+      .catch(function (e) { S.loading = false; cb(e); });
+  }
+
+  // ---------------------------------------------------------------- home
+  function bookCardHtml(h) {
+    var b = h.book, p = h.progress || {};
+    var actions, note;
+    if (isSora()) {
+      actions = '<div class="nv-row nv-hero-actions">' + soraButtons(b) + '</div>' +
+        (b.access === 'assigned' ? '' : '<label class="nv-check nv-borrow"><input type="checkbox" data-act="borrowed" ' + (p.borrowedAt ? 'checked' : '') + (readOnly() ? ' disabled' : '') + '><span>' + (p.borrowedAt ? 'I have the book in Sora ✓' : 'I’ve borrowed the book in Sora') + '</span></label>');
+      note = '<div class="nv-hero-badges">' + accessBadge(b) + '</div><p class="nv-hero-note">' + esc(((h.access || {})[b.access] || {}).note || '') + '</p>';
+    } else {
+      actions = '<label class="nv-check nv-borrow"><input type="checkbox" data-act="borrowed" ' + (p.borrowedAt ? 'checked' : '') + (readOnly() ? ' disabled' : '') + '><span>' + (p.borrowedAt ? 'I have my copy ✓' : 'I have my copy of the book') + '</span></label>';
+      note = '<div class="nv-hero-badges"><span class="nv-access nv-access-own">📖 Your own copy</span></div><p class="nv-hero-note">Read in your print copy. Each day or week here tells you what to read and where to stop.' + (b.edition ? ' Page numbers follow ' + esc(b.edition) + '.' : '') + '</p>';
+    }
+    return '<section class="nv-card nv-hero">' + coverHtml(b, true) + '<div class="nv-hero-copy"><div class="nv-eyebrow">Our novel</div><h1 class="nv-book-title">' + esc(b.title) + '</h1>' + (b.subtitle ? '<div class="nv-book-sub">' + esc(b.subtitle) + '</div>' : '') +
+      (b.author ? '<div class="nv-book-author">by ' + esc(b.author) + '</div>' : '') + note + actions + (b.printNote ? '<p class="nv-small nv-muted">' + esc(b.printNote) + '</p>' : '') + '</div></section>';
+  }
+  /** The unit to start with: today's (day by day), otherwise the newest one that is open. */
+  function currentUnit(h) {
+    var open = (h.units || []).filter(function (u) { return u.anyOpen; });
+    if (h.structure === 'daily') { var t = open.filter(function (u) { return u.date === h.today; })[0]; if (t) return t; var past = open.filter(function (u) { return u.date && u.date <= h.today; }); if (past.length) return past[past.length - 1]; }
+    return open[open.length - 1] || null;
+  }
+  function unitCardHtml(h, u, big) {
+    var p = h.progress || {}, pr = (p.weeks || {})[u.n] || {};
+    var readTxt = pr.status === 'done' ? '✓ Read' : pr.status === 'partway' ? 'Reading' + (pr.where ? ' · at ' + esc(pr.where) : '') : 'Not started';
+    var isToday = h.structure === 'daily' && u.date === h.today;
+    return '<article class="nv-week-card' + (big ? ' is-current' : '') + '"><div class="nv-week-head"><span class="nv-eyebrow">' + esc(u.label) + (u.date ? ' · ' + esc(NV.fmtDay(u.date)) : '') + (isToday ? ' · Today' : '') + '</span><h3>' + esc(u.title || u.label) + '</h3></div>' +
+      '<p class="nv-today-read"><span>' + (h.structure === 'daily' ? 'Read today' : 'Read') + '</span>' + esc(readingLine(u) || 'See your teacher') + '</p>' +
+      (u.eq ? '<p class="nv-eq-mini">' + esc(u.eq) + '</p>' : '') +
+      '<ul class="nv-week-items"><li class="' + (pr.status === 'done' ? 'is-graded' : pr.status === 'partway' ? 'is-progress' : '') + '"><span>Read</span><em>' + readTxt + '</em></li>' + u.activities.map(function (a) {
+        if (!u.open[a.id] && !me().teacherSelf) return '<li class="is-locked"><span>' + esc(a.icon + ' ' + a.title) + '</span><em>Not open yet</em></li>';
+        var s = itemStatus(u, a); return '<li class="is-' + s.cls + '"><span>' + esc(a.icon + ' ' + a.title) + '</span><em>' + esc(a.graded ? s.text : (s.cls === 'none' ? 'Practice' : s.text)) + (u.due[a.id] ? ' · due ' + esc(NV.fmtDate(u.due[a.id])) : '') + (!u.open[a.id] ? ' · hidden from students' : '') + '</em></li>';
+      }).join('') + '</ul><button type="button" class="nv-btn primary nv-week-open" data-act="openWeek" data-week="' + u.n + '">Open ' + esc(u.label) + ' →</button></article>';
+  }
+  NV.views.home = function (app) {
+    if (!NV.state.classId) return NV.go('classes');
+    app.innerHTML = '<section class="nv-card nv-skeleton"><p>Opening your novel study…</p></section>';
+    loadHome(function (err, h) {
+      if (err) return NV.fail(app, err);
+      if (NV.state.view !== 'home') return;
+      var out = ribbon() + '<div class="nv-crumbs"><button type="button" class="nv-link" data-act="toClasses">← Your classes</button><span>' + esc(h.klass.className) + '</span></div>';
+      if (!h.book) { app.innerHTML = out + '<section class="nv-card"><h1>No book yet</h1><p>Your teacher hasn’t set up the book for this class. Check back soon.</p></section>'; return; }
+      out += bookCardHtml(h);
+      var cur = currentUnit(h);
+      if (cur) out += '<section class="nv-card nv-now"><div class="nv-card-head"><h2>' + (h.structure === 'daily' && cur.date === h.today ? 'Today' : 'Now') + '</h2></div><div class="nv-weeks is-one">' + unitCardHtml(h, cur, true) + '</div></section>';
+      if (h.highlightKey && h.highlightKey.length) {
+        out += '<section class="nv-card"><div class="nv-card-head"><h2>' + (isSora() ? 'Our highlight key' : 'Our sticky-note key') + '</h2></div><p class="nv-muted">' +
+          (isSora() ? 'When you highlight in Sora, use these colors. Everyone uses the same key, so your highlights turn into evidence you can bring back here.' : 'Flag your copy with sticky notes (or a pencil mark) in these colors. Everyone uses the same key, so your notes turn into evidence you can bring back here.') + '</p>' +
+          '<ul class="nv-key">' + h.highlightKey.map(function (k) { return '<li>' + swatch(k.color) + '<div><b>' + esc(NV.colorName[k.color] || k.color) + ': ' + esc(k.label) + '</b>' + (k.hint ? '<span>' + esc(k.hint) + '</span>' : '') + '</div></li>'; }).join('') + '</ul></section>';
+      }
+      var res = h.resume;
+      if (res && res.view === 'week' && (!cur || res.week !== cur.n) && h.units.some(function (u) { return u.n === res.week; })) {
+        var ru = unitOf(res.week), ra = actOf(ru, res.step);
+        out += '<button type="button" class="nv-resume" data-act="openWeek" data-week="' + res.week + '" data-step="' + esc(res.step || 'read') + '"><span>Pick up where you left off</span><b>' + esc(ru.label) + (ra ? ' · ' + esc(ra.title) : '') + ' →</b></button>';
+      }
+      out += '<section class="nv-card"><div class="nv-card-head"><h2>All ' + esc(unitWordLower()) + 's</h2></div>';
+      if (!h.units.length) out += '<p>Your teacher hasn’t opened the first ' + esc(unitWordLower()) + ' yet.</p>';
+      out += '<div class="nv-weeks">' + h.units.map(function (u) { return unitCardHtml(h, u, false); }).join('') + '</div></section>';
+      app.innerHTML = out;
+    });
+  };
+  A.toClasses = function () { NV.leave(function () { NV.state.classId = ''; NV.go('classes'); }); };
+  A.borrowed = function (el) {
+    var on = el.checked; el.disabled = true;
+    NV.rpc('saveProgress', { classId: NV.state.classId, as: asArg(), borrowed: on }, { retry: true }).then(function (r) { S.home.progress = r.progress; NV.render(); })
+      .catch(function (e) { el.checked = !on; el.disabled = false; NV.toast(e.message, 'error'); });
+  };
+  A.openWeek = function (el) { NV.leave(function () { NV.go('week', { week: Number(el.dataset.week), step: el.dataset.step || 'read' }); }); };
+
+  // ---------------------------------------------------------------- a unit (week, arc or day)
+  var resumeT = null;
+  function saveResume() {
+    if (readOnly()) return; clearTimeout(resumeT);
+    resumeT = setTimeout(function () { NV.rpc('saveResume', { classId: NV.state.classId, as: asArg(), route: { view: 'week', week: NV.state.week, step: NV.state.step } }).catch(function () {}); }, 1500);
+  }
+  NV.views.week = function (app) {
+    if (!S.home || S.home.klass.classId !== NV.state.classId) {
+      app.innerHTML = '<section class="nv-card nv-skeleton"><p>Opening…</p></section>';
+      return loadHome(function (err) { if (err) return NV.fail(app, err); if (NV.state.view === 'week') NV.views.week(app); });
+    }
+    var u = unitOf(NV.state.week);
+    if (!u) { app.innerHTML = ribbon() + '<section class="nv-card"><h1>That isn’t open</h1><p><button class="nv-btn" data-act="toHome">← Back</button></p></section>'; return; }
+    var steps = [{ k: 'read', label: 'Read', icon: '📖' }].concat(u.activities.map(function (a) { return { k: a.id, label: a.title, icon: a.icon, act: a }; }));
+    var step = steps.some(function (x) { return x.k === NV.state.step; }) ? NV.state.step : 'read';
+    NV.state.step = step; saveResume();
+    var nav = '<nav class="nv-steps" style="--n:' + steps.length + '" aria-label="Steps">' + steps.map(function (s, i) {
+      var a = s.act, open = !a || u.open[a.id] || me().teacherSelf, st = a ? itemStatus(u, a) : null;
+      var cls = 'nv-step' + (s.k === step ? ' is-on' : '') + (!open ? ' is-locked' : '') + (st ? ' st-' + st.cls : '');
+      return '<button type="button" class="' + cls + '" data-act="toStep" data-step="' + esc(s.k) + '"' + (s.k === step ? ' aria-current="step"' : '') + (!open ? ' title="Not open yet"' : '') + '><span class="nv-step-n">' + (i + 1) + '</span><span class="nv-step-label">' + esc(s.label) + '</span>' + (st && st.cls !== 'none' ? '<span class="nv-step-dot" aria-hidden="true"></span>' : '') + '</button>';
+    }).join('') + '</nav>';
+    app.innerHTML = ribbon() + '<div class="nv-crumbs"><button type="button" class="nv-link" data-act="toHome">← All ' + esc(unitWordLower()) + 's</button><span>' + esc(S.home.book.title) + '</span></div>' +
+      '<header class="nv-week-banner"><div class="nv-eyebrow">' + esc(u.label) + (u.date ? ' · ' + esc(NV.fmtDay(u.date)) : '') + '</div><h1>' + esc(u.title || u.label) + '</h1>' +
+      '<p class="nv-today-read is-big"><span>' + (S.home.structure === 'daily' ? 'Read today' : 'Read') + '</span>' + esc(readingLine(u) || 'See your teacher') + (u.reading && u.reading.stopAt ? ' <small>· stop at ' + esc(u.reading.stopAt) + '</small>' : '') + '</p>' +
+      (u.eq ? '<p class="nv-eq"><span>Essential question</span>' + esc(u.eq) + '</p>' : '') + '</header>' + nav + '<div id="nvStep" class="nv-step-body"></div>';
+    var body = NV.byId('nvStep');
+    if (step === 'read') return STEP_VIEWS.read(body, u, steps[1] ? steps[1] : null);
+    var a = actOf(u, step);
+    if (!u.open[a.id] && !me().teacherSelf) { body.innerHTML = '<section class="nv-card"><h2>Not open yet</h2><p>Your teacher hasn’t opened “' + esc(a.title) + '” yet. Anything you already wrote is kept.</p></section>'; return; }
+    var idx = steps.map(function (s) { return s.k; }).indexOf(step), next = steps[idx + 1] || null;
+    (STEP_VIEWS[a.form] || STEP_VIEWS.text)(body, u, a, next);
+  };
+  A.toHome = function () { NV.leave(function () { NV.go('home'); }); };
+  A.toStep = function (el) { NV.leave(function () { NV.state.step = el.dataset.step; NV.render(); try { window.scrollTo(0, 0); } catch (e) {} }); };
+  function nextBtn(next) { return next ? '<div class="nv-next"><button type="button" class="nv-btn primary" data-act="toStep" data-step="' + esc(next.k) + '">Next: ' + esc(next.label) + ' →</button></div>' : '<div class="nv-next"><button type="button" class="nv-btn" data-act="toHome">← All ' + esc(unitWordLower()) + 's</button></div>'; }
+
+  function gradedHead(u, a, extra) {
+    var st = itemStatus(u, a), type;
+    if (!a.graded) type = null;
+    else if (u.noGrade[a.id]) type = 'Not graded this time';
+    else if (a.gradeType === 'auto') type = a.points + ' pts · scores itself';
+    else if (a.gradeType === 'rubric') type = a.points + ' pts · scored on a 7-level rubric';
+    else type = a.points + ' pts';
+    return '<div class="nv-graded-head">' + (type ? '<span class="nv-graded-badge">Graded assignment · ' + esc(type) + '</span>' : '<span class="nv-practice">Practice: not scored on its own</span>') + '<span class="nv-status nv-status-' + st.cls + '">' + esc(st.text) + '</span>' +
+      (u.due[a.id] ? '<span class="nv-due">Due ' + esc(NV.fmtDate(u.due[a.id], true)) + '</span>' : '') + (!u.open[a.id] ? '<span class="nv-chip is-warn">Hidden from students</span>' : '') + (extra || '') + '</div>';
+  }
+  function feedbackHtml(item, a) {
+    var g = item.grade; if (!g) return '';
+    if (g.excluded) return '<div class="nv-feedback"><b>Your teacher left this out of your grade.</b></div>';
+    if (g.score === null || g.score === undefined) return g.comment ? '<div class="nv-feedback"><h3>Feedback from your teacher</h3><p>' + esc(g.comment) + '</p></div>' : '';
+    var label = a.gradeType === 'rubric' ? ((item.rubric || []).filter(function (r) { return r.score === Math.round(g.score); })[0] || {}).label : (g.score >= a.points ? 'Complete' : g.score > 0 ? 'Partly complete' : 'Incomplete');
+    return '<div class="nv-feedback"><h3>Graded: ' + esc(label || '') + ' · ' + esc(g.score) + '/' + esc(a.points) + '</h3>' + (g.comment ? '<p>' + esc(g.comment) + '</p>' : '') + '</div>';
+  }
+  function howScored(item) {
+    if (item.rubric) return '<details class="nv-howscored"><summary>How it’s scored (7 levels)</summary><ol class="nv-rubric-list">' + item.rubric.map(function (r) { return '<li><b>' + r.score + ' · ' + esc(r.label) + '</b> ' + esc(r.text) + '</li>'; }).join('') + '</ol></details>';
+    if (item.complete) return '<details class="nv-howscored"><summary>How it’s scored</summary><p><b>Complete:</b> ' + esc(item.complete.complete) + '</p><p><b>Incomplete:</b> ' + esc(item.complete.incomplete) + '</p></details>';
+    return '';
+  }
+  function promptHtml(a) {
+    return (a.prompt ? '<div class="nv-prompt">' + esc(a.prompt) + '</div>' : '') + ((a.directions || []).length ? '<ol class="nv-directions">' + a.directions.map(function (d) { return '<li>' + esc(d) + '</li>'; }).join('') + '</ol>' : '');
+  }
+
+  var STEP_VIEWS = {};
+
+  // ---------- Read (not scored on its own) ----------
+  STEP_VIEWS.read = function (body, u, next) {
+    var b = S.home.book, pr = ((S.home.progress || {}).weeks || {})[u.n] || {}, key = S.home.highlightKey || [];
+    var focus = key.filter(function (k) { return (u.focus || []).indexOf(k.color) >= 0; });
+    var where = isSora() ? '<div class="nv-row">' + soraButtons(b) + '</div><p class="nv-small nv-muted">Sora opens in its own window. Sign in with your school account if it asks. <b>Side-by-side</b> puts the book on the left and this page on the right.</p>'
+      : '<p class="nv-own-copy">📖 Read in your own copy' + (b.edition ? ' (' + esc(b.edition) + ')' : '') + '.' + (b.printNote ? ' ' + esc(b.printNote) : '') + '</p>';
+    body.innerHTML = '<section class="nv-card nv-read"><div class="nv-practice">Not scored on its own: this step gets you ready for the rest.</div>' +
+      '<h2>' + (S.home.structure === 'daily' ? 'Read today: ' : 'Read ') + esc(readingLine(u) || 'what your teacher assigns') + '</h2>' + (u.reading && u.reading.stopAt ? '<p class="nv-stop"><b>Stop when you reach:</b> ' + esc(u.reading.stopAt) + '</p>' : '') +
+      where +
+      (focus.length ? '<div class="nv-focus"><h3>' + (isSora() ? 'While you read, highlight in Sora' : 'While you read, flag your copy') + '</h3><ul class="nv-key">' + focus.map(function (k) { return '<li>' + swatch(k.color) + '<div><b>' + esc(NV.colorName[k.color]) + ': ' + esc(k.label) + '</b>' + (k.hint ? '<span>' + esc(k.hint) + '</span>' : '') + '</div></li>'; }).join('') + '</ul>' +
+        (isSora() ? '<p class="nv-small nv-muted">Tap and hold (or select) words in Sora, then choose the color. Add a note to the highlight to say why it matters.</p>' : '<p class="nv-small nv-muted">Put a sticky note (or a light pencil mark) by the line and jot a word or two about why it matters.</p>') + '</div>' : '') +
+      '</section><section class="nv-card"><h2>Where are you in the reading?</h2><div class="nv-checkin" role="group" aria-label="Reading check-in">' +
+      [['none', 'Not started'], ['partway', 'Partway'], ['done', 'Finished this reading']].map(function (o) {
+        return '<button type="button" class="nv-pill' + (pr.status === o[0] ? ' is-on' : '') + '" data-act="checkin" data-status="' + o[0] + '" aria-pressed="' + (pr.status === o[0]) + '"' + (readOnly() ? ' disabled' : '') + '>' + o[1] + '</button>';
+      }).join('') + '</div><label class="nv-field nv-where"><span>Where did you stop? <small>(chapter, page' + (isSora() ? ', or the % Sora shows' : '') + ')</small></span><input class="nv-input" id="nvWhere" maxlength="60" value="' + esc(pr.where || '') + '" placeholder="' + (isSora() ? 'e.g. Ch. 3, p. 41 or 38%' : 'e.g. Ch. 3, p. 41') + '"' + (readOnly() ? ' disabled' : '') + '></label>' +
+      '<p class="nv-small nv-muted" id="nvCheckinMsg">' + (pr.at ? 'Last updated ' + esc(NV.fmtDate(pr.at, true)) : '') + '</p>' + nextBtn(next) + '</section>';
+    NV.guard.close();
+    var whereT = null, w = NV.byId('nvWhere'); if (w) w.addEventListener('input', function () { clearTimeout(whereT); whereT = setTimeout(function () { checkin(pr.status || 'partway', w.value); }, 1200); });
+  };
+  function checkin(status, where) {
+    NV.rpc('saveProgress', { classId: NV.state.classId, as: asArg(), week: NV.state.week, status: status, where: where }, { retry: true }).then(function (r) {
+      S.home.progress = r.progress; var m = NV.byId('nvCheckinMsg'); if (m) m.textContent = 'Saved ' + NV.fmtDate(new Date().toISOString(), true);
+    }).catch(function (e) { NV.toast(e.message, 'error'); });
+  }
+  A.checkin = function (el) {
+    var where = NV.byId('nvWhere') ? NV.byId('nvWhere').value : '';
+    document.querySelectorAll('.nv-checkin .nv-pill').forEach(function (b) { b.classList.toggle('is-on', b === el); b.setAttribute('aria-pressed', b === el); });
+    ((S.home.progress.weeks = S.home.progress.weeks || {})[NV.state.week] = { status: el.dataset.status, where: where });
+    checkin(el.dataset.status, where);
+  };
+
+  // ---------- loading one activity ----------
+  function loadItem(body, a, cb) {
+    body.innerHTML = '<section class="nv-card nv-skeleton"><p>Loading…</p></section>';
+    NV.rpc('getStudentItem', { classId: NV.state.classId, as: asArg(), week: NV.state.week, act: a.id }, { retry: true }).then(function (r) {
+      if (NV.state.view !== 'week' || NV.state.step !== a.id) return;
+      S.item = r; cb(r);
+    }).catch(function (e) { NV.fail(body, e); });
+  }
+  function saveBar(item, label) {
+    var ro = readOnly();
+    var sub = item.submittedAt ? '<span class="nv-turned">Turned in ' + esc(NV.fmtDate(item.submittedAt, true)) + '</span>' : '';
+    return '<div class="nv-savebar"><span id="nvSaveState" class="nv-save-state" aria-live="polite"></span>' + sub +
+      (ro ? '' : '<button type="button" class="nv-btn primary" id="nvTurnIn" data-act="turnIn">' + (item.submittedAt ? 'Turn in again' : 'Turn in ' + esc(label)) + '</button>') + '</div>' +
+      '<p class="nv-small nv-muted" id="nvEditedNote"' + (item.submittedAt && item.subFp && item.fp !== item.subFp ? '' : ' hidden') + '>You changed this after turning it in. Turn it in again to send the changes to your teacher.</p>';
+  }
+  function unreadable(body, what) { body.innerHTML = '<section class="nv-card nv-error"><h2>Your saved ' + esc(what) + ' couldn’t be read</h2><p>Nothing was saved over it. Tell your teacher so they can bring back a backup.</p></section>'; }
+  function openGuard(u, a, item, data, readForm, setForm) {
+    return NV.guard.open({ classId: NV.state.classId, as: asArg(), email: me().email, week: u.n, act: a.id, key: item.key, data: data, base: item.updatedAt || item.loadedAt, submittedAt: item.submittedAt, readOnly: readOnly(),
+      readForm: readForm, setForm: setForm, onSaved: onSavedHook });
+  }
+  A.turnIn = function (el) {
+    if (el.disabled) return; el.disabled = true; var old = el.textContent; el.textContent = 'Turning in…';
+    NV.guard.submit().then(function (r) {
+      el.disabled = false;
+      if (r && r.ok) {
+        el.textContent = 'Turn in again';
+        var d = NV.guard.current(); if (d) { S.item.submittedAt = d.submittedAt; S.item.subFp = d.subFp; S.item.fp = d.fp; }
+        var key = 'w' + NV.state.week + '_' + NV.state.step; S.home.status[key] = Object.assign({}, S.home.status[key] || {}, { state: 'submitted', edited: false, submittedAt: d && d.submittedAt });
+        var n = NV.byId('nvEditedNote'); if (n) n.hidden = true;
+        var t = document.querySelector('.nv-turned');
+        if (!t) { var ss = NV.byId('nvSaveState'); if (ss) { ss.insertAdjacentHTML('afterend', '<span class="nv-turned"></span>'); t = document.querySelector('.nv-turned'); } }
+        if (t) t.textContent = 'Turned in ' + NV.fmtDate(d.submittedAt, true);
+        NV.toast('Turned in. Your teacher can see it now.', 'ok');
+      } else { el.textContent = old; }
+    });
+  };
+  function onSavedHook(res, submit) {
+    if (!S.item) return;
+    var n = NV.byId('nvEditedNote');
+    if (n) n.hidden = !(S.item.submittedAt || submit) || submit || (res.subFp && res.fp === res.subFp);
+  }
+
+
+  // ---------- Evidence Log ----------
+  var COLORS = ['gold', 'pink', 'green'];   // Sora's highlight colors
+  STEP_VIEWS.evidence = function (body, u, a, next) {
+    loadItem(body, a, function (item) {
+      var key = S.home.highlightKey || [], ro = readOnly();
+      if (item.unreadable) return unreadable(body, a.title);
+      var data = item.data || {}; if (!Array.isArray(data.cards)) data.cards = [];
+      var focus = key.filter(function (k) { return (u.focus || []).indexOf(k.color) >= 0; });
+      body.innerHTML = '<section class="nv-card nv-evidence">' + gradedHead(u, a) +
+        '<h2>' + esc(a.title) + '</h2>' + promptHtml(a) + '<p>Collect evidence from ' + esc(readingLine(u) || 'the reading') + '. For each one: where it is, a few words from the book, and why it matters.' +
+        (focus.length ? ' Look for ' + focus.map(keyChip).join(' ') + '.' : '') + '</p>' + howScored(item) +
+        feedbackHtml(item, a) + '<div id="nvOffer" class="nv-offer" hidden></div>' +
+        (ro || !isSora() ? '' : '<details class="nv-import"' + (data.cards.length ? '' : ' open') + '><summary><b>Bring in your Sora highlights</b> <span class="nv-muted">(paste, and the app makes the cards)</span></summary>' +
+          '<ol class="nv-small"><li>In Sora, open this book’s <b>Notes &amp; highlights</b>.</li><li>Choose <b>Copy to clipboard</b> (you can filter by color first).</li><li>Paste here and press <b>Make cards</b>. Each highlight becomes one card with its color, its words, your note and its position.</li></ol>' +
+          '<textarea id="nvInbox" class="nv-input nv-inbox" rows="5" placeholder="Paste your Sora highlights and notes here">' + esc(data.inbox || '') + '</textarea>' +
+          '<div class="nv-row"><button type="button" class="nv-btn" data-act="makeCards">Make cards</button><span class="nv-small nv-muted" id="nvInboxMsg"></span></div></details>') +
+        '<p class="nv-made-msg" id="nvMadeMsg" role="status" hidden></p><div id="nvCards" class="nv-cards"></div>' +
+        (ro ? '' : '<button type="button" class="nv-btn ghost" data-act="addCard">+ Add a card' + (isSora() ? ' by hand' : '') + '</button>') +
+        '<p class="nv-small nv-muted">Keep the words from the book short: a phrase or a sentence. Your explanation is what counts.</p>' +
+        saveBar(item, a.title) + nextBtn(next) + '</section>';
+      S.evidence = data;
+      renderCards(data.cards, key, ro);
+      if (!ro && data.cards.some(NV.isImportDebris)) { var mm0 = NV.byId('nvMadeMsg'); if (mm0) { mm0.textContent = 'Some cards look like they were split apart by an earlier paste. Copy your notes from Sora again and press Make cards: the broken ones are replaced, and cards you wrote yourself are kept.'; mm0.hidden = false; } var imp0 = document.querySelector('.nv-import'); if (imp0) imp0.open = true; }
+      var root = body.querySelector('.nv-evidence');
+      openGuard(u, a, item, data, readEvidence, function (d) { S.evidence = d; renderCards(d.cards || [], key, ro); var ib = NV.byId('nvInbox'); if (ib) ib.value = d.inbox || ''; });
+      NV.stats.attach(root, { classId: NV.state.classId, key: item.key, as: asArg(), readOnly: ro, initial: item.stats });
+      root.addEventListener('input', function (e) { if (e.target.closest('.nv-card-ev, #nvInbox')) NV.guard.changed(); });
+      root.addEventListener('change', function (e) { if (e.target.closest('.nv-card-ev')) NV.guard.changed(); });
+    });
+  };
+  function cardHtml(c, i, key, ro) {
+    // One consolidated card per highlight: what the color means, where it is, the words, why it matters.
+    var k = key.filter(function (x) { return x.color === c.color; })[0];
+    var meaning = k ? k.label : '';
+    return '<article class="nv-card-ev nv-hlside-' + esc(c.color || 'none') + '" data-id="' + esc(c.id) + '" data-src="' + esc(c.src || '') + '">' +
+      '<div class="nv-card-ev-head"><span class="nv-card-ev-n">' + (i + 1) + '</span>' +
+      '<label class="nv-ev-meaning nv-hlbg-' + esc(c.color || 'none') + '"><span class="nv-swatch nv-hl-' + esc(c.color || 'none') + '" aria-hidden="true"></span>' +
+      '<select class="nv-ev-color" aria-label="Highlight color and what it means"' + (ro ? ' disabled' : '') + '><option value="">No color</option>' + COLORS.filter(function (x) { return key.some(function (k2) { return k2.color === x; }) || x === c.color; }).map(function (x) {
+        var kk = key.filter(function (k2) { return k2.color === x; })[0];
+        return '<option value="' + x + '"' + (c.color === x ? ' selected' : '') + '>' + esc(NV.colorName[x] || x) + (kk ? ' = ' + esc(kk.label) : '') + '</option>';
+      }).join('') + '</select></label>' +
+      '<input class="nv-input nv-ev-loc" maxlength="120" placeholder="Where? Ch. 2, p. 31" value="' + esc(c.loc || '') + '" aria-label="Location in the book"' + (ro ? ' disabled' : '') + '>' +
+      (c.src === 'sora' ? '<span class="nv-ev-src" title="Brought in from your Sora notes">from Sora</span>' : '') +
+      (ro ? '' : '<button type="button" class="nv-icon-btn" data-act="removeCard" title="Remove this card" aria-label="Remove card ' + (i + 1) + '">✕</button>') + '</div>' +
+      '<label class="nv-field"><span>From the book</span><textarea class="nv-input nv-ev-text" rows="2" maxlength="2000"' + (ro ? ' disabled' : '') + '>' + esc(c.text || '') + '</textarea></label>' +
+      '<label class="nv-field"><span>Why it matters' + (meaning ? ' <small>(' + esc(meaning.toLowerCase()) + ')</small>' : '') + '</span><textarea class="nv-input nv-ev-why" rows="2" maxlength="4000" data-stat-box="evidence" placeholder="' +
+        esc(meaning ? 'What does this show about ' + meaning.toLowerCase() + '? Why does it matter?' : 'What does this show? Why does it matter?') + '"' + (ro ? ' disabled' : '') + '>' + esc(c.why || '') + '</textarea></label></article>';
+  }
+  function renderCards(cards, key, ro) {
+    var box = NV.byId('nvCards'); if (!box) return;
+    box.innerHTML = cards.length ? cards.map(function (c, i) { return cardHtml(c, i, key, ro); }).join('') : '<p class="nv-empty">No evidence yet. Paste your Sora highlights above, or add a card by hand.</p>';
+    if (NV.stats) box.querySelectorAll('[data-stat-box]').forEach(function (el) { NV.stats.bind(el); });
+  }
+  function readEvidence() {
+    var cards = [];
+    document.querySelectorAll('#nvCards .nv-card-ev').forEach(function (el) {
+      cards.push({ id: el.dataset.id, src: el.dataset.src || '', color: el.querySelector('.nv-ev-color').value, loc: el.querySelector('.nv-ev-loc').value, text: el.querySelector('.nv-ev-text').value, why: el.querySelector('.nv-ev-why').value });
+    });
+    var ib = NV.byId('nvInbox');
+    return { cards: cards, inbox: ib ? ib.value : (S.evidence && S.evidence.inbox) || '' };
+  }
+  function newId() { return 'c' + Math.random().toString(36).slice(2, 9); }
+  A.addCard = function () {
+    var d = readEvidence(); d.cards.push({ id: newId(), color: '', loc: '', text: '', why: '' });
+    renderCards(d.cards, S.home.highlightKey || [], false); NV.guard.changed();
+    var last = document.querySelector('#nvCards .nv-card-ev:last-child .nv-ev-loc'); if (last) last.focus();
+  };
+  A.removeCard = function (el) {
+    var id = el.closest('.nv-card-ev').dataset.id, d = readEvidence();
+    var c = d.cards.filter(function (x) { return x.id === id; })[0];
+    if (c && (c.text.trim() || c.why.trim()) && !confirm('Remove this card?')) return;
+    d.cards = d.cards.filter(function (x) { return x.id !== id; });
+    renderCards(d.cards, S.home.highlightKey || [], false); NV.guard.changed();
+  };
+  /**
+   * Turns pasted Sora notes into cards. Sora's "Copy to clipboard" looks like:
+   *   Notes and highlights for / <title> / <author>
+   *   <Color> Note:            (or "<Color> Highlight:")
+   *   <the student's note, one or more lines>
+   *   _on the text:_
+   *   "<the highlighted words>"
+   *   Created on: Oct 18, at position: 6%
+   *   ...  by Sora
+   * Each block becomes ONE card: color (its meaning comes from the class key), the words, the
+   * note as "why it matters", and the position as the location. Anything else is read loosely.
+   * Returns {cards, title, format}.
+   */
+  NV.parseSoraNotes = function (raw) {
+    // Clipboard text can carry invisible characters (zero-width spaces, non-breaking spaces,
+    // line separators, Windows line ends); they are cleaned out before reading.
+    var text = String(raw || '').replace(/\r\n?/g, '\n').replace(/[\u2028\u2029]/g, '\n').replace(/[\u200B-\u200D\u2060\uFEFF]/g, '').replace(/[\u00A0\u2007\u202F]/g, ' ').trim();
+    if (!text) return { cards: [], title: '', format: '' };
+    var lines = text.split('\n');
+    // "Gold Note:", "Pink Highlight:", "• Green note", "Gold Note: my note on the same line" ...
+    var head = /^[^A-Za-z]*(gold|yellow|pink|red|green|blue|orange|purple)\s+(note|highlight|bookmark)s?\b\s*[:\-–]?\s*(.*)$/i;
+    var onText = /^[\s_*>]*on the text\s*:?[\s_*]*$/i;
+    if (!lines.some(function (l) { return head.test(l.trim()); })) return { cards: looseNotes(text), title: '', format: 'loose' };
+    var title = '', cards = [], cur = null, mode = '';
+    for (var i = 0; i < lines.length; i++) {
+      if (/^\s*notes and highlights for\s*:?\s*(.*)$/i.test(lines[i])) {
+        var same = /^\s*notes and highlights for\s*:?\s*(.*)$/i.exec(lines[i])[1].trim();
+        if (same) title = same; else for (var j = i + 1; j < lines.length; j++) if (lines[j].trim()) { title = lines[j].trim(); break; }
+      }
+    }
+    function finish() {
+      if (!cur) return;
+      var words = cur.quote.join(' ').replace(/\s+/g, ' ').trim().replace(/^["“”'‘’]+|["“”'‘’]+$/g, '').trim();
+      var note = cur.note.join(' ').replace(/\s+/g, ' ').trim();
+      if (words || note) cards.push({ id: newId(), color: cur.color, loc: cur.loc, text: words.slice(0, 2000), why: note.slice(0, 4000), src: 'sora' });
+      cur = null;
+    }
+    lines.forEach(function (line) {
+      var t = line.trim(), m = head.exec(t);
+      if (m) {
+        finish(); var c = m[1].toLowerCase();
+        cur = { color: c === 'yellow' ? 'gold' : c === 'red' ? 'pink' : (COLORS.indexOf(c) >= 0 ? c : ''), note: [], quote: [], loc: '' };
+        mode = /note/i.test(m[2]) ? 'note' : 'quote';
+        if (m[3] && m[3].trim()) (mode === 'note' ? cur.note : cur.quote).push(m[3].trim());
+        return;
+      }
+      if (!cur) return;
+      if (onText.test(t)) { mode = 'quote'; return; }
+      // "... _on the text:_" at the end of the note's last line
+      var tail = /^(.*?)[\s_*]*on the text\s*:?[\s_*]*$/i.exec(t);
+      if (tail && mode === 'note') { if (tail[1].trim()) cur.note.push(tail[1].trim()); mode = 'quote'; return; }
+      var cr = /^created on\s*:?(.*)$/i.exec(t);
+      if (cr) {
+        var pos = /position\s*:?\s*([\d.]+\s*%)/i.exec(cr[1]), pg = /\bpage\s*:?\s*(\d+)/i.exec(cr[1]);
+        cur.loc = pg ? 'p. ' + pg[1] : pos ? pos[1].replace(/\s+/g, '') : '';
+        mode = 'after'; return;
+      }
+      if (/^by sora\.?$/i.test(t)) { finish(); mode = ''; return; }
+      if (!t) return;
+      if (mode === 'note') cur.note.push(t); else if (mode === 'quote') cur.quote.push(t);
+    });
+    finish();
+    return { cards: cards.slice(0, 40), title: title, format: 'sora' };
+  };
+  /** Cards an earlier import split apart (a heading, a title line, "_on the text:_" fragments). */
+  NV.isImportDebris = function (c) {
+    if (!c || c.src === 'sora') return false;
+    var t = String(c.text || '').trim(), w = String(c.why || '').trim();
+    if (w && !/on the text/i.test(w)) return false;
+    return /^notes and highlights for/i.test(t) || /^(gold|yellow|pink|red|green|blue|orange|purple)\s+(note|highlight|bookmark)s?\s*:?\s*$/i.test(t) ||
+      /_?on the text:?_?\s*$/i.test(t) || /^by sora$/i.test(t) || /^created on\s*:/i.test(t) || (/^["“]/.test(t) && /created on\s*:/i.test(t));
+  };
+  /** Anything that isn't Sora's format: blocks separated by blank lines. */
+  function looseNotes(text) {
+    var blocks = /\n\s*\n/.test(text) ? text.split(/\n\s*\n+/) : text.split(/\n/);
+    var locRe = /^(.*\b(chapter|chap\.?|ch\.?|part|section|page|pg\.?|p\.|location|loc\.?)\s*[\divxlc]+.*|.*\d{1,3}\s?%.*)$/i, colorRe = /\b(gold|yellow|green|pink|red)\b/i;
+    var norm = function (c) { c = c.toLowerCase(); return c === 'yellow' ? 'gold' : c === 'red' ? 'pink' : c; };
+    var cards = [];
+    blocks.forEach(function (b) {
+      var lines = b.split('\n').map(function (l) { return l.trim(); }).filter(Boolean); if (!lines.length) return;
+      var c = { id: newId(), color: '', loc: '', text: '', why: '' }, rest = [];
+      lines.forEach(function (l) {
+        var m = /^(note|my note|notes)\s*[:\-–]\s*(.*)$/i.exec(l);
+        if (m) { c.why = (c.why ? c.why + ' ' : '') + m[2]; return; }
+        if (!c.loc && l.length <= 80 && locRe.test(l) && !/^["“]/.test(l)) {
+          var cm = colorRe.exec(l); if (cm) c.color = norm(cm[1]);
+          c.loc = l.replace(/\b(highlight|highlighted|note)\b/ig, '').replace(colorRe, '').replace(/^[\s·•|,\-–:]+|[\s·•|,\-–:]+$/g, '').replace(/\s{2,}/g, ' ').slice(0, 120); return;
+        }
+        if (!c.color && l.length <= 24 && colorRe.test(l)) { c.color = norm(colorRe.exec(l)[1]); return; }
+        if (/^(highlight|bookmark)s?$/i.test(l) || /^\d{1,2}\/\d{1,2}\/\d{2,4}/.test(l)) return;
+        rest.push(l);
+      });
+      c.text = rest.join(' ').replace(/^["“]|["”]$/g, '').slice(0, 2000);
+      if (c.text || c.why) cards.push(c);
+    });
+    return cards.slice(0, 40);
+  }
+  A.makeCards = function () {
+    var raw = NV.byId('nvInbox').value, parsed = NV.parseSoraNotes(raw), found = parsed.cards, msg = NV.byId('nvInboxMsg');
+    if (!found.length) { msg.textContent = 'Nothing to make cards from yet. In Sora, copy your notes and highlights to the clipboard, then paste them above.'; return; }
+    var d = readEvidence(), removed = 0;
+    // A Sora paste replaces any cards an earlier import broke apart (they had no writing of the student's own).
+    if (parsed.format === 'sora') { var before = d.cards.length; d.cards = d.cards.filter(function (c) { return !NV.isImportDebris(c); }); removed = before - d.cards.length; }
+    var have = {}; d.cards.forEach(function (c) { have[(c.text || '').replace(/\s+/g, ' ').trim().toLowerCase()] = true; });
+    var add = found.filter(function (c) { return !have[c.text.replace(/\s+/g, ' ').trim().toLowerCase()]; });
+    if (d.cards.length + add.length > 60) add = add.slice(0, Math.max(0, 60 - d.cards.length));
+    d.cards = d.cards.concat(add);
+    renderCards(d.cards, S.home.highlightKey || [], false); NV.guard.changed();
+    var bits = [];
+    bits.push(add.length ? 'Made ' + NV.plural(add.length, 'card') + '.' : 'Those highlights are already on your cards.');
+    if (removed) bits.push('Replaced ' + NV.plural(removed, 'broken card') + ' from an earlier paste.');
+    var noNote = add.filter(function (c) { return !c.why.trim(); }).length;
+    if (noNote) bits.push(NV.plural(noNote, 'card has', 'cards have') + ' no note yet: write why it matters.');
+    if (add.some(function (c) { return /%$/.test(c.loc); })) bits.push('Sora gives a % position; add the chapter or page if you know it.');
+    var bt = (S.home.book || {}).title || '', simp = function (x) { return String(x).toLowerCase().replace(/^the\s+/, '').replace(/[^a-z0-9]+/g, ''); };
+    if (parsed.title && bt && simp(parsed.title).indexOf(simp(bt)) < 0 && simp(bt).indexOf(simp(parsed.title)) < 0) bits.push('Check: these notes are from “' + parsed.title + '”, but this class is reading “' + bt + '”.');
+    msg.textContent = bits.join(' ');
+    // The cards now hold everything, so the paste box is emptied and folded away.
+    if (add.length || removed) { NV.byId('nvInbox').value = ''; var imp = document.querySelector('.nv-import'); if (imp) imp.open = false; NV.guard.changed(); var first = document.querySelector('#nvCards .nv-card-ev:nth-child(' + (d.cards.length - add.length + 1) + ')'); if (first) first.scrollIntoView({ block: 'center', behavior: 'smooth' }); }
+    var mm = NV.byId('nvMadeMsg'); if (mm) { mm.textContent = bits.join(' '); mm.hidden = false; }
+  };
+
+
+  // ---------- Quiz (scores itself) ----------
+  STEP_VIEWS.quiz = function (body, u, a, next) {
+    NV.guard.close();
+    loadItem(body, a, function (item) {
+      var q = item.quiz, ro = readOnly();
+      var h = '<section class="nv-card nv-quiz">' + gradedHead(u, a) + '<h2>' + esc(a.title) + '</h2>' + promptHtml(a) +
+        '<p>' + NV.plural(q.questions.length, 'question') + ' on ' + esc(readingLine(u) || 'the reading') + '. Right on the first try = 1 point. Right on the second try = ½ point. You can look back in ' + (isSora() ? 'Sora' : 'your book') + '.</p>' +
+        (item.grade && item.grade.excluded ? '<div class="nv-feedback"><b>Your teacher left this out of your grade.</b></div>' : '') +
+        '<p class="nv-quiz-progress" id="nvQuizProg">' + quizProgress(q) + '</p><ol class="nv-qlist">';
+      q.questions.forEach(function (x, i) { h += '<li class="nv-q" id="q_' + esc(x.id) + '">' + questionHtml(x, i, ro) + '</li>'; });
+      body.innerHTML = h + '</ol>' + nextBtn(next) + '</section>';
+    });
+  };
+  function quizProgress(q) {
+    var done = q.questions.filter(function (x) { return x.state !== 'open'; }).length;
+    var pts = q.questions.reduce(function (s, x) { return s + (Number(x.points) || 0); }, 0);
+    return done === q.questions.length ? '<b>Finished:</b> ' + pts + ' of ' + q.questions.length + ' points' : done + ' of ' + q.questions.length + ' answered';
+  }
+  function questionHtml(x, i, ro) {
+    var closed = x.state !== 'open';
+    var h = '<p class="nv-q-text"><span class="nv-q-n">' + (i + 1) + '</span>' + esc(x.q) + '</p><div class="nv-choices" role="group" aria-label="Choices for question ' + (i + 1) + '">';
+    x.choices.forEach(function (c, j) {
+      var tried = (x.tries || []).indexOf(j) >= 0, right = closed && x.answer === j;
+      var cls = 'nv-choice' + (right ? ' is-right' : tried ? ' is-wrong' : '');
+      h += '<button type="button" class="' + cls + '" data-act="answer" data-q="' + esc(x.id) + '" data-pick="' + j + '"' + (closed || tried || ro ? ' disabled' : '') + '><span class="nv-choice-l">' + 'ABCD'.charAt(j) + '</span><span>' + esc(c) + '</span>' + (right ? '<span class="nv-choice-mark">✓</span>' : tried ? '<span class="nv-choice-mark">✗</span>' : '') + '</button>';
+    });
+    h += '</div>';
+    if (x.state === 'right') h += '<p class="nv-q-result is-right">' + (x.points === 1 ? 'Right on the first try: 1 point.' : 'Right on the second try: ½ point.') + (x.why ? ' ' + esc(x.why) : '') + '</p>';
+    else if (x.state === 'missed') h += '<p class="nv-q-result is-missed">Not this time. The answer is ' + 'ABCD'.charAt(x.answer) + '.' + (x.why ? ' ' + esc(x.why) : '') + '</p>';
+    else if ((x.tries || []).length) h += '<p class="nv-q-result is-try">Not quite. Look back at the reading and try once more.</p>';
+    return h;
+  }
+  var answering = {};
+  A.answer = function (el) {
+    var qid = el.dataset.q; if (answering[qid]) return; answering[qid] = true;
+    var li = NV.byId('q_' + qid); li.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+    NV.rpc('answerQuiz', { classId: NV.state.classId, as: asArg(), week: NV.state.week, act: NV.state.step, qid: qid, pick: Number(el.dataset.pick) }, { retry: true }).then(function (r) {
+      answering[qid] = false;
+      var q = S.item.quiz, x = q.questions.filter(function (y) { return y.id === qid; })[0], i = q.questions.indexOf(x);
+      x.tries = r.tries; x.state = r.state; x.points = r.points; if (r.answer !== undefined) { x.answer = r.answer; x.why = r.why; }
+      li.innerHTML = questionHtml(x, i, false);
+      NV.byId('nvQuizProg').innerHTML = quizProgress(q);
+      if (r.finished) { var key = 'w' + NV.state.week + '_' + NV.state.step; S.home.status[key] = { state: 'submitted', score: r.score, max: r.max }; NV.toast('Quiz finished: ' + r.score + ' of ' + r.max + ' points.', 'ok'); }
+    }).catch(function (e) { answering[qid] = false; NV.toast(e.message, 'error'); li.querySelectorAll('button').forEach(function (b) { b.disabled = false; }); });
+  };
+
+
+  // ---------- Written activities (bell ringer, written response, creative, reflection) ----------
+  var CITE_RE = /\((?:[^()]*?)(?:ch\.?|chapter|chap\.?|p\.|pp\.|pg\.?|page|part|section|loc\.?|\d{1,3}\s?%)[^()]*\)/ig;
+  STEP_VIEWS.text = function (body, u, a, next) {
+    loadItem(body, a, function (item) {
+      var ro = readOnly();
+      if (item.unreadable) return unreadable(body, a.title);
+      var data = item.data || {}, text = data.text || '', link = data.link || '', long = a.type === 'analysis' || a.type === 'reflection' || a.type === 'creative';
+      var focusPref = NV.store.get('nvFocusPref', false), evAct = u.activities.filter(function (x) { return x.form === 'evidence'; })[0];
+      var placeholder = a.type === 'analysis' ? 'Start with your claim. Then bring in evidence with its location, and explain how it supports your claim.' : a.type === 'reflection' ? 'How has your thinking about the essential question changed? Use the book.' : a.type === 'bellringer' ? 'A few sentences.' : 'Explain your work, with evidence from the book.';
+      body.innerHTML = '<section class="nv-card nv-respond">' + gradedHead(u, a) + '<h2>' + esc(a.title) + '</h2>' + promptHtml(a) + howScored(item) +
+        feedbackHtml(item, a) + '<div id="nvOffer" class="nv-offer" hidden></div>' +
+        '<div class="nv-write-wrap' + (long ? '' : ' is-short') + '" id="nvWriteWrap">' +
+        (long ? '<aside class="nv-write-side"><div class="nv-checklist" id="nvChecklist"></div>' + (evAct ? '<div class="nv-insert" id="nvInsert"><h3>Your evidence</h3><p class="nv-small nv-muted">Loading your Evidence Log…</p></div>' : '') + '</aside>' : '') +
+        '<div class="nv-write-main">' + (ro || !long ? '' : '<div class="nv-focusbar"><button type="button" class="nv-btn small" data-act="focusMode">⤢ Write in focus mode</button><button type="button" class="nv-btn small ghost nv-focus-exit" data-act="focusExit">✕ Exit focus</button></div>') +
+        '<textarea id="nvResponse" class="nv-input nv-writing' + (long ? '' : ' is-short') + '" data-stat-box="response" rows="' + (long ? 14 : 5) + '" aria-label="Your writing"' + (ro ? ' readonly' : '') + ' placeholder="' + esc(placeholder) + '">' + esc(text) + '</textarea>' +
+        '<div class="nv-wordcount" id="nvWordCount"></div>' +
+        (a.type === 'creative' ? '<label class="nv-field"><span>Link to your work <small>(optional: Canva, Slides, a drawing you uploaded)</small></span><input class="nv-input" id="nvLink" maxlength="800" placeholder="https://" value="' + esc(link) + '"' + (ro ? ' readonly' : '') + '></label>' : '') +
+        '<div id="nvMyStats"></div></div></div>' + saveBar(item, a.title) + nextBtn(next) + '</section>';
+      var ta = NV.byId('nvResponse'), root = body.querySelector('.nv-respond');
+      var read = function () { var t = NV.byId('nvResponse'), l = NV.byId('nvLink'); return { text: t ? t.value : text, link: l ? l.value : link }; };
+      openGuard(u, a, item, { text: text, link: link }, read, function (d) { var t = NV.byId('nvResponse'), l = NV.byId('nvLink'); if (t) t.value = d.text || ''; if (l) l.value = d.link || ''; updateChecks(a); });
+      NV.stats.attach(root, { classId: NV.state.classId, key: item.key, as: asArg(), readOnly: ro, initial: item.stats });
+      ta.addEventListener('input', function () { NV.guard.changed(); updateChecks(a); });
+      var l = NV.byId('nvLink'); if (l) l.addEventListener('input', function () { NV.guard.changed(); });
+      updateChecks(a);
+      if (long && focusPref && !ro) A.focusMode();
+      if (long && evAct) loadEvidenceForInsert(u, evAct);
+    });
+  };
+  function updateChecks(a) {
+    var t = (NV.byId('nvResponse') || {}).value || '', words = NV.words(t), min = a.minWords || 0;
+    var cites = (t.match(CITE_RE) || []).length;
+    var items = [{ ok: min ? words >= min : words >= 1, text: min ? 'At least ' + min + ' words (' + words + ' so far)' : 'Write your answer (' + words + ' words)' }];
+    if (a.type === 'analysis' || a.type === 'reflection') items.push({ ok: cites >= (a.type === 'analysis' ? 2 : 1), text: (a.type === 'analysis' ? 'Two or more pieces' : 'At least one piece') + ' of evidence with a location, like (Ch. 3, p. 41) · ' + cites + ' found' });
+    if (a.type === 'analysis') items.push({ ok: /[.!?]["”]?\s*$/.test(t.trim()) && words > 30, text: 'Finished sentences: ends with a conclusion' });
+    var cl = NV.byId('nvChecklist');
+    if (cl) cl.innerHTML = '<h3>Checklist</h3><ul>' + items.map(function (i) { return '<li class="' + (i.ok ? 'is-ok' : '') + '"><span aria-hidden="true">' + (i.ok ? '✓' : '○') + '</span>' + esc(i.text) + '</li>'; }).join('') +
+      '</ul><p class="nv-small nv-muted">The checklist counts what it can see. It can’t tell how strong your thinking is; the rubric is about that.</p>';
+    var wc = NV.byId('nvWordCount'); if (wc) wc.textContent = NV.plural(words, 'word');
+    var ms = NV.byId('nvMyStats'); if (ms) ms.innerHTML = NV.stats.chipsHtml(NV.stats.get('response') || ((S.item || {}).stats || {}).response, t);
+  }
+  function loadEvidenceForInsert(u, evAct) {
+    var box = NV.byId('nvInsert'); if (!box) return;
+    if (!u.open[evAct.id] && !me().teacherSelf) { box.innerHTML = '<h3>Your evidence</h3><p class="nv-small nv-muted">Your Evidence Log isn’t open yet.</p>'; return; }
+    NV.rpc('getStudentItem', { classId: NV.state.classId, as: asArg(), week: u.n, act: evAct.id }).then(function (r) {
+      var cards = ((r.data || {}).cards || []).filter(function (c) { return (c.text || '').trim(); });
+      if (!NV.byId('nvInsert')) return;
+      box.innerHTML = '<h3>Your evidence</h3>' + (cards.length ? '<p class="nv-small nv-muted">Click Insert to add it where your cursor is, with its location.</p><ul class="nv-insert-list">' + cards.map(function (c) {
+        return '<li class="nv-hlside-' + esc(c.color || 'none') + '"><span class="nv-insert-text">“' + esc(c.text.length > 140 ? c.text.slice(0, 140) + '…' : c.text) + '”' + (c.loc ? ' <small>(' + esc(c.loc) + ')</small>' : '') + '</span>' +
+          (readOnly() ? '' : '<button type="button" class="nv-btn small" data-act="insertEvidence" data-text="' + esc(c.text) + '" data-loc="' + esc(c.loc || '') + '">Insert</button>') + '</li>';
+      }).join('') + '</ul>' : '<p class="nv-small nv-muted">No evidence cards yet. <button type="button" class="nv-link" data-act="toStep" data-step="' + esc(evAct.id) + '">Go to ' + esc(evAct.title) + '</button></p>');
+    }).catch(function () { box.innerHTML = '<h3>Your evidence</h3><p class="nv-small nv-muted">Couldn’t load your Evidence Log.</p>'; });
+  }
+
+  // ---------- Close Reading ----------
+  STEP_VIEWS.close = function (body, u, a, next) {
+    loadItem(body, a, function (item) {
+      var ro = readOnly(), d = item.data || {};
+      if (item.unreadable) return unreadable(body, a.title);
+      body.innerHTML = '<section class="nv-card nv-close">' + gradedHead(u, a) + '<h2>' + esc(a.title) + '</h2>' + promptHtml(a) + howScored(item) + feedbackHtml(item, a) + '<div id="nvOffer" class="nv-offer" hidden></div>' +
+        '<div class="nv-form-grid"><label class="nv-field"><span>Where is it?</span><input class="nv-input" id="clLoc" maxlength="120" placeholder="Ch. 4, p. 52' + (isSora() ? ' or 31%' : '') + '" value="' + esc(d.loc || '') + '"' + (ro ? ' readonly' : '') + '></label></div>' +
+        '<label class="nv-field"><span>The passage <small>(keep it short: two or three sentences from your copy)</small></span><textarea class="nv-input nv-ev-text" id="clPassage" rows="3" maxlength="3000"' + (ro ? ' readonly' : '') + '>' + esc(d.passage || '') + '</textarea></label>' +
+        '<label class="nv-field"><span>Your analysis <small>(one choice the author made, and what it does)</small></span><textarea class="nv-input nv-writing" id="clAnalysis" data-stat-box="response" rows="9"' + (ro ? ' readonly' : '') + '>' + esc(d.analysis || '') + '</textarea></label>' +
+        '<div class="nv-wordcount" id="nvWordCount"></div><div id="nvMyStats"></div>' + saveBar(item, a.title) + nextBtn(next) + '</section>';
+      var root = body.querySelector('.nv-close'), read = function () { return { loc: NV.byId('clLoc').value, passage: NV.byId('clPassage').value, analysis: NV.byId('clAnalysis').value }; };
+      var count = function () { var t = NV.byId('clAnalysis').value; NV.byId('nvWordCount').textContent = NV.plural(NV.words(t), 'word'); NV.byId('nvMyStats').innerHTML = NV.stats.chipsHtml(NV.stats.get('response') || (item.stats || {}).response, t); };
+      openGuard(u, a, item, { loc: d.loc || '', passage: d.passage || '', analysis: d.analysis || '' }, read, function (x) { NV.byId('clLoc').value = x.loc || ''; NV.byId('clPassage').value = x.passage || ''; NV.byId('clAnalysis').value = x.analysis || ''; count(); });
+      NV.stats.attach(root, { classId: NV.state.classId, key: item.key, as: asArg(), readOnly: ro, initial: item.stats });
+      root.addEventListener('input', function (e) { if (/^cl/.test(e.target.id)) { NV.guard.changed(); count(); } });
+      count();
+    });
+  };
+
+  // ---------- Vocabulary ----------
+  STEP_VIEWS.vocab = function (body, u, a, next) {
+    loadItem(body, a, function (item) {
+      var ro = readOnly(), d = item.data || {};
+      if (item.unreadable) return unreadable(body, a.title);
+      var rows = Array.isArray(d.rows) && d.rows.length ? d.rows : (a.words || []).map(function (w) { return { word: w.word, loc: '', meaning: '', why: '' }; });
+      if (!rows.length) rows = [{ word: '', loc: '', meaning: '', why: '' }];
+      body.innerHTML = '<section class="nv-card nv-vocab">' + gradedHead(u, a) + '<h2>' + esc(a.title) + '</h2>' + promptHtml(a) +
+        ((a.words || []).length ? '<p class="nv-small nv-muted">Hints: ' + a.words.map(function (w) { return '<b>' + esc(w.word) + '</b>' + (w.hint ? ' (' + esc(w.hint) + ')' : ''); }).join(' · ') + '</p>' : '') +
+        (isSora() ? '<p class="nv-small nv-muted">In Sora, tap a word and choose <b>Define</b> to see its dictionary meaning. Then write what it means in <i>this</i> sentence.</p>' : '') +
+        howScored(item) + feedbackHtml(item, a) + '<div id="nvOffer" class="nv-offer" hidden></div><div id="vbRows" class="nv-vrows"></div>' +
+        (ro ? '' : '<button type="button" class="nv-btn ghost" data-act="vbAdd">+ Add a word</button>') + saveBar(item, a.title) + nextBtn(next) + '</section>';
+      var draw = function (list) {
+        NV.byId('vbRows').innerHTML = list.map(function (r, i) {
+          return '<article class="nv-vrow"><div class="nv-vrow-head"><input class="nv-input vb-word" maxlength="60" placeholder="Word" value="' + esc(r.word) + '" aria-label="Word ' + (i + 1) + '"' + (ro ? ' readonly' : '') + '><input class="nv-input vb-loc" maxlength="120" placeholder="Where? Ch. 2, p. 18" value="' + esc(r.loc) + '" aria-label="Location"' + (ro ? ' readonly' : '') + '>' + (ro ? '' : '<button type="button" class="nv-icon-btn" data-act="vbRemove" aria-label="Remove word ' + (i + 1) + '">✕</button>') + '</div>' +
+            '<label class="nv-field"><span>What it means in this sentence</span><input class="nv-input vb-meaning" maxlength="1000" value="' + esc(r.meaning) + '"' + (ro ? ' readonly' : '') + '></label>' +
+            '<label class="nv-field"><span>Why the author chose it</span><textarea class="nv-input vb-why" rows="2" maxlength="2000" data-stat-box="response"' + (ro ? ' readonly' : '') + '>' + esc(r.why) + '</textarea></label></article>';
+        }).join('');
+        if (NV.stats) NV.byId('vbRows').querySelectorAll('[data-stat-box]').forEach(function (el) { NV.stats.bind(el); });
+      };
+      S.vbRead = function () { return { rows: Array.prototype.map.call(document.querySelectorAll('#vbRows .nv-vrow'), function (el) { return { word: el.querySelector('.vb-word').value, loc: el.querySelector('.vb-loc').value, meaning: el.querySelector('.vb-meaning').value, why: el.querySelector('.vb-why').value }; }) }; };
+      S.vbDraw = draw;
+      draw(rows);
+      var root = body.querySelector('.nv-vocab');
+      openGuard(u, a, item, { rows: Array.isArray(d.rows) ? d.rows : [] }, S.vbRead, function (x) { draw(x.rows && x.rows.length ? x.rows : rows); });
+      NV.stats.attach(root, { classId: NV.state.classId, key: item.key, as: asArg(), readOnly: ro, initial: item.stats });
+      root.addEventListener('input', function (e) { if (e.target.closest('.nv-vrow')) NV.guard.changed(); });
+    });
+  };
+  A.vbAdd = function () { var d = S.vbRead(); if (d.rows.length >= 30) return NV.toast('Up to 30 words.'); d.rows.push({ word: '', loc: '', meaning: '', why: '' }); S.vbDraw(d.rows); NV.guard.changed(); };
+  A.vbRemove = function (el) { var rowsEl = Array.prototype.slice.call(document.querySelectorAll('#vbRows .nv-vrow')), i = rowsEl.indexOf(el.closest('.nv-vrow')), d = S.vbRead(); d.rows.splice(i, 1); S.vbDraw(d.rows.length ? d.rows : [{ word: '', loc: '', meaning: '', why: '' }]); NV.guard.changed(); };
+  A.insertEvidence = function (el) {
+    var ta = NV.byId('nvResponse'); if (!ta) return;
+    var ins = '“' + el.dataset.text.trim() + '”' + (el.dataset.loc ? ' (' + el.dataset.loc.trim() + ')' : '');
+    var s = ta.selectionStart || ta.value.length, e = ta.selectionEnd || s, before = ta.value.slice(0, s);
+    var pad = before && !/\s$/.test(before) ? ' ' : '';
+    ta.value = before + pad + ins + ' ' + ta.value.slice(e);
+    var pos = (before + pad + ins + ' ').length; ta.focus(); ta.setSelectionRange(pos, pos);
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  A.focusMode = function () { var w = NV.byId('nvWriteWrap'); if (!w) return; document.body.classList.add('nv-focus-on'); w.classList.add('is-focus'); NV.store.set('nvFocusPref', true); var t = NV.byId('nvResponse'); if (t) t.focus(); };
+  A.focusExit = function () { document.body.classList.remove('nv-focus-on'); var w = NV.byId('nvWriteWrap'); if (w) w.classList.remove('is-focus'); NV.store.set('nvFocusPref', false); };
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && document.body.classList.contains('nv-focus-on') && NV.byId('nvModal').hidden) A.focusExit(); });
+
+  // ---------- Discussion ----------
+  function draftKey(parentId) { return 'nvd|' + me().email + '|' + NV.state.classId + '|w' + NV.state.week + '|' + NV.state.step + '|' + (parentId || 'top'); }
+  STEP_VIEWS.discussion = function (body, u, a, next) {
+    NV.guard.close();
+    loadItem(body, a, function (item) { drawDiscussion(body, u, a, item); });
+  };
+  function drawDiscussion(body, u, a, item) {
+    var d = item.discussion, ro = readOnly(), posts = d.posts || [];
+    var top = posts.filter(function (p) { return !p.parentId; }), replies = posts.filter(function (p) { return p.parentId; });
+    var h = '<section class="nv-card nv-discuss">' + gradedHead(u, a) + '<h2>' + esc(a.title) + '</h2>' + promptHtml(a) +
+      (item.complete ? '<details class="nv-howscored"><summary>How it’s scored</summary><p><b>Complete:</b> ' + esc(item.complete.complete) + '</p><p><b>Incomplete:</b> ' + esc(item.complete.incomplete) + '</p></details>' : '') +
+      feedbackHtml(item, a);
+    if (!top.some(function (p) { return p.mine; }) && !ro) {
+      h += '<div class="nv-compose"><label class="nv-field"><span>Your post</span><textarea id="nvPostText" class="nv-input" rows="5" maxlength="8000" placeholder="Answer the question. Use the book: name the chapter or page.">' + esc(NV.store.get(draftKey(''), '')) + '</textarea></label>' +
+        '<div class="nv-row"><button type="button" class="nv-btn primary" data-act="post">Post</button><span class="nv-small nv-muted">Post first. Then you’ll see your classmates’ posts and can reply.</span></div></div>';
+    }
+    if (!d.unlocked) h += '<p class="nv-locked-note">' + NV.plural(d.count || 0, 'classmate has', 'classmates have') + ' posted. Their posts appear once you post yours.</p>';
+    h += '<div class="nv-thread">' + top.map(function (p) {
+      var rs = replies.filter(function (r) { return r.parentId === p.id; });
+      return '<article class="nv-post' + (p.mine ? ' is-mine' : '') + '" data-id="' + esc(p.id) + '"><header><b>' + esc(p.mine ? 'You' : p.name) + '</b><time>' + esc(NV.fmtDate(p.createdAt, true)) + (p.editedAt ? ' · edited' : '') + '</time>' + (p.mine && !ro ? '<button type="button" class="nv-link" data-act="editPost" data-id="' + esc(p.id) + '">Edit</button>' : '') + '</header>' +
+        '<div class="nv-post-text">' + esc(p.text) + '</div>' +
+        (rs.length ? '<div class="nv-replies">' + rs.map(function (r) { return '<div class="nv-reply' + (r.mine ? ' is-mine' : '') + '" data-id="' + esc(r.id) + '"><header><b>' + esc(r.mine ? 'You' : r.name) + '</b><time>' + esc(NV.fmtDate(r.createdAt, true)) + (r.editedAt ? ' · edited' : '') + '</time>' + (r.mine && !ro ? '<button type="button" class="nv-link" data-act="editPost" data-id="' + esc(r.id) + '">Edit</button>' : '') + '</header><div class="nv-post-text">' + esc(r.text) + '</div></div>'; }).join('') + '</div>' : '') +
+        (d.unlocked && !ro ? '<div class="nv-reply-box" data-parent="' + esc(p.id) + '"><textarea class="nv-input nv-reply-text" rows="2" maxlength="8000" placeholder="Reply: build on this idea, or push back with evidence" aria-label="Reply to ' + esc(p.mine ? 'your post' : p.name) + '">' + esc(NV.store.get(draftKey(p.id), '')) + '</textarea><button type="button" class="nv-btn small" data-act="reply" data-parent="' + esc(p.id) + '">Reply</button></div>' : '') + '</article>';
+    }).join('') + '</div><div class="nv-next"><button type="button" class="nv-btn" data-act="toHome">← Back to all ' + esc(unitWordLower()) + 's</button></div></section>';
+    body.innerHTML = h;
+    // Half-written posts and replies are kept on this device and warn before leaving.
+    body.querySelectorAll('#nvPostText, .nv-reply-text').forEach(function (t) {
+      t.addEventListener('input', function () { var k = draftKey(t.id === 'nvPostText' ? '' : t.closest('.nv-reply-box').dataset.parent); if (t.value.trim()) NV.store.set(k, t.value); else NV.store.del(k); });
+    });
+    NV.guard.registerExtra('discussion', function () { return Array.prototype.some.call(document.querySelectorAll('#nvPostText, .nv-reply-text'), function (t) { return t.value.trim(); }); });
+  }
+  function sendPost(text, parentId, btn) {
+    if (!text.trim()) { NV.toast('Write something first.'); return; }
+    btn.disabled = true; var clientId = 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    NV.rpc('postDiscussion', { classId: NV.state.classId, as: asArg(), week: NV.state.week, act: NV.state.step, text: text, parentId: parentId || '', clientId: clientId }, { retry: true, timeoutMs: 45000 }).then(function (r) {
+      NV.store.del(draftKey(parentId)); S.item.discussion = r.discussion;
+      var key = 'w' + NV.state.week + '_' + NV.state.step; S.home.status[key] = Object.assign({}, S.home.status[key] || {}, { state: 'submitted' });
+      NV.guard.registerExtra('discussion', null);
+      drawDiscussion(NV.byId('nvStep'), unitOf(NV.state.week), actOf(unitOf(NV.state.week), NV.state.step), S.item);
+      NV.toast(parentId ? 'Reply posted.' : 'Posted. Now read your classmates’ posts and reply to one.', 'ok');
+    }).catch(function (e) { btn.disabled = false; NV.toast(e.message + ' Your writing is still here.', 'error'); });
+  }
+  A.post = function (el) { sendPost(NV.byId('nvPostText').value, '', el); };
+  A.reply = function (el) { var t = el.closest('.nv-reply-box').querySelector('textarea'); sendPost(t.value, el.dataset.parent, el); };
+  A.editPost = function (el) {
+    var id = el.dataset.id, p = (S.item.discussion.posts || []).filter(function (x) { return x.id === id; })[0]; if (!p) return;
+    NV.modal('<h2 id="nvModalTitle">Edit your post</h2><textarea id="nvEditText" class="nv-input" rows="7" maxlength="8000">' + esc(p.text) + '</textarea><div class="nv-row"><button type="button" class="nv-btn primary" id="nvEditSave">Save</button><button type="button" class="nv-btn" onclick="NV.closeModal()">Cancel</button></div>');
+    NV.byId('nvEditSave').onclick = function () {
+      var b = this; b.disabled = true;
+      NV.rpc('editDiscussion', { classId: NV.state.classId, as: asArg(), postId: id, text: NV.byId('nvEditText').value }, { retry: true }).then(function (r) {
+        NV.closeModal(); S.item.discussion = r.discussion; drawDiscussion(NV.byId('nvStep'), unitOf(NV.state.week), actOf(unitOf(NV.state.week), NV.state.step), S.item);
+      }).catch(function (e) { b.disabled = false; NV.toast(e.message, 'error'); });
+    };
+  };
+
+  window.__MB.Student = 'ok';
+})();
+</script>

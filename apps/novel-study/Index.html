@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<base target="_top">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Novel Study</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,600;7..72,700&family=Public+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  /* Structure only; the look is in NovelTheme (included last). */
+  html,body{margin:0}
+  #nvBoot{padding:48px 20px;text-align:center;font:16px system-ui,sans-serif;color:#444}
+  .nv-missing{margin:12px;padding:12px 14px;border:2px solid #b42318;border-radius:10px;background:#fff4f2;color:#7a1a12;font:600 14px system-ui,sans-serif}
+  [hidden]{display:none!important}
+</style>
+</head>
+<body>
+<div id="nvUpdateBar" class="nv-update" hidden role="status"></div>
+<header class="nv-top" id="nvTop" hidden>
+  <div class="nv-top-inner">
+    <div class="nv-brand"><span class="nv-brand-mark" aria-hidden="true"></span><span class="nv-brand-name">Novel Study</span></div>
+    <div class="nv-roles" id="nvRoles" role="group" aria-label="View as"></div>
+    <div class="nv-account" id="nvAccount"></div>
+  </div>
+</header>
+<main id="app" class="nv-app" aria-live="polite"><div id="nvBoot">Loading Novel Study…</div></main>
+<div id="nvToast" class="nv-toast" role="status" aria-live="polite" hidden></div>
+<div id="nvModal" class="nv-modal" hidden><div class="nv-modal-card" role="dialog" aria-modal="true" aria-labelledby="nvModalTitle"><div id="nvModalBody"></div></div></div>
+<div id="nvDidntSave" class="nv-didnt" hidden></div>
+
+<script>
+// ============================================================================
+// Novel Study -- page core: state, server calls, top bar, routing, small helpers.
+// Feature files (WritingStats, SaveGuard, Student, Teacher, Build, Marking) add views to NV.views.
+// ============================================================================
+window.__MB = window.__MB || {};
+var NV = window.NV = {
+  BUILD: '2026-10-23a',
+  boot: null,
+  state: { role: 'student', view: 'loading', classId: '', as: '', asName: '', week: 0, step: 'read', itemKey: '' },
+  views: {},
+  tabId: (function () { try { return sessionStorage.getItem('nvTabId') || (function () { var t = Math.random().toString(36).slice(2, 10); sessionStorage.setItem('nvTabId', t); return t; })(); } catch (e) { return Math.random().toString(36).slice(2, 10); } })()
+};
+
+// ---------- helpers ----------
+NV.esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
+NV.attr = NV.esc;
+NV.byId = function (id) { return document.getElementById(id); };
+NV.store = {
+  get: function (k, fb) { try { var v = localStorage.getItem(k); return v == null ? fb : JSON.parse(v); } catch (e) { return fb; } },
+  set: function (k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } },
+  del: function (k) { try { localStorage.removeItem(k); } catch (e) {} },
+  keys: function (prefix) { var out = []; try { for (var i = 0; i < localStorage.length; i++) { var k = localStorage.key(i); if (k && k.indexOf(prefix) === 0) out.push(k); } } catch (e) {} return out; }
+};
+NV.fmtDate = function (iso, withTime) {
+  if (!iso) return ''; var d = new Date(iso); if (isNaN(d)) return '';
+  var o = { month: 'short', day: 'numeric' }; if (withTime) { o.hour = 'numeric'; o.minute = '2-digit'; }
+  return d.toLocaleString(undefined, o);
+};
+NV.fmtDay = function (ymd) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(ymd || '')); if (!m) return ''; var d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])); return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' }); };
+NV.words = function (s) { var m = String(s || '').trim().match(/\S+/g); return m ? m.length : 0; };
+NV.plural = function (n, one, many) { return n + ' ' + (n === 1 ? one : (many || one + 's')); };
+NV.kindLabel = { quiz: 'Quiz', evidence: 'Evidence Log', response: 'Response', discussion: 'Discussion' };
+NV.colorName = { gold: 'Gold', pink: 'Pink', green: 'Green', yellow: 'Gold' };   // Sora's three highlight colors
+
+NV.toast = function (msg, kind) {
+  var t = NV.byId('nvToast'); t.textContent = msg; t.className = 'nv-toast' + (kind ? ' is-' + kind : ''); t.hidden = false;
+  clearTimeout(NV._toastT); NV._toastT = setTimeout(function () { t.hidden = true; }, kind === 'error' ? 7000 : 3500);
+};
+NV.modal = function (html, opts) {
+  var m = NV.byId('nvModal'); NV.byId('nvModalBody').innerHTML = html; m.hidden = false;
+  m.dataset.locked = opts && opts.locked ? '1' : '';
+  var f = m.querySelector('[autofocus], button, input, textarea'); if (f) setTimeout(function () { f.focus(); }, 30);
+};
+NV.closeModal = function () { NV.byId('nvModal').hidden = true; NV.byId('nvModalBody').innerHTML = ''; };
+document.addEventListener('keydown', function (e) {
+  if (e.key === 'Escape' && !NV.byId('nvModal').hidden && !NV.byId('nvModal').dataset.locked) NV.closeModal();
+});
+
+// ---------- server calls ----------
+// One handler chain per call. Busy/network errors retry by themselves when opts.retry is set.
+NV.isRetryable = function (msg) { return /busy|timed out|try again in a moment|network|NetworkError|Failed to fetch|server error|Service unavailable|Internal error/i.test(String(msg || '')); };
+NV.rpc = function (name, payload, opts) {
+  opts = opts || {};
+  var tries = opts.retry ? 3 : 1;
+  return new Promise(function (resolve, reject) {
+    function attempt(n) {
+      var done = false, timer = null;
+      if (opts.timeoutMs) timer = setTimeout(function () { if (done) return; done = true; if (n + 1 < tries) attempt(n + 1); else reject(new Error('The server didn’t answer. Check your connection.')); }, opts.timeoutMs);
+      google.script.run
+        .withSuccessHandler(function (res) { if (done) return; done = true; clearTimeout(timer); resolve(res); })
+        .withFailureHandler(function (err) {
+          if (done) return; done = true; clearTimeout(timer);
+          var msg = String(err && err.message || err || 'Something went wrong.').replace(/^(Exception|Error):\s*/, '');
+          if (n + 1 < tries && NV.isRetryable(msg)) return setTimeout(function () { attempt(n + 1); }, 700 * (n + 1));
+          var e = new Error(msg); e.server = true; reject(e);
+        })[name](payload);
+    }
+    attempt(0);
+  });
+};
+
+// ---------- top bar: Student · Teacher · Admin, always on top ----------
+NV.renderTop = function () {
+  var b = NV.boot || {}, top = NV.byId('nvTop'); top.hidden = false;
+  var roles = b.role === 'admin' ? ['student', 'teacher', 'admin'] : b.role === 'teacher' ? ['student', 'teacher'] : [];
+  NV.byId('nvRoles').hidden = !roles.length;
+  NV.byId('nvRoles').innerHTML = roles.map(function (r) {
+    var on = NV.state.role === r;
+    return '<button type="button" class="nv-role' + (on ? ' is-on' : '') + '" data-role="' + r + '" aria-pressed="' + on + '">' + r.charAt(0).toUpperCase() + r.slice(1) + '</button>';
+  }).join('');
+  NV.byId('nvAccount').innerHTML = b.email ? '<span class="nv-account-email" title="Signed in">' + NV.esc(b.email) + '</span><span class="nv-build" title="App version">v' + NV.esc(NV.BUILD) + '</span>' : '';
+};
+document.addEventListener('click', function (e) {
+  var r = e.target.closest('.nv-role'); if (!r) return;
+  NV.leave(function () {
+    NV.state.role = r.dataset.role; NV.state.as = ''; NV.state.asName = '';
+    NV.store.set('nvRole', NV.state.role);
+    if (NV.state.role === 'teacher') NV.go('dashboard');
+    else if (NV.state.role === 'admin') NV.go('admin');
+    else NV.go(NV.state.classId ? 'home' : 'classes');
+  });
+});
+
+// ---------- routing ----------
+// NV.leave(fn): anything with unsaved typing is saved first (SaveGuard overrides this).
+NV.leave = function (fn) { fn(); };
+NV.go = function (view, patch) {
+  Object.assign(NV.state, patch || {}); NV.state.view = view;
+  NV.renderTop();
+  NV.render();
+  try { window.scrollTo(0, 0); } catch (e) {}
+};
+NV.render = function () {
+  var v = NV.views[NV.state.view], app = NV.byId('app');
+  try { document.body.setAttribute('data-view', NV.state.view || ''); } catch (e) {}   // page-level styling (the theme keeps writing pages at a readable width)
+  if (!v) { app.innerHTML = '<section class="nv-card"><p>Loading…</p></section>'; return; }
+  try { v(app); } catch (e) { console.error(e); app.innerHTML = '<section class="nv-card nv-error"><h2>Something went wrong on this page.</h2><p>' + NV.esc(e.message) + '</p><p><button class="nv-btn" onclick="location.reload()">Reload</button></p></section>'; }
+};
+NV.fail = function (el, err) {
+  var msg = err && err.message ? err.message : String(err);
+  if (el) el.innerHTML = '<section class="nv-card nv-error" role="alert"><h2>That didn’t load.</h2><p>' + NV.esc(msg) + '</p><p><button type="button" class="nv-btn" data-act="reloadView">Try again</button></p></section>';
+  else NV.toast(msg, 'error');
+};
+document.addEventListener('click', function (e) { if (e.target.closest('[data-act="reloadView"]')) NV.render(); });
+
+// ---------- versions: the update bar compares against the build THIS link serves ----------
+NV.checkVersion = function () {
+  if (!window.google || !google.script) return;
+  NV.rpc('getAppVersion', {}).then(function (v) {
+    var bar = NV.byId('nvUpdateBar'), url = v.url || '';
+    var teacher = NV.boot && NV.boot.role && NV.boot.role !== 'student';
+    if (v.serverBuild && v.serverBuild !== NV.BUILD && NV.cmpVer(v.serverBuild, NV.BUILD) > 0) {
+      var reloaded = NV.store.get('nvReloadedFor', '') === v.serverBuild;
+      if (reloaded && teacher) {
+        bar.innerHTML = 'This link is still running v' + NV.esc(NV.BUILD) + '. In the Apps Script editor: Deploy → Manage deployments → pencil → Version: New version → Deploy.';
+        bar.hidden = false;
+      } else if (!reloaded) {
+        NV._latestBuild = v.serverBuild;
+        bar.innerHTML = 'A new version of Novel Study is ready. <a class="nv-btn small" id="nvReloadLink" target="_top" href="' + NV.esc(url) + '">Reload</a>';
+        bar.hidden = false;
+      }
+    } else {
+      if (NV.cmpVer(NV.BUILD, NV.store.get('nvReloadedFor', '')) >= 0) NV.store.del('nvReloadedFor');
+    }
+    if (teacher && v.version && v.serverBuild === NV.BUILD && NV.cmpVer(v.version, NV.BUILD) > 0) {
+      bar.innerHTML = 'This link runs v' + NV.esc(NV.BUILD) + ', but v' + NV.esc(v.version) + ' is live elsewhere. To update this link: Deploy → Manage deployments → pencil → New version.';
+      bar.hidden = false;
+    }
+  }).catch(function () {});
+};
+NV.cmpVer = function (a, b) { a = String(a); b = String(b); return a === b ? 0 : (a > b ? 1 : -1); };
+document.addEventListener('click', function (e) {
+  var a = e.target.closest('#nvReloadLink'); if (!a) return;
+  // The bar waits for saves: Reload goes only when nothing is unsaved.
+  if (NV.hasUnsaved && NV.hasUnsaved()) { e.preventDefault(); NV.toast('Saving your work first. Press Reload again in a moment.'); if (NV.flushAll) NV.flushAll(); return; }
+  NV.store.set('nvReloadedFor', NV._latestBuild || '');
+});
+
+// ---------- start ----------
+NV.start = function () {
+  NV.rpc('getBootstrap', {}, { retry: true }).then(function (b) {
+    NV.boot = b;
+    if (b.needsSetup) { NV.byId('app').innerHTML = '<section class="nv-card"><h1>Novel Study isn’t set up yet</h1><p>In the Apps Script editor, run <b>setupNovelStudy</b> once while signed in with your school account, then reload this page.</p></section>'; return; }
+    if (!b.email) { NV.byId('app').innerHTML = '<section class="nv-card"><h1>Sign in with your school account</h1><p>Novel Study couldn’t tell who is signed in. Open it in a browser signed in to your school Google account.</p></section>'; return; }
+    var saved = NV.store.get('nvRole', '');
+    if (b.role === 'student') NV.state.role = 'student';
+    else NV.state.role = (saved === 'admin' && b.role === 'admin') || saved === 'student' ? saved : 'teacher';
+    var sc = b.studentClasses || [];
+    if (NV.state.role === 'student') {
+      var last = NV.store.get('nvClass_' + b.email, '');
+      if (sc.length === 1) NV.state.classId = sc[0].classId;
+      else if (last && sc.some(function (c) { return c.classId === last; })) NV.state.classId = last;
+      NV.go(NV.state.classId ? 'home' : 'classes');
+    } else if (NV.state.role === 'admin') NV.go('admin');
+    else NV.go('dashboard');
+    setInterval(NV.checkVersion, 5 * 60 * 1000);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') NV.checkVersion(); });
+    setTimeout(NV.checkVersion, 4000);
+  }).catch(function (e) {
+    NV.byId('app').innerHTML = '<section class="nv-card nv-error"><h1>Novel Study couldn’t start</h1><p>' + NV.esc(e.message) + '</p><p><button class="nv-btn" onclick="location.reload()">Try again</button></p></section>';
+  });
+};
+window.__MB.Index = 'ok';
+</script>
+<?!= include_('WritingStats'); ?>
+<?!= include_('SaveGuard'); ?>
+<?!= include_('Student'); ?>
+<?!= include_('Teacher'); ?>
+<?!= include_('Build'); ?>
+<?!= include_('Marking'); ?>
+<?!= include_('Guide'); ?>
+<?!= include_('NovelTheme'); ?>
+<script>
+(function () {
+  var want = ['Index', 'WritingStats', 'SaveGuard', 'Student', 'Teacher', 'Build', 'Marking', 'NovelTheme'];
+  var missing = want.filter(function (f) { return window.__MB[f] !== 'ok'; });
+  if (missing.length) {
+    var d = document.createElement('div'); d.className = 'nv-missing'; d.setAttribute('role', 'alert');
+    d.textContent = 'Part of Novel Study didn’t load (' + missing.join(', ') + '). Reload the page; if it keeps happening, tell your teacher.';
+    document.body.insertBefore(d, document.body.firstChild);
+  }
+  NV.start();
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,399 @@
+<script>
+window.__MB = window.__MB || {}; __MB.GatsbyData = 'started';
+
+// ============================================================================
+// GatsbyData.html — all content data for The Great Gatsby unit, as plain
+// objects, so the teacher can edit content without touching app logic.
+// Mirrors the shape of Macbeth's PlayData.html exactly, with one deliberate
+// difference: there is no per-chapter story text here. The novel's actual
+// text is never reproduced in this app's code (see Index.html's
+// storyTextStore block, which the teacher pastes into by hand). Everything
+// below is original material written FROM comprehension of the novel, not
+// quoted from it: chapter framing, comprehension questions, activities,
+// glossary/context notes, rubrics, and standards.
+//
+// Unit shape: 9 chapters, keyed "1.1".."9.1" (an "act.scene" key with scene
+// always 1) so this file's shape — and every function in AppLogic.html and
+// BackendClient.html that reads SCENE_META/CHAPTERS by that key format —
+// matches Macbeth's structure exactly. "act" here just means "chapter."
+// ============================================================================
+
+// CHAPTERS — replaces Macbeth's SCENES. No "original"/"modern" text pair:
+// the novel needs no Elizabethan-to-modern translation, and its real text is
+// never stored in app code. Each entry is chapter metadata only; the actual
+// paragraphs render from Index.html's storyTextStore at runtime.
+const CHAPTERS = {
+  "1.1": { act: 1, scene: 1, title: "Nick Arrives in West Egg" },
+  "2.1": { act: 2, scene: 1, title: "The Valley of Ashes" },
+  "3.1": { act: 3, scene: 1, title: "Gatsby's Party" },
+  "4.1": { act: 4, scene: 1, title: "Gatsby's Story" },
+  "5.1": { act: 5, scene: 1, title: "The Reunion" },
+  "6.1": { act: 6, scene: 1, title: "Gatsby's Past Revealed" },
+  "7.1": { act: 7, scene: 1, title: "Confrontation in the City" },
+  "8.1": { act: 8, scene: 1, title: "The Night Before" },
+  "9.1": { act: 9, scene: 1, title: "After Gatsby" }
+};
+
+// QUESTIONS — one multiple-choice comprehension check + one open-response
+// (DOK) analytical prompt per chapter. Same 4-element shape as Macbeth:
+// [mcPrompt, choices(4), correctIdx, dokPrompt]. All original wording.
+const QUESTIONS = {
+  "1.1": [
+    "Why does Nick move to West Egg?",
+    ["To marry Daisy Buchanan", "To work in the bond business in New York", "To manage Gatsby's household", "To attend Yale with Tom"],
+    1,
+    "Nick describes seeing Gatsby standing alone on his lawn, reaching toward a green light across the bay. What does Nick's description of this moment suggest about Gatsby's state of mind, based on how Nick reacts to it?"
+  ],
+  "2.1": [
+    "What is the Valley of Ashes?",
+    ["Tom and Daisy's family estate", "The neighborhood where Gatsby grew up", "A desolate industrial area between West Egg and New York City", "A nightclub Gatsby owns"],
+    2,
+    "How does the introduction of Myrtle Wilson complicate the reader's understanding of Tom Buchanan?"
+  ],
+  "3.1": [
+    "What is unusual about how Nick first encounters Gatsby at the party?",
+    ["Nick talks with a stranger for a while before realizing it is Gatsby himself", "Gatsby personally greets Nick at the gate", "Gatsby is asleep during his own party", "Gatsby refuses to attend his own party"],
+    0,
+    "What do the competing rumors about Gatsby's past, which circulate among his own party guests, suggest about how the wealthy of West Egg regard him?"
+  ],
+  "4.1": [
+    "What does Jordan Baker reveal to Nick about Gatsby's past?",
+    ["Gatsby and Tom were college roommates", "Gatsby served under Tom during the war", "Gatsby once worked for Daisy's father", "Gatsby and Daisy were involved years before she married Tom"],
+    3,
+    "Gatsby gives Nick an account of his own life that includes claims about attending Oxford and serving as a war hero. Based on how Nick reacts, and what readers learn later, what does this account suggest about how Gatsby has built his identity?"
+  ],
+  "5.1": [
+    "What happens when Gatsby and Daisy are reunited at Nick's house?",
+    ["Daisy refuses to speak to Gatsby at all", "The reunion is awkward at first, then warms as Gatsby shows off his mansion", "Tom arrives and interrupts the reunion", "Gatsby confesses his real name to Daisy"],
+    1,
+    "Why might showing Daisy his possessions — his house, his shirts — matter more to Gatsby than simply talking with her?"
+  ],
+  "6.1": [
+    "How did James Gatz become Jay Gatsby?",
+    ["He inherited the identity from a wealthy relative", "He won the name in a card game", "He reinvented himself after meeting the wealthy Dan Cody, who took him on as a companion", "He was given the name by the U.S. Army"],
+    2,
+    "Gatsby insists to Nick that the past can be repeated. What does this belief reveal about how Gatsby understands time, memory, or love?"
+  ],
+  "7.1": [
+    "What happens during the confrontation at the Plaza Hotel?",
+    ["Gatsby and Tom physically fight", "Daisy announces she is leaving Tom for Gatsby", "Nick reveals Gatsby's real identity to the group", "Tom exposes Gatsby's illegal business dealings, and Daisy retreats back to Tom"],
+    3,
+    "Why might Fitzgerald have Daisy — not Gatsby — be the one driving when Myrtle is killed, and what does Gatsby's response to the accident reveal about him?"
+  ],
+  "8.1": [
+    "Why does George Wilson go after Gatsby?",
+    ["Gatsby cheated Wilson in a business deal", "He wrongly concludes that Gatsby was both Myrtle's lover and the driver who killed her", "Wilson discovers Gatsby's criminal past on his own", "Tom directly sends Wilson to confront Gatsby"],
+    1,
+    "Nick fills in more of Gatsby's and Daisy's shared history in this chapter, right before Gatsby's death. Why might Fitzgerald choose this moment to finally give readers that fuller picture?"
+  ],
+  "9.1": [
+    "What most stands out to Nick about Gatsby's funeral?",
+    ["How grand and well-attended the funeral is", "That Daisy delivers the eulogy", "How few people bother to attend, despite the crowds who came to his parties", "That Tom refuses to allow the funeral to happen"],
+    2,
+    "How does the novel's closing image of boats moving against a current, carried backward, connect Gatsby's individual story to a larger idea about the American Dream?"
+  ]
+};
+
+// ACTIVITIES — sparse, same shape as Macbeth: keyed by chapter key or the
+// special "PRE" (pre-reading) key, each an array of [type, title, urlOrDesc]
+// tuples. type is "Video", "Activity", or "Resource". Video URLs below were
+// verified as real, existing videos before inclusion — nothing fabricated.
+const ACTIVITIES = {
+  "PRE": [
+    ["Video", "Crash Course Literature: The Great Gatsby, Part 1", "https://www.youtube.com/watch?v=xw9Au9OoN88"],
+    ["Video", "Crash Course US History: The Roaring Twenties", "https://www.youtube.com/watch?v=VfOR1XCMf7A"],
+    ["Video", "The Great Gatsby (2013) — Official Trailer", "https://www.youtube.com/watch?v=4w8lohkQtbY"]
+  ],
+  "1.1": [
+    ["Activity", "Green Light Tracker", "Students begin a running log of every appearance of the color green — and the green light itself — to build across the whole novel."]
+  ],
+  "2.1": [
+    ["Activity", "Old Money vs. New Money Chart", "Students sort details about East Egg, West Egg, and the Valley of Ashes into a three-column class chart."]
+  ],
+  "3.1": [
+    ["Video", "Crash Course Literature: The Great Gatsby, Part 2", "https://www.youtube.com/watch?v=cn0WZ8-0Z1Y"],
+    ["Activity", "Gatsby Rumor Mill", "Students collect the contradictory rumors that party guests spread about who Gatsby really is, and weigh how believable each one is."]
+  ],
+  "4.1": [
+    ["Activity", "Nick the Narrator", "Students find a moment where Nick's account of events feels shaped by his own opinion rather than a neutral retelling."]
+  ],
+  "6.1": [
+    ["Activity", "Then vs. Now", "Students compare Gatsby's belief that the past can be repeated to a modern example of someone trying to recreate a past relationship or moment."]
+  ],
+  "7.1": [
+    ["Activity", "Who's Responsible? Debate Prep", "Students choose a character connected to Myrtle's death and build the strongest possible case for how responsible that character really is."]
+  ],
+  "9.1": [
+    ["Activity", "American Dream Then vs. Now", "Students compare Gatsby's version of the American Dream to a present-day version of the same idea."]
+  ]
+};
+
+// EQ — the unit's 3 essential questions. Used for evidence highlighting
+// while reading, and for the discussion/reflection prompts throughout.
+// NOTE: this is a DIFFERENT set of 3 from ESSAY_POSITIONS below — see that
+// constant's comment for why the essay uses its own 3 options instead of
+// these. Both appear in the app; they answer different questions on purpose.
+const EQ = [
+  { id: "dream", label: "The American Dream", color: "var(--q1)", q: "What does Gatsby's rise and fall reveal about the American Dream?" },
+  { id: "class", label: "Wealth & Class", color: "var(--q2)", q: "How does wealth — old money versus new money — build invisible walls between people?" },
+  { id: "illusion", label: "Illusion & Reality", color: "var(--q3)", q: "Where does the novel blur the line between illusion and reality?" }
+];
+
+// ESSAY_POSITIONS — the three stances the unit's essay asks students to
+// choose between: "Is the American Dream in this novel alive, dead, or
+// corrupted?" This is intentionally a separate list from EQ above. EQ names
+// three THEMES worth reading for (dream / class / illusion); the essay asks
+// students to take a STANCE on one specific claim about the Dream. Reusing
+// EQ for both would have forced the essay into the same 3 thematic buckets
+// used for evidence-tagging, which doesn't match the prompt Jaben chose.
+const ESSAY_POSITIONS = [
+  { id: "alive", label: "Alive", color: "var(--q1)", blurb: "Gatsby's own dream fails, but the novel still leaves room to believe the American Dream itself is real and worth pursuing." },
+  { id: "dead", label: "Dead", color: "var(--q2)", blurb: "The novel presents the American Dream as an illusion that was never actually achievable." },
+  { id: "corrupted", label: "Corrupted", color: "var(--q3)", blurb: "The American Dream still exists in this novel, but it has been twisted into a chase for money, status, and pleasure." }
+];
+
+// ACTIVITY_DETAILS — keyed by the exact "Activity" titles used above.
+// Same table/fields shape as Macbeth: table entries render an editable
+// table; fields entries render labeled text boxes. Unlisted or "Video"/
+// "Resource" titles fall back to a generic response box (handled in
+// AppLogic.html, not here).
+const ACTIVITY_DETAILS = {
+  "Green Light Tracker": {
+    prompt: "Every time the color green — or the green light specifically — appears in a chapter, add a row. Keep adding to this table across the whole novel.",
+    table: ["Chapter", "What is described as green", "What it seems to represent in that moment"],
+    minRows: 4,
+    reflection: "Does the green light mean the same thing every time it appears, or does its meaning change as the novel goes on?"
+  },
+  "Old Money vs. New Money Chart": {
+    prompt: "Sort details about East Egg, West Egg, and the Valley of Ashes into the three columns below as you read.",
+    table: ["East Egg (old money)", "West Egg (new money)", "The Valley of Ashes"],
+    minRows: 3,
+    reflection: "Which of these three places seems to have the least power, and why?"
+  },
+  "Gatsby Rumor Mill": {
+    prompt: "List at least three different rumors that party guests spread about who Gatsby really is.",
+    table: ["Rumor", "Who says it", "Does it seem believable?"],
+    minRows: 3,
+    reflection: "Why might Gatsby let these rumors keep spreading instead of correcting them?"
+  },
+  "Nick the Narrator": {
+    prompt: "Find one moment where Nick's account of events feels shaped by his own opinion rather than a neutral retelling of what happened.",
+    fields: [
+      { label: "What Nick describes", placeholder: "Summarize the moment in your own words" },
+      { label: "What makes it feel like his opinion, not just fact" }
+    ],
+    reflection: "Does noticing this change how much you trust Nick as a narrator? Why or why not?"
+  },
+  "Then vs. Now": {
+    prompt: "Gatsby insists the past can be repeated. Think of a modern example — a person, a story, a trend — of someone trying to recreate a past relationship or moment.",
+    fields: [
+      { label: "Your modern example" },
+      { label: "How it is similar to what Gatsby is trying to do" },
+      { label: "How it is different" }
+    ],
+    reflection: "Based on your example, do you think the past really can be repeated?"
+  },
+  "Who's Responsible? Debate Prep": {
+    prompt: "Choose one character connected to Myrtle's death — Daisy, Gatsby, Tom, or George Wilson — and build the strongest possible case for how responsible that character really is.",
+    fields: [
+      { label: "Character you are arguing about" },
+      { label: "Strongest piece of evidence for their responsibility" },
+      { label: "Strongest counter-argument you will need to answer" }
+    ],
+    reflection: "Is there one character who deserves most of the blame, or is responsibility spread across several people?"
+  },
+  "American Dream Then vs. Now": {
+    prompt: "Compare Gatsby's version of the American Dream to a present-day version of the same idea.",
+    fields: [
+      { label: "Gatsby's version of the dream" },
+      { label: "A present-day version of the same dream" },
+      { label: "What stayed the same, and what changed" }
+    ],
+    reflection: "Based on this novel, would Fitzgerald say the American Dream is still achievable today?"
+  }
+};
+
+// RUBRIC — the 4-criterion essay rubric (must stay in sync with Code.gs's
+// ESSAY_CRITERIA array: Meaning, Style, Form, Conventions). Only Meaning's
+// text is content-specific (it names the unit's themes); Style/Form/
+// Conventions are generic essay-quality language.
+const RUBRIC = {
+  Meaning: [
+    "The essay demonstrates a deep, insightful understanding of the novel's ideas about the American Dream, wealth and class, or illusion and reality. The analysis is original and supported by strong, well-chosen evidence.",
+    "The essay demonstrates a strong understanding of the novel's ideas about the American Dream, wealth and class, or illusion and reality. The analysis is supported by relevant evidence.",
+    "The essay demonstrates a general understanding of the novel's ideas about the American Dream, wealth and class, or illusion and reality, but the analysis is uneven or only partly supported by evidence.",
+    "The essay shows only a surface-level understanding of the novel's ideas, with little analysis and thin or missing evidence.",
+    "The essay does not demonstrate an understanding of the novel's central ideas."
+  ],
+  Style: [
+    "Word choice is precise and varied, and sentences are built with control and a clear sense of the writer's own voice.",
+    "Word choice is generally precise and sentences are varied, with an emerging sense of voice.",
+    "Word choice is adequate but general or repetitive, and sentence variety is limited.",
+    "Word choice is vague or imprecise, and sentences are simple or repetitive throughout.",
+    "Word choice and sentence construction are unclear enough to interfere with meaning."
+  ],
+  Form: [
+    "The essay is organized around a clear, arguable thesis, with purposeful paragraphing and transitions that build one idea into the next.",
+    "The essay is organized around a clear thesis with logical paragraphing and mostly effective transitions.",
+    "The essay has a basic organizational structure, but paragraphing or transitions are inconsistent.",
+    "The essay's organization is difficult to follow, with an unclear thesis or disconnected paragraphs.",
+    "The essay lacks a recognizable organizational structure."
+  ],
+  Conventions: [
+    "The essay follows the conventions of standard written English with effectively no errors that interfere with meaning.",
+    "The essay follows the conventions of standard written English with only minor, non-distracting errors.",
+    "The essay contains errors in grammar, usage, or mechanics that occasionally interfere with meaning.",
+    "The essay contains frequent errors in grammar, usage, or mechanics that interfere with meaning.",
+    "The essay contains errors severe and frequent enough to seriously interfere with meaning."
+  ]
+};
+
+// QUIZ_ANCHORS — intentionally EMPTY. Macbeth uses this to jump the reader
+// to a spot mid-scene by searching for a verbatim quoted substring, which
+// requires storing a fragment of the source text. That mechanism is not
+// used here: the app never stores or matches against the novel's actual
+// wording, so the comprehension check and DOK box always render after the
+// full chapter text instead (the codebase's existing "not found" fallback,
+// left as-is rather than special-cased, handles this with zero code change).
+const QUIZ_ANCHORS = {};
+
+// DOK_RUBRIC — 7-band open-response rubric (index 0 unused; scores run 1-7).
+const DOK_RUBRIC = [
+  null,
+  "Incomplete. The response is missing, off-topic, or too brief to show any engagement with the question.",
+  "Minimal. The response attempts the question but shows little understanding of the chapter and includes no textual evidence.",
+  "Developing. The response shows a basic understanding of the chapter but the analysis is surface-level, vague, or only partly answers the question.",
+  "Adequate. The response answers the question with a reasonable understanding of the chapter, but the analysis is thin or evidence is only loosely connected to the point being made.",
+  "Proficient. The response clearly answers the question and demonstrates solid understanding of the chapter, supported by relevant evidence from the novel.",
+  "Strong. The response fully answers the question with thoughtful analysis and specific, well-chosen evidence from the novel that clearly supports the reasoning.",
+  "Exemplary. The response fully and insightfully answers the question, using specific evidence from the novel to support original, well-reasoned analysis that goes beyond a surface reading of the chapter."
+];
+
+// READING_SUPPORT — new (Macbeth's PlayData.html has no equivalent object,
+// since its dual-pane reader shows a modern-English paraphrase instead).
+// Gatsby's text needs no translation, so this replaces that pane: a short,
+// chapter-level panel of original vocabulary notes and historical context.
+// Not paired to specific paragraphs or lines (the app has no access to the
+// teacher's pasted text to align against) — it renders as one panel per
+// chapter, below the reading pane. Renderer returns "" when a chapter has
+// no entry, same copy-the-shape convention as the rest of this file.
+const READING_SUPPORT = {
+  "1.1": {
+    vocab: [
+      { term: "bond business", def: "Buying and selling investment securities for clients — Nick's new job in New York City." },
+      { term: "veranda", def: "A roofed, open-air porch along the outside of a house, common on grand homes of the era." }
+    ],
+    context: [
+      "The novel is set in the summer of 1922, on Long Island, New York.",
+      "\"East Egg\" and \"West Egg\" are Fitzgerald's invented names for two peninsulas across the bay from each other — one old money, one new money."
+    ]
+  },
+  "2.1": {
+    vocab: [
+      { term: "Valley of Ashes", def: "Fitzgerald's name for a stretch of industrial wasteland between Long Island and New York City, where ash and smoke from nearby factories settle." },
+      { term: "Prohibition", def: "The nationwide ban on making, transporting, or selling alcohol in the U.S. from 1920 to 1933 — it made illegal liquor sales hugely profitable." }
+    ],
+    context: [
+      "Several wealthy characters in this novel are rumored to have built their fortunes, at least partly, on bootlegging — illegally selling alcohol during Prohibition."
+    ]
+  },
+  "3.1": {
+    vocab: [
+      { term: "old sport", def: "A casual, upper-class term of address Gatsby uses constantly — part of the persona he has built for himself." }
+    ],
+    context: [
+      "Gatsby's parties were famous for their scale — live orchestras, imported food, and guests who often were not personally invited at all."
+    ]
+  },
+  "4.1": {
+    vocab: [
+      { term: "bootlegger", def: "Someone who illegally makes, transports, or sells alcohol, especially during Prohibition." }
+    ],
+    context: [
+      "Meyer Wolfshiem is based loosely on real organized-crime figures of the era who profited from Prohibition-era bootlegging and gambling."
+    ]
+  },
+  "5.1": {
+    vocab: [],
+    context: [
+      "Fitzgerald often uses weather to mirror a scene's emotional tone — notice the weather in this chapter's reunion."
+    ]
+  },
+  "6.1": {
+    vocab: [
+      { term: "self-made man", def: "A common phrase for someone who rises from modest beginnings to wealth or success through their own effort — an idea closely tied to the American Dream." }
+    ],
+    context: [
+      "Gatsby's backstory draws on a real American mythology of reinvention — the idea that anyone can remake themselves, given enough will and opportunity."
+    ]
+  },
+  "7.1": {
+    vocab: [],
+    context: [
+      "The Plaza Hotel was (and still is) one of New York City's most prestigious hotels — a fitting setting for the novel's central confrontation."
+    ]
+  },
+  "8.1": {
+    vocab: [],
+    context: [
+      "Automobiles were still a fairly new luxury in 1922, and reckless driving among the wealthy was a recognizable social concern of the period."
+    ]
+  },
+  "9.1": {
+    vocab: [
+      { term: "the Dutch sailors", def: "Nick's closing reflection imagines the earliest European sailors seeing Long Island for the first time — an image of a \"fresh, green\" continent full of promise, before it became this novel's world of parties and ash." }
+    ],
+    context: [
+      "The novel's final lines are among the most quoted in American literature — pay attention to how Nick connects Gatsby's personal story to a much larger idea about America itself."
+    ]
+  }
+};
+
+// COMMON_CORE — reference table shown to teachers; not linked to specific
+// chapters or activities. Grades 11-12 band (The Great Gatsby is commonly
+// taught a level up from Macbeth's grades 9-10 placement in American Lit —
+// flag this to Jaben as an assumption; it's a straightforward find-and-
+// replace of the two group-label strings if he wants the 9-10 band instead).
+const COMMON_CORE = {
+  "Reading Literature · Grades 11–12": [
+    ["CCSS.ELA-LITERACY.RL.11-12.1", "Cite strong and thorough textual evidence to support analysis, including where the text leaves matters uncertain."],
+    ["CCSS.ELA-LITERACY.RL.11-12.2", "Determine two or more themes or central ideas and analyze their development, including how they interact and build on one another."],
+    ["CCSS.ELA-LITERACY.RL.11-12.3", "Analyze the impact of the author's choices regarding how to develop and relate elements of a story."],
+    ["CCSS.ELA-LITERACY.RL.11-12.4", "Determine the meaning of words and phrases as they are used in the text, including figurative and connotative meanings; analyze the impact of specific word choices on meaning and tone."],
+    ["CCSS.ELA-LITERACY.RL.11-12.5", "Analyze how an author's choices concerning structure, ordering of events, and manipulation of time create effects such as mystery, tension, or surprise."],
+    ["CCSS.ELA-LITERACY.RL.11-12.6", "Analyze a case in which grasping a point of view requires distinguishing what is directly stated from what is really meant, including irony or understatement."],
+    ["CCSS.ELA-LITERACY.RL.11-12.7", "Analyze multiple interpretations of a story, evaluating how each version interprets the source text."],
+    ["CCSS.ELA-LITERACY.RL.11-12.9", "Demonstrate knowledge of foundational works of American literature, including how two texts from the same period treat similar themes or topics."]
+  ],
+  "Writing · Grades 11–12": [
+    ["CCSS.ELA-LITERACY.W.11-12.1", "Write arguments to support claims in an analysis of substantive topics, using valid reasoning and relevant, sufficient evidence."],
+    ["CCSS.ELA-LITERACY.W.11-12.1.A", "Introduce precise, knowledgeable claims and organize the reasons and evidence logically."],
+    ["CCSS.ELA-LITERACY.W.11-12.1.B", "Develop claims and counterclaims fairly, supplying evidence for each while pointing out the strengths and limitations of both."],
+    ["CCSS.ELA-LITERACY.W.11-12.1.C", "Use words, phrases, and clauses to link the major sections of the text and clarify the relationships among claims, counterclaims, reasons, and evidence."],
+    ["CCSS.ELA-LITERACY.W.11-12.1.D", "Establish and maintain a formal style and objective tone."],
+    ["CCSS.ELA-LITERACY.W.11-12.1.E", "Provide a concluding statement that follows from and supports the argument presented."],
+    ["CCSS.ELA-LITERACY.W.11-12.4", "Produce clear and coherent writing in which the development, organization, and style are appropriate to task, purpose, and audience."],
+    ["CCSS.ELA-LITERACY.W.11-12.5", "Develop and strengthen writing by planning, revising, editing, rewriting, or trying a new approach."],
+    ["CCSS.ELA-LITERACY.W.11-12.6", "Use technology to produce, publish, and update individual writing products."],
+    ["CCSS.ELA-LITERACY.W.11-12.8", "Gather relevant information and evidence, assess its usefulness, and integrate it while avoiding plagiarism."],
+    ["CCSS.ELA-LITERACY.W.11-12.9.A", "Apply reading standards to literature to support analysis, reflection, and research."],
+    ["CCSS.ELA-LITERACY.W.11-12.10", "Write routinely over extended time frames for a range of tasks, purposes, and audiences."]
+  ],
+  "Speaking & Listening · Grades 11–12": [
+    ["CCSS.ELA-LITERACY.SL.11-12.1", "Initiate and participate effectively in a range of collaborative discussions, building on others' ideas and expressing your own clearly."],
+    ["CCSS.ELA-LITERACY.SL.11-12.1.A", "Come to discussions prepared, having read and researched material, and draw on that preparation to promote a substantive discussion."],
+    ["CCSS.ELA-LITERACY.SL.11-12.1.C", "Propel conversations by posing and responding to questions that probe reasoning and evidence."],
+    ["CCSS.ELA-LITERACY.SL.11-12.1.D", "Respond thoughtfully to diverse perspectives, synthesizing comments and resolving contradictions when possible."]
+  ],
+  "Language · Grades 11–12": [
+    ["CCSS.ELA-LITERACY.L.11-12.1", "Demonstrate command of the conventions of standard English grammar and usage when writing or speaking."],
+    ["CCSS.ELA-LITERACY.L.11-12.2", "Demonstrate command of the conventions of standard English capitalization, punctuation, and spelling."],
+    ["CCSS.ELA-LITERACY.L.11-12.3", "Apply knowledge of language to understand how language functions in different contexts, to make effective choices for meaning or style."],
+    ["CCSS.ELA-LITERACY.L.11-12.4", "Determine or clarify the meaning of unknown words and phrases, choosing flexibly from a range of strategies."],
+    ["CCSS.ELA-LITERACY.L.11-12.5", "Demonstrate understanding of figurative language, word relationships, and nuances in word meanings."],
+    ["CCSS.ELA-LITERACY.L.11-12.6", "Acquire and use accurately general academic and domain-specific words and phrases."]
+  ]
+};
+
+__MB.GatsbyData = 'ok';
+</script>
