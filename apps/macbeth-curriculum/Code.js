@@ -2,7 +2,7 @@ const MACBETH_DB_PROP = 'MACBETH_DB_ID';
 // Bump this value for every published Macbeth build. The browser compares its
 // embedded build number with this server value so a cached/stale page cannot
 // quietly keep students on old code after a new deployment.
-const MACBETH_APP_VERSION = '2026-10-23b';
+const MACBETH_APP_VERSION = '2026-10-23c';
 // Shared across deployment versions. This is the important part of the update
 // guard: an old open page can still read this property even when its
 // google.script.run calls are executing older deployed code.
@@ -2553,11 +2553,11 @@ function migrateGradeItems() {
 // that isn't a space or a line break is identical -- the editor reflowed the
 // paste, which is not worth a re-paste.
 var FILE_FINGERPRINTS = {
-  release: '2026-10-23b (simpler Canvas assignment window)',
+  release: '2026-10-23c (new modern-English text)',
   files: {
-    Index:         {chars: 37039, md5: 'b4d70bb89de017fbedc08436e32afb55', md5ws: 'a8573db042490a8e8f2907e40831073f'},
+    Index:         {chars: 37039, md5: '268cba676d2b66aae6711ef8ac643cf6', md5ws: 'af2ec533a028d6f8d5cba62c8f459193'},
     Images:        {chars: 100381, md5: '739c361772b7464e7275948e434a844e', md5ws: '868206cca315adb7c3f88c935aada735'},
-    PlayData:      {chars: 245646, md5: 'f894db4c1c7545d30695efbea69cb192', md5ws: '33af4a0dcd7732298e710468dd23f997'},
+    PlayData:      {chars: 241404, md5: 'ec7f019c4d9e1b61178d9b826279249b', md5ws: 'e70c572bf8b027504e9b7f354575c5af'},
     AppLogic:      {chars: 154281, md5: 'd6481df3f65f7889a01a48e84200bef9', md5ws: '69222def9f45099506b70d3f46f9a069'},
     BackendClient: {chars: 300852, md5: '2378f2d9ec37327bbd8fea3c618de8d8', md5ws: '301446c165723c313ad088dc0ec2303b'}
   },
