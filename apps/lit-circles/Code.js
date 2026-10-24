@@ -45,7 +45,7 @@ var GEMINI_MODEL = 'gemini-3.7-flash';
 // Bump on every release: here, LCH_RELEASE at the top of BackendClient.html (it sets the badge and
 // LC_CLIENT_VERSION, so Index.html only needs re-pasting when Index itself changes) and
 // FILE_FINGERPRINTS.release at the bottom of this file.
-var LC_APP_VERSION = '2026-10-23d';
+var LC_APP_VERSION = '2026-10-23e';
 var LC_LIVE_VERSION_PROP = 'LC_LIVE_APP_VERSION';
 
 var SHEET_NAMES = { GROUPS: 'Groups', WORK: 'WeeklyWork', DRAFTS: 'WeeklyDrafts', PEER: 'PeerAssessments', HISTORY: 'BookHistory', REFLECT: 'Reflections', RESUME: 'StudentResume', SELF: 'DiscussionSelfAssessments', STEP: 'StepDrafts', BACKUP: 'WorkBackups', WSTATS: 'WritingStats', JIMG: 'JournalImages', AWAY: 'DiscussionAway' };
@@ -3531,7 +3531,7 @@ function teacherRestoreLiteratureArchive(payload){
 // Regenerate FILE_FINGERPRINTS with Node every release.
 // ============================================================================
 var FILE_FINGERPRINTS = {
-  "release": "2026-10-23d",
+  "release": "2026-10-23e",
   "files": {
     "Index": {
       "chars": 403155,
@@ -3540,8 +3540,8 @@ var FILE_FINGERPRINTS = {
     },
     "BackendClient": {
       "chars": 274589,
-      "md5": "b91b2b96a1610269598019f4f6a2188a",
-      "md5ws": "554620499f72fa31872bc4429fec8f1c"
+      "md5": "bad813a40bf8c7a86d876d2c042d0da8",
+      "md5ws": "c04f57a0d6f51c7c90e4173c1956fdd2"
     },
     "Checklists": {
       "chars": 37703,
@@ -3594,9 +3594,9 @@ var FILE_FINGERPRINTS = {
       "md5ws": "2614fe902070bc8f82030a73a495604e"
     },
     "LibraryTheme": {
-      "chars": 318040,
-      "md5": "23cd5a237ab7bac5b998e8fdce770ee3",
-      "md5ws": "036ec74b78e518ab610dd15a536da413"
+      "chars": 232280,
+      "md5": "dad179517742439f77438553b0295dfa",
+      "md5ws": "3728d5708c6815961a48cd70fec62c28"
     }
   }
 };
