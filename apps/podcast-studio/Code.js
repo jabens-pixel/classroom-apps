@@ -14,7 +14,7 @@
 // Student, Teacher, Marking, ReadAloud, PodcastTheme (last).
 // ============================================================================
 
-var PC_APP_VERSION = '2026-10-23a';
+var PC_APP_VERSION = '2026-10-23b';
 var PC_DB_PROP = 'PODCAST_STUDIO_DB_ID';
 var PC_LIVE_VERSION_PROP = 'PODCAST_STUDIO_LIVE_VERSION';
 var PC_DEMO_DOMAIN = 'demo.podcaststudio.local';
@@ -646,7 +646,7 @@ function restoreWorkBackup() {
 // checkFiles: proves every file in the project is the one this release shipped.
 // ============================================================================
 
-var FILE_FINGERPRINTS = {"Index":{"chars":15231,"md5":"e1cfc8cfadb5fae584d03ebae0cf009f","loose":"b8446b2002cab4196815d407e7026ab4"},"Marking":{"chars":45441,"md5":"2dc2644f485792c6888b91f8cdb1333c","loose":"2abe763cc5dc769c0345ae3baaf275b1"},"PodcastTheme":{"chars":827667,"md5":"02ac28a4f52f67810dcc27fbb9074407","loose":"f4c0b48f6715271be3f980953cd3c3dd"},"ReadAloud":{"chars":6259,"md5":"43111f91d6b58f51e863433f8e90a82a","loose":"865001116154ad37371b8b240599a9b6"},"SaveGuard":{"chars":13490,"md5":"502c603f291f88145f86cf77b318d426","loose":"dc67d5c95c2d30e31226be8533fa9a20"},"Student":{"chars":84613,"md5":"fedd99cae1994cebe7c31e482cdef1fa","loose":"3e7869bd81c09fe9a17c1f885c11ffbb"},"Teacher":{"chars":59243,"md5":"ce548e04d67a0cc919410c72612325e4","loose":"78ed5eadedc77aaf285f036b9d002370"},"WritingStats":{"chars":5075,"md5":"204ca2e52966b59319a8d88f4d66373a","loose":"b1ffb94ec4014918688ca9d78a498a09"}};
+var FILE_FINGERPRINTS = {"Index":{"chars":15231,"md5":"ca9fcfbb6cca9746c5c75d8a965879c9","loose":"80b284ba0f0ff7c708adbdb5705c2ea9"},"Marking":{"chars":45441,"md5":"2dc2644f485792c6888b91f8cdb1333c","loose":"2abe763cc5dc769c0345ae3baaf275b1"},"PodcastTheme":{"chars":912019,"md5":"d006cb199af9ac44d93a58bf3d0c4bb2","loose":"dcaf13805a889df9e72b0803def19455"},"ReadAloud":{"chars":6259,"md5":"43111f91d6b58f51e863433f8e90a82a","loose":"865001116154ad37371b8b240599a9b6"},"SaveGuard":{"chars":13490,"md5":"502c603f291f88145f86cf77b318d426","loose":"dc67d5c95c2d30e31226be8533fa9a20"},"Student":{"chars":84613,"md5":"fedd99cae1994cebe7c31e482cdef1fa","loose":"3e7869bd81c09fe9a17c1f885c11ffbb"},"Teacher":{"chars":59243,"md5":"ce548e04d67a0cc919410c72612325e4","loose":"78ed5eadedc77aaf285f036b9d002370"},"WritingStats":{"chars":5075,"md5":"204ca2e52966b59319a8d88f4d66373a","loose":"b1ffb94ec4014918688ca9d78a498a09"}};
 function checkFiles() {
   var lines = [];
   Object.keys(FILE_FINGERPRINTS).forEach(function (name) {

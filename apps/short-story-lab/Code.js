@@ -5,7 +5,7 @@ const SHORTSTORY_DB_PROP = 'SHORTSTORY_DB_ID';
 // version returned by getBootstrap()/getAppVersion(). Bump this one value for
 // each classroom release; stale tabs safely reload with a cache-busting URL
 // and then show the one-time "App updated" confirmation.
-const SHORTSTORY_APP_VERSION = '2026.10.23.43';
+const SHORTSTORY_APP_VERSION = '2026.10.23.44';
 // Bumped on every build that ships. A student's browser remembers the value
 // it booted with and the server returns the current one on every save, so a
 // tab left open across a redeploy can notice and offer to reload -- it is
@@ -4076,9 +4076,9 @@ var FILE_FINGERPRINTS = {
       "md5ws": "b2fbcd340ad7737c7432bef505c53bfd"
     },
     "Images": {
-      "chars": 382179,
-      "md5": "da9a44b2699901a57baae8ff6dcfa8ac",
-      "md5ws": "da9eb4bdc2fe76e929be5257c920aff7"
+      "chars": 1029379,
+      "md5": "234729686e0a28d20e4cff88309a1875",
+      "md5ws": "87bef28320ffb28affd989a0e05eba5f"
     },
     "Index": {
       "chars": 319379,
