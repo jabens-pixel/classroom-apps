@@ -29,7 +29,16 @@ Free Google Apps Script apps for high-school English, built and used in real cla
 
 Ideas, bug reports and improvements are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## For schools and districts
+
+Setup help, Canvas connections, custom versions and teacher training are available. [Send a request](../../issues/new?title=School%20or%20district%20request).
+
 ## License
 
-Code: MIT (see [LICENSE](LICENSE)). Lesson content (questions, prompts, rubrics, guides): [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/). Share and adapt it, give credit, don't sell it.
+Free for teachers, students, schools and other noncommercial use.
+
+- **Code:** [PolyForm Noncommercial 1.0.0](LICENSE). Use it, change it and share it for any noncommercial purpose. Schools, districts and other educational institutions may use it.
+- **Lesson content** (questions, prompts, rubrics, guides, modern-English text): [CC BY-NC-SA 4.0](LICENSE-LESSONS.md). Share and adapt it with credit, keep it under the same license, and don't sell it.
+- **Selling it, or building it into a paid product,** needs permission from Jaben Schalk.
+
 Story and book texts included are in the public domain. Paste in any other text only if you hold the rights to it.

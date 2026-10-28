@@ -16,3 +16,6 @@ Thank you for helping! Two ways to contribute:
 - **No copyrighted story or book text.** Public-domain texts only; everything else stays a placeholder the teacher fills in.
 - **No personal or school details** (emails, school domains, Canvas addresses, keys) in the code. Secrets go in Script Properties.
 - **No new Google permissions** (OAuth scopes) without explaining why in the pull request.
+
+**Licensing your contribution**
+By opening a pull request, you agree that your contribution is shared under this project's licenses (PolyForm Noncommercial 1.0.0 for code, CC BY-NC-SA 4.0 for lesson content), and that Jaben Schalk may also offer it under other terms, for example to a company that asks permission to use the apps. This keeps the apps free for teachers while letting the project cover its costs.
