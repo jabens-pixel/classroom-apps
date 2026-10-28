@@ -2,26 +2,25 @@
 
 A full Macbeth unit: the play act by act with side-by-side support, activities, discussion, grading and Canvas.
 
-Grades 9–12 · Google Apps Script · free · works with any Google Workspace for Education school.
+Grades 9–12 · Google Apps Script · free for teachers and schools · works with any Google Workspace for Education school.
 
-## Use it in your classroom (about 10 minutes)
+## Use it in your classroom (about 3 minutes)
 
-**Easiest: make a copy** from the [website](https://jabens-pixel.github.io/classroom-apps/) once this app's copy link is up. Your students' work saves to *your* Google Drive.
+1. **Make a copy** from the [website](https://jabens-pixel.github.io/classroom-apps/) and click **Make a copy** in Google's box. The copy is a Google Sheet in *your* Drive.
+2. In your copy, click **Classroom App ▸ Set up my app** (the menu appears a few seconds after the Sheet opens).
+3. Approve Google's permission screen. Because your copy is your own app, Google says **"Google hasn't verified this app"**. That's expected: click **Advanced ▸ Go to Macbeth Curriculum**, then **Allow**.
+4. A box shows your **student link**. Copy it into Canvas, Google Classroom or your class page. Open it yourself first to make a class.
 
-**Or build it from this folder:**
-1. Go to [script.google.com](https://script.google.com) and start a **New project** named "Macbeth Curriculum".
-2. Add every `.js` and `.html` file in this folder with the same names (`Code.js` goes into the existing **Code.gs**). Turn on **Project Settings → Show "appsscript.json"** and paste that file too.
-3. In the editor, choose **`setupMacbethBackend`** in the function list and click **Run**. Approve Google's permission prompt. This builds the app's backend Sheet in your Drive and makes **you** the admin.
-4. **Deploy → New deployment → Web app.** Execute as: *Me*. Who has access: *anyone in your school domain*. Share that link with your students.
+Your students' work saves to this Sheet, in your Drive. You can find the link again under **Classroom App ▸ Show my student link**.
 
-If you use clasp: `clasp create --type standalone --title "Macbeth Curriculum"` in this folder, then `clasp push` and continue at step 3.
+**If the box says "Turn on one Google setting":** open [script.google.com/home/usersettings](https://script.google.com/home/usersettings), switch on **Google Apps Script API**, and run **Set up my app** again. If your school has switched it off, the box shows three manual steps instead.
 
 ## Optional extras
 
 - **Canvas:** Teacher dashboard → Canvas. Each teacher pastes their own Canvas access token. It is stored for that teacher only.
-- **AI feedback** (in apps that have it): add a script property `GEMINI_API_KEY` with your own key (Project Settings → Script properties).
+- **AI feedback** (in apps that have it): add a script property `GEMINI_API_KEY` with your own key (Extensions ▸ Apps Script ▸ Project Settings ▸ Script properties).
 - **Time zone:** the copy is set to Pacific/Honolulu. Change `timeZone` in appsscript.json to yours.
 
 ## Updates
 
-New versions are posted here. To update, replace your files with the new ones and deploy a **new version** of your existing deployment (Deploy → Manage deployments → pencil → New version), so your student link stays the same. Your students' work is never touched by an update.
+New versions are posted here. Paste the new files into your copy (Extensions ▸ Apps Script), then click **Classroom App ▸ Set up my app** again. It publishes the new version to the same student link. Your students' work is never touched by an update.
