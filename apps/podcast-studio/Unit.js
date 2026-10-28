@@ -140,6 +140,7 @@ function pcGradeOut_(r) {
   return { score: r.Score === '' || r.Score == null ? null : Number(r.Score), excluded: pcTruthy_(r.Excluded), comment: pcCellText_(r.Comment), gradedAt: pcIso_(r.GradedAt), criteria: pcParse_(r.CriteriaJson, {}) || {} };
 }
 function pcStudentGrades_(classId, email) {
+  pcEnsureScale7_();
   var out = {}, sh = pcSheet_('Grades');
   pcReadRows_(sh, pcFindRowNums_(sh, 'Email', email)).filter(function (r) { return String(r.ClassId) === String(classId); }).forEach(function (r) { out[String(r.ItemKey)] = pcGradeOut_(r); });
   return out;

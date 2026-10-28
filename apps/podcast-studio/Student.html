@@ -41,6 +41,28 @@
       }).catch(function (err) { btn.disabled = false; PC.byId('joinMsg').textContent = err.message; });
     };
   };
+  // ---------------------------------------------------------------- your name (added by email)
+  // A teacher added this student by email, so the app doesn't know their name yet. They type it once;
+  // it fills every class that has no name for them (setMyName).
+  PC.views.name = function (app) {
+    var b = PC.boot, cs = b.addedTo || [];
+    app.innerHTML = '<section class="pc-card pc-name-card"><span class="pc-eyebrow">Welcome to Podcast Studio</span><h1>What’s your name?</h1>' +
+      '<p>' + (cs.length ? 'Your teacher added you to <b>' + cs.map(esc).join('</b>, <b>') + '</b>. ' : '') + 'Type your name the way your teacher should see it. You only do this once.</p>' +
+      '<form class="pc-join" id="pcName" autocomplete="on"><label class="pc-field"><span>First name</span><input id="nmFirst" class="pc-input" autocomplete="given-name" maxlength="40" required value="' + esc(b.suggestFirst || '') + '"></label>' +
+      '<label class="pc-field"><span>Last name</span><input id="nmLast" class="pc-input" autocomplete="family-name" maxlength="40" required value="' + esc(b.suggestLast || '') + '"></label>' +
+      '<button type="submit" class="pc-btn primary" id="nmSave">Continue</button><p class="pc-form-msg" id="nmMsg" role="alert"></p></form>' +
+      '<p class="pc-small pc-muted">Signed in as ' + esc(b.email) + '</p></section>';
+    var f = PC.byId('nmFirst'); setTimeout(function () { if (f.value && PC.byId('nmLast').value) PC.byId('nmSave').focus(); else f.focus(); }, 40);
+    PC.byId('pcName').onsubmit = function (e) {
+      e.preventDefault(); var btn = PC.byId('nmSave'); btn.disabled = true; PC.byId('nmMsg').textContent = '';
+      PC.rpc('setMyName', { firstName: PC.byId('nmFirst').value, lastName: PC.byId('nmLast').value }, { retry: true }).then(function (r) {
+        b.needsName = false; b.studentClasses = r.studentClasses || b.studentClasses; PC.toast('Thanks, ' + r.name.split(' ')[0] + '!', 'ok');
+        var sc = b.studentClasses || [];
+        if (!PC.state.classId && sc.length === 1) PC.state.classId = sc[0].classId;
+        PC.go(PC.state.classId ? 'home' : 'classes');
+      }).catch(function (err) { btn.disabled = false; PC.byId('nmMsg').textContent = err.message; });
+    };
+  };
   A.pickClass = function (el) { PC.state.classId = el.dataset.class; PC.state.as = ''; PC.store.set('pcClass_' + PC.boot.email, el.dataset.class); PC.go('home'); };
 
   // ---------------------------------------------------------------- shared bits
@@ -112,7 +134,7 @@
     var titleField=document.querySelector('[data-field="coverTitle"]'),subField=document.querySelector('[data-field="coverSubtitle"]');
     var show=(S.home&&S.home.show)||{};
     var title=(titleField&&titleField.value)||show.name||'Your Show',sub=(subField&&subField.value)||show.tagline||'Stories worth listening to.';
-    PC.modal('<h2 id="pcModalTitle">Vintage cover maker</h2><p>Set your cover title and tagline in the saved fields on <b>Cover Art</b>, then reopen this maker. Your show name is used if those fields are blank.</p><div id="pcCoverPreview" class="pc-cover-preview"></div><p>Download the square PNG and upload it into your Canva episode. This is finished cover artwork; add separate text or other elements in Canva if you want to develop it further.</p><div class="pc-row"><button type="button" class="pc-btn primary" id="pcCoverDownload" disabled>Preparing cover…</button><a class="pc-btn" href="https://www.canva.com/" target="_blank" rel="noopener">Open Canva ↗</a><button type="button" class="pc-btn" onclick="PC.closeModal()">Close</button></div>');
+    PC.modal('<h2 id="pcModalTitle">Vintage cover maker</h2><p>Set your cover title and tagline in the saved fields on <b>Cover Art</b>, then reopen this maker. Your show name is used if those fields are blank.</p><div id="pcCoverPreview" class="pc-cover-preview"></div><p>Download the square PNG and upload it into your Canva episode. This is finished cover artwork; add separate text or other elements in Canva if you want to develop it further.</p><div class="pc-row"><button type="button" class="pc-btn primary" id="pcCoverDownload" disabled>Preparing cover…</button><a class="pc-btn" href="https:&#47;&#47;www.canva.com/" target="_blank" rel="noopener">Open Canva ↗</a><button type="button" class="pc-btn" onclick="PC.closeModal()">Close</button></div>');
     var mount=PC.byId('pcCoverPreview'),button=PC.byId('pcCoverDownload');
     Promise.resolve(document.fonts ? document.fonts.ready : null).then(function(){if(!mount.isConnected)return;var c=coverCanvas(title,sub);c.setAttribute('role','img');c.setAttribute('aria-label',title+' podcast cover');mount.appendChild(c);button.disabled=false;button.textContent='Download cover PNG';button.onclick=function(){c.toBlob(function(blob){if(blob)downloadResource(blob,'Podcast-Studio-Cover.png');else PC.toast('The cover could not be downloaded. Please try again.','error');},'image/png');};});
   };
@@ -211,8 +233,8 @@
       reflect: '<path fill="P" d="M21 27h67v65H21z"/><path d="M31 41h34M31 51h34M31 61h21M31 77h39"/><path fill="T" d="M77 14l15 7-20 47-16 13 1-20z"/><path d="M62 64l7 3M65 60l17-39"/><path d="M24 16Q40 1 57 13M49 6l8 7-10 3"/> '
     };
     var body = art[id] || art.recording;
-    body = body.replace(/fill="P"/g, 'fill="'+paper+'"').replace(/fill="T"/g, 'fill="'+teal+'"').replace(/fill="G"/g, 'fill="'+gold+'"');
-    return '<svg viewBox="0 0 120 104" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="'+ink+'" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round">'+body+'</g></svg>';
+    body = body.replace(/fill=\x22P\x22/g, 'fill="'+paper+'"').replace(/fill=\x22T\x22/g, 'fill="'+teal+'"').replace(/fill=\x22G\x22/g, 'fill="'+gold+'"');
+    return '<svg viewBox="0 0 120 104" xmlns="http:&#47;&#47;www.w3.org/2000/svg" aria-hidden="true" focusable="false"><g fill="none" stroke="'+ink+'" stroke-width="2.8" stroke-linejoin="round" stroke-linecap="round">'+body+'</g></svg>';
   }
   function stepHeading(a) { return '<h2 class="pc-activity-title"><span class="pc-activity-icon" aria-hidden="true">'+vintageStepIcon(a.id)+'</span><span>'+esc(a.title)+'</span></h2>'; }
 
@@ -256,7 +278,7 @@
     var st = itemStatus(u, a), type;
     if (u.noGrade[a.id]) type = 'Not graded this time';
     else if (a.gradeType === 'auto') type = a.points + ' pts · scores itself';
-    else if (a.gradeType === 'rubric') type = a.points + ' pts · scored on a 7-level rubric';
+    else if (a.gradeType === 'rubric') type = a.points + ' pts · scored on a rubric';
     else if (a.gradeType === 'criteria') type = a.points + ' pts · scored on the Final Episode rubric';
     else type = a.points + ' pts';
     return '<div class="pc-graded-head"><span class="pc-graded-badge">Graded assignment · ' + esc(type) + '</span><span class="pc-status pc-status-' + st.cls + '">' + esc(st.text) + '</span>' +
@@ -276,7 +298,7 @@
       crit.map(function (c) { return '<tr><th scope="row">' + esc(c.label) + (c.standards ? '<small>(' + esc(c.standards) + ')</small>' : '') + '<small>out of ' + c.max + '</small></th>' + c.bands.map(function (b) { return '<td>' + esc(b.text) + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>';
   };
   function howScored(item) {
-    if (item.rubric) return '<details class="pc-howscored"><summary>How it’s scored (7 levels)</summary><ol class="pc-rubric-list">' + item.rubric.map(function (r) { return '<li><b>' + r.score + ' · ' + esc(r.label) + '</b> ' + esc(r.text) + '</li>'; }).join('') + '</ol></details>';
+    if (item.rubric) return '<details class="pc-howscored"><summary>How it’s scored</summary><ol class="pc-rubric-list">' + item.rubric.map(function (r) { return '<li><b>' + r.score + ' · ' + esc(r.label) + '</b> ' + esc(r.text) + '</li>'; }).join('') + '</ol></details>';
     if (item.criteria) return '<details class="pc-howscored" open><summary>How it’s scored: the Final Episode rubric</summary>' + PC.critTableHtml(item.criteria) + '</details>';
     if (item.complete) return '<details class="pc-howscored"><summary>How it’s scored</summary><p><b>Complete:</b> ' + esc(item.complete.complete) + '</p><p><b>Incomplete:</b> ' + esc(item.complete.incomplete) + '</p></details>';
     return '';
@@ -288,7 +310,7 @@
   // ---------- Lessons (read & watch; nothing to turn in) ----------
   function sectionHtml(sec) {
     var h = '<section class="pc-lesson-sec">' + (sec.h ? '<h3>' + esc(sec.h) + '</h3>' : '') + (sec.sub ? '<p class="pc-lesson-sub">' + esc(sec.sub) + '</p>' : '');
-    if (sec.video) h += '<div class="pc-video"><iframe src="https://www.youtube-nocookie.com/embed/' + esc(sec.video.id) + '" title="' + esc(sec.video.title) + '" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>' +
+    if (sec.video) h += '<div class="pc-video"><iframe src="https:&#47;&#47;www.youtube-nocookie.com/embed/' + esc(sec.video.id) + '" title="' + esc(sec.video.title) + '" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>' +
       '<p class="pc-small"><a href="' + esc(sec.video.url) + '" target="_blank" rel="noopener">Open the video on YouTube ↗</a> <span class="pc-muted">(if it doesn’t play here)</span></p>';
     (sec.p || []).forEach(function (t) { h += '<p>' + esc(t) + '</p>'; });
     if (sec.list) h += '<ul class="pc-lesson-list">' + sec.list.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
@@ -406,7 +428,7 @@
       '<textarea id="fld_' + esc(fd.id) + '" class="pc-input pc-fval' + (fd.focus ? ' pc-writing' : '') + '" data-field="' + esc(fd.id) + '" data-stat-box="' + esc(fd.id) + '" rows="' + (fd.rows || 5) + '"' + (ro ? ' readonly' : '') + '>' + esc(v || '') + '</textarea><div class="pc-fmeta" data-meta="' + esc(fd.id) + '"></div>';
     else if (fd.kind === 'choice') inner = '<div class="pc-choice-row" role="radiogroup" aria-label="' + esc(fd.label) + '">' + fd.options.concat(v && fd.options.indexOf(v) < 0 ? [v] : []).map(function (o) { return '<label class="pc-radio' + (v === o ? ' is-on' : '') + '"><input type="radio" class="pc-fval" name="f_' + esc(fd.id) + '" data-field="' + esc(fd.id) + '" value="' + esc(o) + '"' + (v === o ? ' checked' : '') + (ro ? ' disabled' : '') + '><span>' + esc(o) + '</span></label>'; }).join('') + '</div>';
     else if (fd.kind === 'episode') inner = episodeHtml(fd, v || '', ro);
-    else if (fd.kind === 'link') inner = '<div class="pc-linkrow"><input type="url" id="fld_' + esc(fd.id) + '" class="pc-input pc-fval" data-field="' + esc(fd.id) + '" placeholder="https://www.canva.com/design/…/view" value="' + esc(v || '') + '"' + (ro ? ' readonly' : '') + '><a class="pc-btn small" data-open="' + esc(fd.id) + '" target="_blank" rel="noopener" href="' + esc(/^https?:\/\//i.test(v || '') ? v : '#') + '"' + (/^https?:\/\//i.test(v || '') ? '' : ' hidden') + '>Open ↗</a></div>' + (fd.canva ? '<p class="pc-small pc-muted">In Canva: <b>Share → View-only link → Copy</b>, then paste it here. Open it in a private window to check it works.</p>' : '');
+    else if (fd.kind === 'link') inner = '<div class="pc-linkrow"><input type="url" id="fld_' + esc(fd.id) + '" class="pc-input pc-fval" data-field="' + esc(fd.id) + '" placeholder="https:&#47;&#47;www.canva.com/design/…/view" value="' + esc(v || '') + '"' + (ro ? ' readonly' : '') + '><a class="pc-btn small" data-open="' + esc(fd.id) + '" target="_blank" rel="noopener" href="' + esc(/^https?:\/{2}/i.test(v || '') ? v : '#') + '"' + (/^https?:\/{2}/i.test(v || '') ? '' : ' hidden') + '>Open ↗</a></div>' + (fd.canva ? '<p class="pc-small pc-muted">In Canva: <b>Share → View-only link → Copy</b>, then paste it here. Open it in a private window to check it works.</p>' : '');
     else inner = '<input id="fld_' + esc(fd.id) + '" class="pc-input pc-fval" data-field="' + esc(fd.id) + '" maxlength="400" value="' + esc(v || '') + '"' + (ro ? ' readonly' : '') + '>';
     return '<div class="pc-fld pc-fld-' + esc(fd.kind) + '" data-fid="' + esc(fd.id) + '"' + (fieldShown(fd, vals) ? '' : ' hidden') + '>' + (fd.kind === 'rows' || fd.kind === 'choice' ? '<div class="pc-flabel-wrap">' + lab + '</div>' : '<label class="pc-flabel-wrap" for="fld_' + esc(fd.id) + '">' + lab + '</label>') + inner + '</div>';
   }
@@ -479,7 +501,7 @@
         root.querySelectorAll('.pc-fmeta').forEach(function (m) { var id = m.dataset.meta; m.innerHTML = '<span class="pc-wordcount">' + PC.plural(PC.words(f[id]), 'word') + '</span>' + PC.stats.chipsHtml(PC.stats.get(id) || (item.stats || {})[id], f[id]); });
         root.querySelectorAll('.pc-radio').forEach(function (r) { r.classList.toggle('is-on', !!r.querySelector('input:checked')); });
         root.querySelectorAll('[data-open]').forEach(function (b) {
-          var v = String(f[b.dataset.open] || '').trim(), ok = /^https?:\/\//i.test(v); b.hidden = !ok; if (ok) b.href = v;
+          var v = String(f[b.dataset.open] || '').trim(), ok = /^https?:\/{2}/i.test(v); b.hidden = !ok; if (ok) b.href = v;
           var fld = b.closest('.pc-fld'), warn = fld && fld.querySelector('.pc-link-warn');
           if (v && !ok && fld && !warn) b.parentNode.insertAdjacentHTML('afterend', '<p class="pc-link-warn" role="status">That doesn’t look like a link yet. In Canva: Share → View-only link → Copy, then paste it here.</p>');
           if ((ok || !v) && warn) warn.remove();
@@ -720,13 +742,13 @@
     loadItem(body, a, function (item) { drawDiscussion(body, u, a, item, next); });
   };
   function linkify(text) {
-    return esc(text).replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"]/g, function (m) { return '<a href="' + m + '" target="_blank" rel="noopener">' + m + '</a>'; });
+    return esc(text).replace(/https?:\/{2}[^\s<]+[^\s<.,;:!?)\]\x27\x22]/g, function (m) { return '<a href="' + m + '" target="_blank" rel="noopener">' + m + '</a>'; });
   }
   function drawDiscussion(body, u, a, item, next) {
     var d = item.discussion, ro = readOnly(), posts = d.posts || [];
     var top = posts.filter(function (p) { return !p.parentId; }), replies = posts.filter(function (p) { return p.parentId; });
     var h = '<section class="pc-card pc-discuss">' + gradedHead(u, a) + stepHeading(a) + promptHtml(a) +
-      (item.complete ? '<details class="pc-howscored"><summary>How it’s scored</summary><p><b>Complete:</b> ' + esc(item.complete.complete) + '</p><p><b>Incomplete:</b> ' + esc(item.complete.incomplete) + '</p></details>' : '') +
+      howScored(item) +
       feedbackHtml(item, a);
     if (!top.some(function (p) { return p.mine; }) && !ro) {
       h += '<div class="pc-compose"><label class="pc-field"><span>Your post</span><textarea id="pcPostText" class="pc-input" rows="5" maxlength="8000">' + esc(PC.store.get(draftKey(''), '')) + '</textarea></label>' +

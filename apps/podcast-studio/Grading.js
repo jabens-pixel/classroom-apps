@@ -10,9 +10,68 @@
 
 // The rubrics live in PodcastData.js (PC_RUBRICS, PC_FINAL_RUBRIC); pcRubricOf_/pcCompleteRubric_ are in Unit.js.
 
+// ---------- 2026-10-26a: every scored assignment out of 7 (7 / 6 / 5 / 4 / 0) ----------
+// Scores entered before were Complete / Partly / Incomplete out of 5 (logs, concept, cover,
+// reflection) or 3 (discussions), and the Final Episode's lowest band was worth 2. Once, the first
+// time any grading or grade view runs after the release, each of those scores is rescaled to 7 and
+// snapped to the nearest band (a tie goes up): Complete -> 7, Partly -> 4, Incomplete -> 0, 4/5 -> 6.
+// A Final Episode criterion scored 2 becomes 4 (the same descriptor, now worth 4). Process and
+// Script were already out of 7 and keep their scores. MarkedFp is kept, so nothing shows as a redo.
+// Every change is listed in the GradeChanges tab; the next Push sends the new numbers to Canvas.
+var PC_SCALE_V = '7', PC_SCALE_PROP = 'PC_SCALE7_DONE';
+function pcSnapToBand_(v) {
+  var best = PC_RUBRIC_POINTS[0];
+  PC_RUBRIC_POINTS.forEach(function (p) { var d = Math.abs(p - v), bd = Math.abs(best - v); if (d < bd - 1e-9 || (Math.abs(d - bd) < 1e-9 && p > best)) best = p; });
+  return best;
+}
+/** What one old grade row becomes, or null when it doesn't change. */
+function pcRescaleRow_(r) {
+  var m = /^w\d+_([A-Za-z0-9_-]+)$/.exec(String(r.ItemKey || '')); if (!m) return null;
+  var act = m[1], has = r.Score !== '' && r.Score != null && isFinite(Number(r.Score));
+  if (PC_OLD_MAX[act]) {
+    if (!has) return null;
+    var old = Number(r.Score), nw = pcSnapToBand_(Math.min(1, Math.max(0, old / PC_OLD_MAX[act])) * 7);
+    return { Score: nw, CriteriaJson: r.CriteriaJson, changed: nw !== old, reason: 'out of ' + PC_OLD_MAX[act] + ' -> out of 7' };
+  }
+  if (act === 'episode' && r.CriteriaJson) {
+    var cr = pcParse_(r.CriteriaJson, null); if (!cr || typeof cr !== 'object') return null;
+    var moved = false;
+    Object.keys(cr).forEach(function (k) { if (Number(cr[k]) === 2) { cr[k] = 4; moved = true; } });
+    if (!moved) return null;
+    var all = PC_FINAL_RUBRIC.every(function (c) { return cr[c.id] !== undefined; });
+    return { Score: all ? PC_FINAL_RUBRIC.reduce(function (n, c) { return n + Number(cr[c.id]); }, 0) : '', CriteriaJson: JSON.stringify(cr), changed: true, reason: 'Final Episode band 2 -> 4' };
+  }
+  return null;
+}
+function pcEnsureScale7_() {
+  if (PC_X_.scale7) return;
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty(PC_SCALE_PROP)) { PC_X_.scale7 = true; return; }
+  var lock = LockService.getScriptLock();
+  if (!lock.tryLock(10000)) return;   // someone else is doing it; this view shows what's there now
+  var was = PC_X_.scriptLocked; PC_X_.scriptLocked = true;
+  try {
+    if (props.getProperty(PC_SCALE_PROP)) { PC_X_.scale7 = true; return; }
+    var sh = pcSheet_('Grades'), log = pcSheet_('GradeChanges'), n = 0;
+    pcAllRows_(sh).forEach(function (r) {
+      if (String(r.ScaleV || '') === PC_SCALE_V) return;
+      var ch = pcRescaleRow_(r); if (!ch || !ch.changed) return;
+      var fresh = pcReadRows_(sh, [r._row])[0];
+      if (!fresh || String(fresh.ItemKey) !== String(r.ItemKey) || pcNorm_(fresh.Email) !== pcNorm_(r.Email) || String(fresh.ScaleV || '') === PC_SCALE_V) return;
+      pcAppend_(log, { ClassId: fresh.ClassId, Email: fresh.Email, ItemKey: fresh.ItemKey, OldScore: fresh.Score, NewScore: ch.Score, OldCriteriaJson: fresh.CriteriaJson || '', NewCriteriaJson: ch.CriteriaJson || '', ChangedAt: new Date(), Reason: ch.reason });
+      var o = {}; Object.keys(fresh).forEach(function (k) { if (k !== '_row') o[k] = fresh[k]; });
+      o.Score = ch.Score; o.CriteriaJson = ch.CriteriaJson || ''; o.ScaleV = PC_SCALE_V;
+      pcWriteRow_(sh, r._row, o); n++;
+    });
+    props.setProperty(PC_SCALE_PROP, new Date().toISOString() + ' · ' + n + ' changed');
+    PC_X_.scale7 = true;
+  } finally { PC_X_.scriptLocked = was; lock.releaseLock(); }
+}
+
 // ---------- the data every grading view is built from (one read per tab) ----------
 
 function pcGradeData_(classId) {
+  pcEnsureScale7_();
   var roster = pcRoster_(classId), inClass = {};
   roster.forEach(function (s) { inClass[s.email] = true; });
   var work = {}, quiz = {}, disc = {}, grades = {};
@@ -270,7 +329,7 @@ function saveGrade(payload) {
         out = { ok: false, conflict: true, current: curComment }; return null;
       }
       var f = {};
-      if (hasScore) { f.Score = score === null ? '' : score; f.MarkedFp = String(payload.markedFp || ''); f.GradedBy = ctx.teacher.email; f.GradedAt = now; }
+      if (hasScore) { f.Score = score === null ? '' : score; f.MarkedFp = String(payload.markedFp || ''); f.GradedBy = ctx.teacher.email; f.GradedAt = now; f.ScaleV = PC_SCALE_V; }
       if (hasCrit) {
         // One save records the fingerprint for the whole item; the grade is the total once every criterion is scored.
         var cur = Object.assign({}, r ? (pcParse_(r.CriteriaJson, {}) || {}) : {});
@@ -278,7 +337,7 @@ function saveGrade(payload) {
         var all = PC_FINAL_RUBRIC.every(function (c) { return cur[c.id] !== undefined; });
         f.CriteriaJson = JSON.stringify(cur);
         f.Score = all ? PC_FINAL_RUBRIC.reduce(function (n, c) { return n + Number(cur[c.id]); }, 0) : '';
-        f.MarkedFp = String(payload.markedFp || ''); f.GradedBy = ctx.teacher.email; f.GradedAt = now;
+        f.MarkedFp = String(payload.markedFp || ''); f.GradedBy = ctx.teacher.email; f.GradedAt = now; f.ScaleV = PC_SCALE_V;
       }
       if (hasEx) { f.Excluded = payload.excluded; f.GradedBy = ctx.teacher.email; f.GradedAt = now; }
       if (hasComment) { f.Comment = pcClean_(payload.comment, 6000); }

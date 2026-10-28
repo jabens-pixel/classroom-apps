@@ -33,11 +33,11 @@
 <script>
 // ============================================================================
 // Podcast Studio -- page core: state, server calls, top bar, routing, small helpers.
-// Feature files (WritingStats, SaveGuard, Student, Teacher, Marking, ReadAloud) add views to PC.views.
+// Feature files (WritingStats, SaveGuard, Student, Teacher, Marking) add views to PC.views.
 // ============================================================================
 window.__MB = window.__MB || {};
 var PC = window.PC = {
-  BUILD: '2026-10-24f',
+  BUILD: '2026-10-28a',
   boot: null,
   state: { role: 'student', view: 'loading', classId: '', as: '', asName: '', week: 0, step: '', itemKey: '' },
   views: {},
@@ -45,7 +45,7 @@ var PC = window.PC = {
 };
 
 // ---------- helpers ----------
-PC.esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;'); };
+PC.esc = function (s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\x22/g, '&quot;').replace(/\x27/g, '&#39;'); };
 PC.attr = PC.esc;
 PC.byId = function (id) { return document.getElementById(id); };
 PC.store = {
@@ -227,7 +227,8 @@ PC.start = function () {
       var last = PC.store.get('pcClass_' + b.email, '');
       if (sc.length === 1) PC.state.classId = sc[0].classId;
       else if (last && sc.some(function (c) { return c.classId === last; })) PC.state.classId = last;
-      PC.go(PC.state.classId ? 'home' : 'classes');
+      // Added by email: they type their own name once, before anything else.
+      PC.go(b.needsName ? 'name' : PC.state.classId ? 'home' : 'classes');
     } else if (PC.state.role === 'admin') PC.go('admin');
     else PC.go('dashboard');
     setInterval(PC.checkVersion, 5 * 60 * 1000);
@@ -244,11 +245,10 @@ window.__MB.Index = 'ok';
 <?!= include_('Student'); ?>
 <?!= include_('Teacher'); ?>
 <?!= include_('Marking'); ?>
-<?!= include_('ReadAloud'); ?>
 <?!= include_('PodcastTheme'); ?>
 <script>
 (function () {
-  var want = ['Index', 'WritingStats', 'SaveGuard', 'Student', 'Teacher', 'Marking', 'ReadAloud', 'PodcastTheme'];
+  var want = ['Index', 'WritingStats', 'SaveGuard', 'Student', 'Teacher', 'Marking', 'PodcastTheme'];
   var missing = want.filter(function (f) { return window.__MB[f] !== 'ok'; });
   if (missing.length) {
     var d = document.createElement('div'); d.className = 'pc-missing'; d.setAttribute('role', 'alert');

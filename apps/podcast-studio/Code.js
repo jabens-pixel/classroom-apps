@@ -11,10 +11,10 @@
 //
 // Files: Code (this), PodcastData (ALL the unit's content), Unit (the unit + student work), Grading,
 // Canvas, PodcastLmsHub, LmsHub (shared -- never edit), Index (page shell), WritingStats, SaveGuard,
-// Student, Teacher, Marking, ReadAloud, PodcastTheme (last).
+// Student, Teacher, Marking, PodcastTheme (last). (Read aloud was removed in 2026-10-26a.)
 // ============================================================================
 
-var PC_APP_VERSION = '2026-10-24f';
+var PC_APP_VERSION = '2026-10-28a';
 var PC_DB_PROP = 'PODCAST_STUDIO_DB_ID';
 var PC_LIVE_VERSION_PROP = 'PODCAST_STUDIO_LIVE_VERSION';
 var PC_DEMO_DOMAIN = 'demo.podcaststudio.local';
@@ -33,7 +33,10 @@ var PC_SHEETS = {
   // One row per student per quiz. Score/SubmittedAt = the best counted try; AttemptsJson = every finished try.
   Quiz:        ['ClassId', 'Email', 'Week', 'AnswersJson', 'Score', 'Max', 'StartedAt', 'SubmittedAt', 'UpdatedAt', 'ActId', 'AttemptsJson', 'CurrentTry', 'ExtraTries'],
   Discuss:     ['PostId', 'ClassId', 'Week', 'Email', 'Name', 'ParentId', 'Text', 'CreatedAt', 'EditedAt', 'ClientId', 'ActId'],
-  Grades:      ['ClassId', 'Email', 'ItemKey', 'Score', 'Excluded', 'Comment', 'GradedBy', 'GradedAt', 'MarkedFp', 'CanvasPostedScore', 'CanvasCommentFp', 'CriteriaJson'],
+  // ScaleV '7' = scored on the 7 / 6 / 5 / 4 / 0 rubrics (2026-10-26a); blank = from before (rescaled once).
+  Grades:      ['ClassId', 'Email', 'ItemKey', 'Score', 'Excluded', 'Comment', 'GradedBy', 'GradedAt', 'MarkedFp', 'CanvasPostedScore', 'CanvasCommentFp', 'CriteriaJson', 'ScaleV'],
+  // Every score the 2026-10-26a rescale changed, before and after (nothing is lost).
+  GradeChanges:['ClassId', 'Email', 'ItemKey', 'OldScore', 'NewScore', 'OldCriteriaJson', 'NewCriteriaJson', 'ChangedAt', 'Reason'],
   WritingStats:['ClassId', 'Email', 'ItemKey', 'StatsJson', 'UpdatedAt'],
   Resume:      ['ClassId', 'Email', 'RouteJson', 'UpdatedAt'],
   WorkBackups: ['ClassId', 'Email', 'Week', 'Kind', 'SavedAt', 'Reason', 'Chars', 'DataJson', 'DataJson2', 'DataJson3']
@@ -395,14 +398,14 @@ function pcActing_(classId, as, write) {
     var enrolled = pcEnrollment_(classId, session);
     var teaches = role !== 'student' && (role === 'admin' || pcNorm_(klass.TeacherEmail) === session);
     if (!enrolled && !teaches) throw new Error('You are not in this class. Join it with the class code from your teacher.');
-    return { email: session, name: enrolled ? String(enrolled.Name) : pcNameFromEmail_(session), klass: klass, self: true, teacherSelf: !enrolled && teaches };
+    return { email: session, name: enrolled ? (pcCellText_(enrolled.Name) || pcNameFromEmail_(session)) : pcNameFromEmail_(session), klass: klass, self: true, teacherSelf: !enrolled && teaches };
   }
   var t = pcRoleOf_(session);
   if (t === 'student' || (t !== 'admin' && pcNorm_(klass.TeacherEmail) !== session)) throw new Error('You are signed in as ' + session + ', so you can only open that account’s work.');
   var en = pcEnrollment_(classId, target);
   if (!en) throw new Error('That student is not in this class.');
   if (write && !pcIsDemo_(target)) throw new Error(PC_TEACHER_VIEW_MSG);
-  return { email: target, name: String(en.Name), klass: klass, self: false, demo: pcIsDemo_(target), readOnly: !pcIsDemo_(target) };
+  return { email: target, name: pcCellText_(en.Name) || pcNameFromEmail_(target), klass: klass, self: false, demo: pcIsDemo_(target), readOnly: !pcIsDemo_(target) };
 }
 
 // ============================================================================
@@ -465,7 +468,7 @@ function pcRoster_(classId) {
   pcEnrollAll_().forEach(function (r) {
     if (String(r.ClassId) !== String(classId) || !pcTruthy_(r.Active)) return;
     var e = pcNorm_(r.Email); if (seen[e]) return; seen[e] = true;
-    out.push({ email: e, name: pcCellText_(r.Name) || pcNameFromEmail_(e), demo: pcIsDemo_(e) });
+    out.push({ email: e, name: pcCellText_(r.Name) || pcNameFromEmail_(e), demo: pcIsDemo_(e), notYet: !pcCellText_(r.Name).trim() });
   });
   return out.sort(function (a, b) { return pcSortName_(a.name).localeCompare(pcSortName_(b.name)); });
 }
@@ -522,7 +525,9 @@ function joinClass(payload) {
   var k = pcClasses_().filter(function (c) { return String(c.JoinCode).toUpperCase() === code && pcTruthy_(c.Active); }).pop();
   if (!k) throw new Error('That class code wasn’t found. Check it with your teacher.');
   pcUserLock_(function () {
-    if (!pcEnrollment_(k.ClassId, email)) pcAppend_(pcSheet_('Enroll'), { ClassId: k.ClassId, Email: email, Name: name, JoinedAt: new Date(), Active: true });
+    var en = pcEnrollment_(k.ClassId, email);
+    if (!en) pcAppend_(pcSheet_('Enroll'), { ClassId: k.ClassId, Email: email, Name: name, JoinedAt: new Date(), Active: true });
+    else if (!pcCellText_(en.Name).trim()) pcUpsert_('Enroll', 'Email', { ClassId: k.ClassId, Email: email }, function (r) { return r && !pcCellText_(r.Name).trim() ? { Name: name } : null; });   // added by email: their own name now
   });
   PC_X_.enroll = null;
   return { ok: true, classId: String(k.ClassId), classes: pcStudentClasses_(email) };
@@ -555,6 +560,92 @@ function addDemoStudents(payload) {
   return { ok: true, added: made, roster: pcRoster_(ctx.klass.ClassId) };
 }
 
+// ---------- Add students by email (cross-app; Bell Ringers 2026.10.14.3 is the reference) ----------
+// The teacher pastes a list of emails. Each student is enrolled straight away: the class appears the
+// first time they open the app with that Google account, no join code needed. No name is stored: the
+// student types their own first and last name the first time (setMyName), and until then the roster
+// shows a name made from the email, marked "Not signed in yet". Someone removed earlier is switched
+// back on (their work was never deleted). A name the student already gave in another class is reused.
+var PC_ROSTER_MAX = 400;
+var PC_EMAIL_RE_ = /^[^\s@<>(),;:\x22\[\]]+@[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?)+$/;
+function pcKnownName_(email) {
+  var e = pcNorm_(email), n = '';
+  pcEnrollAll_().forEach(function (r) { if (!n && pcNorm_(r.Email) === e && pcCellText_(r.Name).trim()) n = pcCellText_(r.Name).trim(); });
+  return n;
+}
+function addStudentsByEmail(payload) {
+  payload = payload || {}; var ctx = pcTeacherClass_(String(payload.classId || '')), classId = String(ctx.klass.ClassId);
+  var list = Array.isArray(payload.entries) ? payload.entries : [];
+  if (!list.length) throw new Error('Paste at least one student email.');
+  if (list.length > PC_ROSTER_MAX) throw new Error('Add up to ' + PC_ROSTER_MAX + ' students at a time.');
+  var out = { ok: true, added: 0, readded: 0, already: [], invalid: [], classId: classId, className: pcCellText_(ctx.klass.ClassName) };
+  pcWithLock_(function () {
+    PC_X_.enroll = null;
+    var mine = {};
+    pcEnrollAll_().forEach(function (r) {
+      if (String(r.ClassId) !== classId) return;
+      var e = pcNorm_(r.Email); if (!mine[e] || pcTruthy_(r.Active)) mine[e] = r;
+    });
+    var seen = {}, fresh = [], back = [];
+    list.forEach(function (x) {
+      var raw = String((x && x.email) || ''), e = pcNorm_(raw).replace(/^mailto:/, '').replace(/\.+$/, '');
+      if (!e || e.length > 120 || !PC_EMAIL_RE_.test(e)) { out.invalid.push(raw.slice(0, 120)); return; }
+      if (seen[e]) return; seen[e] = true;
+      if (e === pcNorm_(ctx.klass.TeacherEmail) || e === ctx.teacher.email) { out.invalid.push(e + ' (that’s the teacher)'); return; }
+      if (pcIsDemo_(e)) { out.invalid.push(e + ' (a demo student: use Add demo students)'); return; }
+      var ex = mine[e];
+      if (ex && pcTruthy_(ex.Active)) { out.already.push(e); return; }
+      if (ex) back.push(ex); else fresh.push(e);
+    });
+    if (fresh.length) {
+      var sh = pcSheet_('Enroll'), now = new Date();
+      var rows = fresh.map(function (e) { return pcRowValues_(sh, { ClassId: classId, Email: e, Name: pcKnownName_(e), JoinedAt: now, Active: true }); });
+      sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);   // one write for the whole list
+      out.added = fresh.length;
+    }
+    back.forEach(function (r) {
+      var fresh2 = pcReadRows_(pcSheet_('Enroll'), [r._row])[0];
+      if (!fresh2 || String(fresh2.ClassId) !== classId || pcNorm_(fresh2.Email) !== pcNorm_(r.Email)) return;
+      var o = {}; Object.keys(fresh2).forEach(function (k) { if (k !== '_row') o[k] = fresh2[k]; });
+      o.Active = true; pcWriteRow_(pcSheet_('Enroll'), r._row, o); out.readded++;
+    });
+  });
+  PC_X_.enroll = null;
+  out.roster = pcRoster_(classId);
+  return out;
+}
+/** Classes this person was added to by email and hasn't named themself in yet. */
+function pcUnnamedClasses_(email) {
+  var e = pcNorm_(email), ids = {};
+  pcEnrollAll_().forEach(function (r) { if (pcNorm_(r.Email) === e && pcTruthy_(r.Active) && !pcCellText_(r.Name).trim()) ids[String(r.ClassId)] = true; });
+  return pcClasses_().filter(function (c) { return ids[String(c.ClassId)] && pcTruthy_(c.Active); }).map(function (c) { return pcCellText_(c.ClassName); });
+}
+function pcGuessName_(email) {
+  var p = String(email || '').split('@')[0].replace(/\d+/g, ' ').split(/[._-]+/).map(function (x) { return x.trim(); }).filter(Boolean);
+  var cap = function (x) { return x ? x.charAt(0).toUpperCase() + x.slice(1).toLowerCase() : ''; };
+  return p.length >= 2 ? { first: cap(p[0]), last: cap(p[p.length - 1]) } : { first: '', last: '' };
+}
+/** A student added by email types their own name once; it fills every class that has no name yet. */
+function setMyName(payload) {
+  payload = payload || {};
+  var email = pcSessionEmail_(); if (!email) throw new Error('Sign in with your school Google account first.');
+  var name = pcCleanNamePart_(payload.firstName, 'first name') + ' ' + pcCleanNamePart_(payload.lastName, 'last name');
+  var n = 0;
+  pcUserLock_(function () {
+    PC_X_.enroll = null;
+    var sh = pcSheet_('Enroll');
+    pcReadRows_(sh, pcFindRowNums_(sh, 'Email', email)).forEach(function (r) {
+      if (pcNorm_(r.Email) !== email || !pcTruthy_(r.Active) || pcCellText_(r.Name).trim()) return;
+      var fresh = pcReadRows_(sh, [r._row])[0];
+      if (!fresh || pcNorm_(fresh.Email) !== email || pcCellText_(fresh.Name).trim()) return;
+      var o = {}; Object.keys(fresh).forEach(function (k) { if (k !== '_row') o[k] = fresh[k]; });
+      o.Name = name; pcWriteRow_(sh, r._row, o); n++;
+    });
+  });
+  PC_X_.enroll = null;
+  return { ok: true, name: name, updated: n, studentClasses: pcStudentClasses_(email) };
+}
+
 // ============================================================================
 // BOOTSTRAP AND ADMIN
 // ============================================================================
@@ -566,6 +657,9 @@ function getBootstrap() {
   if (!email) return Object.assign(base, { role: 'none' });
   var role = pcRoleOf_(email), u = pcUser_(email);
   var out = Object.assign(base, { role: role, name: u ? pcCellText_(u.Name) : '', studentClasses: pcStudentClasses_(email) });
+  // Added by email (no name yet): the student types their own name the first time they open the app.
+  var unnamed = pcUnnamedClasses_(email);
+  if (unnamed.length) { var g = pcGuessName_(email); out.needsName = true; out.addedTo = unnamed; out.suggestFirst = g.first; out.suggestLast = g.last; }
   if (role !== 'student') {
     out.classes = pcTeacherClasses_({ email: email, isAdmin: role === 'admin' });
     out.lastClassId = pcTeacherLastClass_(email);
@@ -646,7 +740,7 @@ function restoreWorkBackup() {
 // checkFiles: proves every file in the project is the one this release shipped.
 // ============================================================================
 
-var FILE_FINGERPRINTS = {"Index":{"chars":15231,"md5":"b6f7b634b41eeee6ded1b149b74a0fb9","loose":"f74691c57aef6a24bbc441bc3fcf1e2f"},"Marking":{"chars":45441,"md5":"2dc2644f485792c6888b91f8cdb1333c","loose":"2abe763cc5dc769c0345ae3baaf275b1"},"PodcastTheme":{"chars":827667,"md5":"02ac28a4f52f67810dcc27fbb9074407","loose":"f4c0b48f6715271be3f980953cd3c3dd"},"ReadAloud":{"chars":6259,"md5":"43111f91d6b58f51e863433f8e90a82a","loose":"865001116154ad37371b8b240599a9b6"},"SaveGuard":{"chars":13490,"md5":"502c603f291f88145f86cf77b318d426","loose":"dc67d5c95c2d30e31226be8533fa9a20"},"Student":{"chars":84613,"md5":"fedd99cae1994cebe7c31e482cdef1fa","loose":"3e7869bd81c09fe9a17c1f885c11ffbb"},"Teacher":{"chars":59243,"md5":"ce548e04d67a0cc919410c72612325e4","loose":"78ed5eadedc77aaf285f036b9d002370"},"WritingStats":{"chars":5075,"md5":"204ca2e52966b59319a8d88f4d66373a","loose":"b1ffb94ec4014918688ca9d78a498a09"}};
+var FILE_FINGERPRINTS = {"Index":{"chars":15283,"md5":"50fd4c7e66fa5ace3c888753793b8599","loose":"761775879b24ede2eea8dedbda4c8639"},"Marking":{"chars":45363,"md5":"2d044266012c000e2b2c3d8bfa2910a6","loose":"381f97a691b759e146c22d30df7cdbd1"},"PodcastTheme":{"chars":967118,"md5":"3bfe74cee43c81e01d4b4363e4405936","loose":"3ba5811dcca851796efae84323502ee2"},"SaveGuard":{"chars":13490,"md5":"502c603f291f88145f86cf77b318d426","loose":"dc67d5c95c2d30e31226be8533fa9a20"},"Student":{"chars":86680,"md5":"e66fe36ce34ae5cb3fdcba5c01ede7fd","loose":"2935992935f9a6658585201c46640ffa"},"Teacher":{"chars":66316,"md5":"81aa5fc364900c11fa8db30bee3aa263","loose":"774fa114688477acd419dba232cbfea4"},"WritingStats":{"chars":5075,"md5":"204ca2e52966b59319a8d88f4d66373a","loose":"b1ffb94ec4014918688ca9d78a498a09"}};
 function checkFiles() {
   var lines = [];
   Object.keys(FILE_FINGERPRINTS).forEach(function (name) {

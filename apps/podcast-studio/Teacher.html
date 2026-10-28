@@ -142,7 +142,7 @@
     var badge = status === 'needs' ? '<span class="pc-badge is-needs' + (t.needsRegrade ? ' has-redo' : '') + '" title="' + (t.needsRegrade ? t.needsRegrade + ' redone after grading · ' : '') + t.fresh + ' new · ' + todo + ' waiting on you">' + (t.needsRegrade ? '↻ ' : '') + todo + '</span>'
       : status === 'done' ? '<span class="pc-badge is-done" title="Nothing waiting on you here">✓</span>' : '<span class="pc-badge is-excluded" title="Left out of every student’s grade. Scores already entered are kept.">Not graded</span>';
     var worth = t.allExcluded ? 'Excluded for this class' : t.max + ' pts';
-    var note = t.kind === 'quiz' ? 'Multiple choice scores itself · ' + t.answered + ' of ' + total + ' answered' : t.type === 'rubric' ? 'Scored on a 7-level rubric' : t.type === 'criteria' ? 'Your Final Episode rubric: each criterion out of 7' : t.kind === 'discussion' ? 'Complete / partly / incomplete · a post or reply counts as turned in' : 'Complete / partly / incomplete, or any score';
+    var note = t.kind === 'quiz' ? 'Multiple choice scores itself · ' + t.answered + ' of ' + total + ' answered' : t.type === 'rubric' ? 'Rubric: 7 · 6 · 5 · 4 · 0' : t.type === 'criteria' ? 'Your Final Episode rubric: each criterion out of 7' : t.kind === 'discussion' ? 'Complete / partly / incomplete · a post or reply counts as turned in' : 'Complete / partly / incomplete, or any score';
     var action = status === 'needs' ? '<button type="button" class="pc-btn primary pc-tile-open" data-act="openMarking" data-key="' + esc(t.key) + '">Grade ' + todo + (t.needsRegrade ? ' <span class="pc-tile-open-sub">· ' + PC.plural(t.needsRegrade, 'redo') + '</span>' : '') + '<span aria-hidden="true"> →</span></button>'
       : '<button type="button" class="pc-btn pc-tile-open" data-act="openMarking" data-key="' + esc(t.key) + '">' + (status === 'done' && done ? 'Review graded work' : 'Open') + '<span aria-hidden="true"> →</span></button>';
     var body = t.allExcluded ? '<p class="pc-excluded-note">Left out of the grade for this class. Any scores you entered are kept; choose <b>Count it again</b> in the ⋯ menu to bring it back.</p>'
@@ -159,7 +159,7 @@
       '<button type="button" role="menuitem" data-act="tileCsv" data-key="' + esc(t.key) + '"' + (busy ? ' disabled' : '') + '>Download Canvas CSV</button><hr>' +
       '<button type="button" role="menuitem" class="' + (t.allExcluded ? 'is-count' : 'is-nograde') + '" data-act="tileNoGrade" data-key="' + esc(t.key) + '" data-on="' + (!t.allExcluded) + '">' + (t.allExcluded ? '↺ Count it again' : 'Don’t grade for this class') + '</button></div></details>';
     return '<article class="pc-tile pc-tile-' + t.kind + (t.released ? ' is-released' : ' is-hidden') + (status === 'needs' ? ' has-needs' : '') + (t.allExcluded ? ' is-nograde' : '') + '" style="--acc:' + (WEEK_ACC[t.week] || '#4a4f7a') + '" aria-label="' + esc(t.label) + '">' +
-      '<header class="pc-tile-head" data-act="openMarking" data-key="' + esc(t.key) + '"><div class="pc-tile-id"><span class="pc-eyebrow">' + esc(g.unitLabel) + ' · ' + esc(t.kind === 'quiz' ? 'Quiz' : t.kind === 'discussion' ? 'Discussion' : t.type === 'criteria' ? 'Your rubric' : t.type === 'rubric' ? '7-level rubric' : 'Complete / incomplete') + '</span><h4 class="pc-tile-title">' + esc((t.icon ? t.icon + ' ' : '') + t.kindLabel) + '</h4>' +
+      '<header class="pc-tile-head" data-act="openMarking" data-key="' + esc(t.key) + '"><div class="pc-tile-id"><span class="pc-eyebrow">' + esc(g.unitLabel) + ' · ' + esc(t.kind === 'quiz' ? 'Quiz' : t.kind === 'discussion' ? 'Discussion' : t.type === 'criteria' ? 'Your rubric' : t.type === 'rubric' ? 'Rubric' : 'Complete / incomplete') + '</span><h4 class="pc-tile-title">' + esc((t.icon ? t.icon + ' ' : '') + t.kindLabel) + '</h4>' +
       '<span class="pc-tile-meta"><span>' + esc(worth) + '</span>' + due + '</span></div>' + badge + '</header>' +
       '<div class="pc-tile-body" data-act="openMarking" data-key="' + esc(t.key) + '">' + body + '</div>' + action +
       '<footer class="pc-tile-foot">' + sw + '<div class="pc-canvas-row"><span class="pc-canvas-state ' + cv[1] + '"' + (linked && t.canvas.linked ? ' title="' + esc(t.canvas.moduleName ? 'In the Canvas module “' + t.canvas.moduleName + '”' : 'Not in a Canvas module') + '"' : '') + '>' + esc(cv[0]) + '</span><span class="pc-canvas-actions">' +
@@ -360,25 +360,84 @@
     var d = T.dash, shows = d.shows || {};
     var rows = d.roster.map(function (s) {
       var sh = shows[s.email] || {};
-      return '<tr><td>' + esc(s.name) + (s.demo ? ' <small class="pc-demo-tag">demo</small>' : '') + '<div class="pc-small pc-muted">' + esc(s.email) + '</div></td><td>' + (sh.name ? esc(sh.name) + (sh.turnedIn ? '' : ' <small class="pc-muted">(draft)</small>') : '<span class="pc-muted">—</span>') + '</td>' +
+      return '<tr><td>' + esc(s.name) + (s.demo ? ' <small class="pc-demo-tag">demo</small>' : '') + (s.notYet && !s.demo ? ' <small class="pc-notyet-tag" title="Added by email. The class appears for them the first time they open the app, and they type their own name.">Not signed in yet</small>' : '') + '<div class="pc-small pc-muted">' + esc(s.email) + '</div></td><td>' + (sh.name ? esc(sh.name) + (sh.turnedIn ? '' : ' <small class="pc-muted">(draft)</small>') : '<span class="pc-muted">—</span>') + '</td>' +
         '<td>' + (sh.crew === 'Crew' ? '<span class="pc-chip">Crew</span>' + (sh.members ? '<div class="pc-small">' + esc(sh.members) + '</div>' : '') : sh.crew ? 'Solo' : '<span class="pc-muted">—</span>') + '</td>' +
         '<td class="pc-roster-actions"><button type="button" class="pc-btn small" data-act="openAs" data-email="' + esc(s.email) + '" data-name="' + esc(s.name) + '">' + (s.demo ? 'Use as this student' : 'View (read-only)') + '</button>' +
         '<button type="button" class="pc-btn small ghost" data-act="renameStudent" data-email="' + esc(s.email) + '" data-name="' + esc(s.name) + '">Rename</button><button type="button" class="pc-btn small ghost is-danger" data-act="removeStudent" data-email="' + esc(s.email) + '" data-name="' + esc(s.name) + '">Remove</button></td></tr>';
     }).join('');
     return '<details class="pc-card pc-fold" id="pcStudents"' + (T.studentsOpen ? ' open' : '') + '><summary><h2>Students</h2><span class="pc-muted">' + PC.plural(d.roster.filter(function (s) { return !s.demo; }).length, 'student') + ' · join code <b>' + esc(d.klass.joinCode) + '</b></span></summary>' +
-      '<p class="pc-card-sub">Students go to this app’s link, sign in with their school account, and type the class code <b>' + esc(d.klass.joinCode) + '</b>. Their show name and crew come from their Show Concept (Week 2). Demo students let you try every step without touching real students.</p>' +
-      (rows ? '<div class="pc-table-wrap"><table class="pc-table"><thead><tr><th>Student</th><th>Show</th><th>Solo / crew</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<p class="pc-empty">No students yet.</p>') +
-      '<div class="pc-row"><button type="button" class="pc-btn small" data-act="addDemo">Add demo students</button></div></details>';
+      '<div class="pc-row pc-roster-tools"><button type="button" class="pc-btn small primary" data-act="addByEmail">+ Add students by email</button><button type="button" class="pc-btn small" data-act="addDemo">Add demo students</button></div>' +
+      '<p class="pc-card-sub">Add students by pasting their school emails: the class appears for them the first time they open the app, and they type their own name. Or they can go to this app’s link, sign in with their school account, and type the class code <b>' + esc(d.klass.joinCode) + '</b>. Their show name and crew come from their Show Concept (Week 2). Demo students let you try every step without touching real students.</p>' +
+      (rows ? '<div class="pc-table-wrap"><table class="pc-table"><thead><tr><th>Student</th><th>Show</th><th>Solo / crew</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '<p class="pc-empty">No students yet. Add them by email above, or give them the class code.</p>') + '</details>';
   }
   document.addEventListener('toggle', function (e) { if (e.target.id === 'pcStudents') T.studentsOpen = e.target.open; }, true);
   A.openAs = function (el) { PC.state.role = 'student'; PC.state.classId = cid(); PC.state.as = el.dataset.email; PC.state.asName = el.dataset.name; PC.go('home'); };
   A.addDemo = function (el) { el.disabled = true; PC.rpc('addDemoStudents', { classId: cid() }, { retry: true }).then(function (r) { T.dash.roster = r.roster; T.studentsOpen = true; PC.toast(r.added ? 'Added ' + PC.plural(r.added, 'demo student') + '.' : 'The demo students are already here.'); PC.loadDash(function () { drawDash(PC.byId('app')); }); }).catch(function (e) { el.disabled = false; PC.toast(e.message, 'error'); }); };
+  // ---- Add students by email (cross-app; Bell Ringers 2026.10.14.3) ----
+  // Picks every email address out of whatever is pasted: one per line, a spreadsheet column, a Canvas
+  // or Google Classroom export, or a list separated by commas. Anything else on a line is ignored.
+  var BS_EMAIL_RE = /[^\s<>(),;:\x22\x27\[\]]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/g;
+  function bsParse(text) {
+    var out = [], bad = [], seen = {}, dup = 0;
+    String(text || '').split(/\r?\n/).forEach(function (raw) {
+      var line = raw.trim(); if (!line) return;
+      var ems = line.match(BS_EMAIL_RE);
+      if (!ems) { if (!/^(name|email|e-mail|student|first|last|login)\b/i.test(line)) bad.push(line); return; }
+      ems.forEach(function (e) { e = String(e).toLowerCase().replace(/^mailto:/, '').replace(/\.+$/, ''); if (seen[e]) { dup++; return; } seen[e] = 1; out.push({ email: e }); });
+    });
+    return { entries: out, bad: bad, dup: dup };
+  }
+  function bsRosterEmails(classId) {
+    if (!T.dash || String(T.dash.klass.classId) !== String(classId)) return null;
+    var o = {}; (T.dash.roster || []).forEach(function (s) { o[String(s.email).toLowerCase()] = 1; }); return o;
+  }
+  A.addByEmail = function () {
+    var cs = PC.boot.classes || [], cur = cid();
+    PC.modal('<h2 id="pcModalTitle">Add students by email</h2>' +
+      '<label class="pc-field"><span>Add to class</span><select class="pc-input" id="bsClass">' + cs.map(function (c) { return '<option value="' + esc(c.classId) + '"' + (c.classId === cur ? ' selected' : '') + '>' + esc(c.className) + (c.period ? ' · ' + esc(c.period) : '') + '</option>'; }).join('') + '</select></label>' +
+      '<label class="pc-field"><span>Student emails</span><textarea class="pc-input pc-bs-text" id="bsText" rows="8" spellcheck="false" placeholder="One email per line, or a list separated by commas.&#10;&#10;ava.brooks@students.school.org&#10;marcus.lee@students.school.org"></textarea></label>' +
+      '<p class="pc-small pc-muted">Paste a column from a spreadsheet, a Canvas or Google Classroom export, or a list separated by commas. Just the emails: the first time each student opens Podcast Studio, it asks for their first and last name, and that is the name you see. The class appears for them right away; no class code needed.</p>' +
+      '<div id="bsPreview" class="pc-bs-preview" aria-live="polite"></div><p class="pc-form-msg" id="bsMsg" role="alert"></p>' +
+      '<div class="pc-row pc-wk-foot"><button type="button" class="pc-btn ghost" onclick="PC.closeModal()">Cancel</button><button type="button" class="pc-btn primary" id="bsAdd" disabled>Add students</button></div>');
+    var ta = PC.byId('bsText');
+    ta.addEventListener('input', bsPreview); PC.byId('bsClass').addEventListener('change', bsPreview);
+    PC.byId('bsAdd').onclick = function () { bsAddNow(this); };
+    setTimeout(function () { ta.focus(); }, 40); bsPreview();
+  };
+  function bsPreview() {
+    var ta = PC.byId('bsText'), box = PC.byId('bsPreview'), btn = PC.byId('bsAdd'); if (!ta || !box) return;
+    var p = bsParse(ta.value), have = bsRosterEmails(PC.byId('bsClass').value);
+    var already = have ? p.entries.filter(function (x) { return have[x.email]; }) : [], fresh = have ? p.entries.filter(function (x) { return !have[x.email]; }) : p.entries;
+    btn.disabled = !fresh.length; btn.textContent = fresh.length ? 'Add ' + PC.plural(fresh.length, 'student') : 'Add students';
+    if (!p.entries.length && !p.bad.length) { box.innerHTML = ''; return; }
+    var doms = {}; p.entries.forEach(function (x) { var d = x.email.split('@')[1]; doms[d] = (doms[d] || 0) + 1; });
+    var domList = Object.keys(doms).sort(function (a, b) { return doms[b] - doms[a]; });
+    // A domain used by only a few addresses when most use another is probably a typo.
+    var odd = domList.length > 1 ? domList.slice(1).filter(function (d) { return doms[d] <= Math.max(1, Math.floor(p.entries.length * 0.2)); }) : [];
+    box.innerHTML = '<div class="pc-bs-summary"><span class="pc-chip is-ok">' + fresh.length + ' ready to add</span>' + (already.length ? '<span class="pc-chip">' + already.length + ' already in this class</span>' : '') + (p.dup ? '<span class="pc-chip">' + PC.plural(p.dup, 'duplicate') + ' ignored</span>' : '') +
+      domList.map(function (d) { var o = odd.indexOf(d) >= 0; return '<span class="pc-chip' + (o ? ' is-warn' : '') + '" title="' + (o ? 'Different from most of the list: check for a typo' : 'Email domain') + '">@' + esc(d) + ' · ' + doms[d] + '</span>'; }).join('') + '</div>' +
+      (p.bad.length ? '<p class="pc-bs-bad"><b>Not an email, skipped (' + p.bad.length + '):</b> ' + p.bad.slice(0, 6).map(esc).join(' · ') + (p.bad.length > 6 ? ' …' : '') + '</p>' : '') +
+      (fresh.length ? '<div class="pc-bs-list"><table class="pc-table"><thead><tr><th>Email</th><th>Name</th></tr></thead><tbody>' + fresh.slice(0, 200).map(function (x) { var o = odd.indexOf(x.email.split('@')[1]) >= 0; return '<tr><td>' + esc(x.email) + (o ? ' <span class="pc-chip is-warn">check</span>' : '') + '</td><td class="pc-muted">the student types it</td></tr>'; }).join('') + '</tbody></table>' + (fresh.length > 200 ? '<p class="pc-small pc-muted">…and ' + (fresh.length - 200) + ' more.</p>' : '') + '</div>' : '');
+  }
+  function bsAddNow(btn) {
+    var p = bsParse(PC.byId('bsText').value), classId = PC.byId('bsClass').value, have = bsRosterEmails(classId);
+    var entries = have ? p.entries.filter(function (x) { return !have[x.email]; }) : p.entries; if (!entries.length) return;
+    btn.disabled = true; btn.textContent = 'Adding…'; PC.byId('bsMsg').textContent = '';
+    PC.rpc('addStudentsByEmail', { classId: classId, entries: entries }).then(function (r) {
+      var n = r.added + r.readded, bits = ['Added ' + PC.plural(n, 'student') + ' to ' + r.className + '.'];
+      if (r.readded) bits.push(r.readded + ' had been removed before and are back, with their earlier work.');
+      if (r.already.length) bits.push(r.already.length + ' were already in the class.');
+      if (r.invalid.length) bits.push('Skipped: ' + r.invalid.slice(0, 5).join(', ') + (r.invalid.length > 5 ? '…' : '') + '.');
+      PC.closeModal(); PC.toast(bits.join(' '), 'ok'); T.studentsOpen = true;
+      if (String(classId) === String(cid())) PC.loadDash(function () { drawDash(PC.byId('app')); });
+    }).catch(function (e) { btn.disabled = false; btn.textContent = 'Add students'; PC.byId('bsMsg').textContent = e.message; });
+  }
   A.renameStudent = function (el) {
     var n = prompt('Name for ' + el.dataset.email, el.dataset.name); if (!n || n === el.dataset.name) return;
     PC.rpc('renameStudent', { classId: cid(), email: el.dataset.email, name: n }, { retry: true }).then(function () { PC.loadDash(function () { drawDash(PC.byId('app')); }); }).catch(function (e) { PC.toast(e.message, 'error'); });
   };
   A.removeStudent = function (el) {
-    if (!confirm('Remove ' + el.dataset.name + ' from this class? Their work is kept, and they can rejoin with the code.')) return;
+    if (!confirm('Remove ' + el.dataset.name + ' from this class? They will no longer see it. Their work is kept, and adding them again (by email or with the code) brings it back.')) return;
     PC.rpc('removeStudent', { classId: cid(), email: el.dataset.email }, { retry: true }).then(function () { PC.loadDash(function () { drawDash(PC.byId('app')); }); }).catch(function (e) { PC.toast(e.message, 'error'); });
   };
 
@@ -420,8 +479,8 @@
   function canvaCard() {
     var c = T.dash.canva || {};
     return '<section class="pc-sub" id="pcCanvaCard"><h3>Ready-to-use resources</h3><p class="pc-small pc-muted">The cover maker, printable run-sheet starter, research notebook and question preparation are built into the student pages. No template setup is needed. You can optionally add your own Canva template links below; these appear alongside the built-in resources.</p>' +
-      '<div class="pc-form-grid"><label class="pc-field"><span>Optional Canva cover template</span><input class="pc-input" id="cvaCover" placeholder="https://www.canva.com/design/…" value="' + esc(c.cover || '') + '"></label>' +
-      '<label class="pc-field"><span>Optional Canva run-sheet template</span><input class="pc-input" id="cvaRun" placeholder="https://www.canva.com/design/…" value="' + esc(c.runsheet || '') + '"></label></div>' +
+      '<div class="pc-form-grid"><label class="pc-field"><span>Optional Canva cover template</span><input class="pc-input" id="cvaCover" placeholder="https:&#47;&#47;www.canva.com/design/…" value="' + esc(c.cover || '') + '"></label>' +
+      '<label class="pc-field"><span>Optional Canva run-sheet template</span><input class="pc-input" id="cvaRun" placeholder="https:&#47;&#47;www.canva.com/design/…" value="' + esc(c.runsheet || '') + '"></label></div>' +
       '<div class="pc-row"><button type="button" class="pc-btn small primary" data-act="saveCanva">Save template links</button><span class="pc-form-msg" id="cvaMsg" role="status"></span></div></section>';
   }
   A.saveCanva = function (el) {
@@ -437,7 +496,7 @@
     var h = '<section class="pc-sub" id="pcCanvasCard"><h3>Canvas</h3>';
     if (d.lmsHub) h += '<p class="pc-small pc-chip is-ok">Pushes go through your LMS Hub.</p>';
     if (!c.connected) {
-      h += '<p class="pc-muted">Connect once with a Canvas access token (Canvas → Account → Settings → New Access Token). Your token is stored for you only.</p><div class="pc-form-grid"><label class="pc-field"><span>Canvas address</span><input class="pc-input" id="cvUrl" placeholder="https://yourschool.instructure.com"></label><label class="pc-field"><span>Access token</span><input class="pc-input" id="cvToken" type="password" autocomplete="off"></label></div><div class="pc-row"><button class="pc-btn primary" data-act="cvConnect">Connect Canvas</button><span class="pc-form-msg" id="cvMsg" role="status"></span></div>';
+      h += '<p class="pc-muted">Connect once with a Canvas access token (Canvas → Account → Settings → New Access Token). Your token is stored for you only.</p><div class="pc-form-grid"><label class="pc-field"><span>Canvas address</span><input class="pc-input" id="cvUrl" placeholder="https:&#47;&#47;yourschool.instructure.com"></label><label class="pc-field"><span>Access token</span><input class="pc-input" id="cvToken" type="password" autocomplete="off"></label></div><div class="pc-row"><button class="pc-btn primary" data-act="cvConnect">Connect Canvas</button><span class="pc-form-msg" id="cvMsg" role="status"></span></div>';
     } else {
       h += '<p>Connected to <b>' + esc(c.baseUrl) + '</b>. <button type="button" class="pc-link" data-act="cvDisconnect">Disconnect</button></p>';
       h += s.courseId ? '<p>This class pushes to <b>' + esc(s.courseName || s.courseId) + '</b>' + (s.assignmentGroupName ? ', assignment group <b>' + esc(s.assignmentGroupName) + '</b>' : '') + '. <button type="button" class="pc-link" data-act="cvUnlink">Change course</button></p><p class="pc-small pc-muted">Each assignment is made in Canvas the first time you press ↗ Push on its tile (or Save in a week’s Due dates &amp; Canvas…), and reused after that. Excluded work is sent as Excused.</p>' + unitModuleHtml(s)
@@ -461,7 +520,7 @@
     loadingMods = true;
     PC.rpc('listCanvasModules', { classId: cid() }).then(function (r) {
       loadingMods = false; T.modules[s.courseId] = r.modules;
-      var box = document.querySelector('.pc-unit-module'); if (box && document.activeElement !== PC.byId('cvUnitModule')) box.outerHTML = unitModuleHtml(s).replace(/<p class="pc-small pc-muted">[\s\S]*$/, '');
+      var box = document.querySelector('.pc-unit-module'); if (box && document.activeElement !== PC.byId('cvUnitModule')) box.outerHTML = unitModuleHtml(s).replace(/<p class=.pc-small pc-muted.>[\s\S]*$/, '');
     }).catch(function (e) { loadingMods = false; var m = PC.byId('cvModMsg'); if (m) m.textContent = 'Couldn’t load the modules: ' + e.message; });
   }
   A.cvSaveModule = function (el) {

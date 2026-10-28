@@ -45,7 +45,7 @@
     }).catch(function (e) { PC.fail(app, e); });
   }
   function badCrit(t, cd) { PC.toast((cd ? cd.label : 'Scores') + ' go from 0 to ' + (cd ? cd.max : 7) + ' (halves allowed).', 'error'); var r = rowOf(t.dataset.email), v = (((r || {}).grade || {}).criteria || {})[t.dataset.crit]; t.value = v === undefined ? '' : v; }
-  function cssEsc(s) { return String(s).replace(/["\\]/g, '\\$&'); }
+  function cssEsc(s) { return String(s).replace(/[\x22\\]/g, '\\$&'); }
   function firstToMark() {
     var r = M.data.rows.filter(function (x) { return x.group === 'redo'; })[0] || M.data.rows.filter(function (x) { return x.group === 'ready'; })[0];
     return r ? r.email : '';
@@ -123,8 +123,8 @@
   function hasWriting(v) { if (v == null) return false; if (typeof v === 'string') return !!v.trim(); if (typeof v === 'object') return Object.keys(v).some(function (k) { return hasWriting(v[k]); }); return false; }
   function shownFor(fd, f) { return !fd.showIf || String(f[fd.showIf.field] || '') === fd.showIf.eq; }
   function episodeName(v) { var e = (M.data.library || []).filter(function (x) { return x.id === v; })[0]; return e ? '<a href="' + esc(e.url) + '" target="_blank" rel="noopener">' + esc(e.show + ': ' + e.title) + ' ↗</a> <small class="pc-muted">(' + esc(e.format) + ')</small>' : esc(v); }
-  function linkify(t) { return esc(t).replace(/https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"]/g, function (m) { return '<a href="' + m + '" target="_blank" rel="noopener">' + m + '</a>'; }); }
-  function linkHtml(v) { return /^https?:\/\//i.test(v) ? '<a class="pc-mlink" href="' + esc(v) + '" target="_blank" rel="noopener">' + esc(v.length > 70 ? v.slice(0, 68) + '…' : v) + ' ↗</a>' : esc(v); }
+  function linkify(t) { return esc(t).replace(/https?:\/{2}[^\s<]+[^\s<.,;:!?)\]\x27\x22]/g, function (m) { return '<a href="' + m + '" target="_blank" rel="noopener">' + m + '</a>'; }); }
+  function linkHtml(v) { return /^https?:\/{2}/i.test(v) ? '<a class="pc-mlink" href="' + esc(v) + '" target="_blank" rel="noopener">' + esc(v.length > 70 ? v.slice(0, 68) + '…' : v) + ' ↗</a>' : esc(v); }
   function workHtml(r) {
     var d = M.data, k = d.item.kind, w = r.work;
     if (r.unreadable) return '<p class="pc-error">This copy couldn’t be read. A backup is in the WorkBackups tab (editor tool: listWorkBackups).</p>';
@@ -147,7 +147,7 @@
         body = rows.length ? '<div class="pc-table-wrap"><table class="pc-table pc-mrows"><thead><tr>' + fd.cols.map(function (c) { return '<th>' + esc(c.label) + '</th>'; }).join('') + '</tr></thead><tbody>' + rows.map(function (row) { return '<tr>' + fd.cols.map(function (c) { return '<td>' + esc(row[c.id] || '') + '</td>'; }).join('') + '</tr>'; }).join('') + '</tbody></table></div>' + (fd.min ? '<div class="pc-mmeta">' + rows.length + ' of ' + fd.min + ' rows asked for</div>' : '') : '<p class="pc-empty">—</p>';
       } else if (fd.kind === 'long') {
         var t = String(v || '');
-        body = t ? (PC.say ? '<button type="button" class="pc-btn small ghost pc-say-btn" data-act="sayStart" title="Read this box aloud">🔊 Read aloud</button>' : '') + '<div class="pc-mtext pc-readable" data-say="' + esc(fd.id) + '">' + PC.stats.highlightHtml(t, stats[fd.id]) + '</div><div class="pc-mmeta">' + PC.plural(PC.words(t), 'word') + (fd.minWords ? ' · asked for ' + fd.minWords + '+' : '') + '</div>' + PC.stats.chipsHtml(stats[fd.id], t) + pasteLegend(stats[fd.id]) : '<p class="pc-empty">—</p>';
+        body = t ? '<div class="pc-mtext pc-readable" data-say="' + esc(fd.id) + '">' + PC.stats.highlightHtml(t, stats[fd.id]) + '</div><div class="pc-mmeta">' + PC.plural(PC.words(t), 'word') + (fd.minWords ? ' · asked for ' + fd.minWords + '+' : '') + '</div>' + PC.stats.chipsHtml(stats[fd.id], t) + pasteLegend(stats[fd.id]) : '<p class="pc-empty">—</p>';
       } else if (fd.kind === 'episode') body = v ? '<p>' + episodeName(v) + '</p>' : '<p class="pc-empty">—</p>';
       else if (fd.kind === 'link') body = v ? '<p>' + linkHtml(String(v)) + '</p>' : '<p class="pc-empty">No link</p>';
       else body = v ? '<p>' + esc(v) + '</p>' : '<p class="pc-empty">—</p>';
@@ -191,7 +191,7 @@
     var it = M.data.item, c = r.cell, g = r.grade || {}, e = esc(r.email), ctx = cid() + '::' + it.key + '::' + r.email;
     var score = c.score, h = '<div class="pc-mpanel">';
     if (it.type === 'rubric') {
-      h += '<div class="pc-bands" role="group" aria-label="Rubric level">' + (M.data.rubric || []).map(function (b) { var on = score !== null && score !== undefined && Math.round(score) === b.score; return '<button type="button" class="pc-band' + (on ? ' is-on' : '') + '" data-act="markBand" data-email="' + e + '" data-score="' + b.score + '" aria-pressed="' + on + '" title="' + esc(b.text) + '"><b>' + b.score + '</b><span>' + esc(b.label) + '</span></button>'; }).join('') + '</div>';
+      h += '<div class="pc-bands' + ((M.data.rubric || []).length === 5 ? ' is-five' : '') + '" role="group" aria-label="Rubric level">' + (M.data.rubric || []).map(function (b) { var on = score !== null && score !== undefined && Math.round(score) === b.score; return '<button type="button" class="pc-band' + (on ? ' is-on' : '') + '" data-act="markBand" data-email="' + e + '" data-score="' + b.score + '" aria-pressed="' + on + '" title="' + esc(b.text) + '"><b>' + b.score + '</b><span>' + esc(b.label) + '</span></button>'; }).join('') + '</div>';
     } else if (it.type === 'points') {
       h += '<div class="pc-bands is-three" role="group" aria-label="Complete, partly complete or incomplete">' + [[it.max, 'Complete', '✓'], [half(it.max), 'Partly', '½'], [0, 'Incomplete', '✗']].map(function (b) { var on = score !== null && score !== undefined && Number(score) === b[0]; return '<button type="button" class="pc-band' + (on ? ' is-on' : '') + '" data-act="markBand" data-email="' + e + '" data-score="' + b[0] + '" aria-pressed="' + on + '"><b>' + b[2] + '</b><span>' + b[1] + ' (' + b[0] + ')</span></button>'; }).join('') + '</div>';
     } else if (it.type === 'criteria') {

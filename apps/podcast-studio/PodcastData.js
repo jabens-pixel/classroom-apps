@@ -4,8 +4,8 @@
 //   PC_LIBRARY      the Listening Library (real episodes, linked -- never copied)
 //   PC_PARTS        "Anatomy of a podcast" glossary (original wording)
 //   PC_UNIT         three weeks; each week holds activities in order
-//   PC_RUBRICS      7-level rubrics (Process, Script) -- written for this app; change freely
-//   PC_FINAL_RUBRIC the Final Episode rubric -- the teacher's own wording, copied exactly
+//   PC_RUBRICS      a 7 / 6 / 5 / 4 / 0 rubric for every assignment the teacher scores (one per activity id)
+//   PC_FINAL_RUBRIC the Final Episode rubric -- the teacher's own wording (7 / 6 / 5 / 4 / 0 per criterion)
 //
 // Activity forms
 //   lesson      reading/watching, not scored, nothing to turn in   (sections[])
@@ -15,9 +15,8 @@
 //               showIf: {field, eq} hides a field unless another field has that answer
 //   quiz        multiple choice that scores itself                 (mc[])
 //   discussion  post first, then see classmates and reply
-// Grading: quiz = auto; rubric: 'process' | 'script' = the 7-level rubric; criteria: true = the
-// Final Episode rubric (each criterion scored, the total is the grade); anything else is
-// Complete / Partly / Incomplete (complete: {complete, incomplete} says what each means).
+// Grading: quiz = auto; rubric: '<key>' = that PC_RUBRICS rubric, out of 7; criteria: true = the
+// Final Episode rubric (each criterion scored, the total is the grade).
 // Activity ids are where students' work is filed. NEVER rename an id once students have started.
 // ============================================================================
 
@@ -85,40 +84,103 @@ var PC_PARTS = [
 ];
 
 // ---------------------------------------------------------------------------- rubrics
+// Every assignment you score is out of 7 on a five-level rubric, the same shape as the Short Story
+// Lab: 7 / 6 / 5 / 4 / 0. Writing uses Excellent · Very Good · Good · Decent · No Marks; discussions
+// use Excellent · Very Good · Good · Needs Improvement · Incomplete (your Short Story level names).
+// The descriptors are written for each task here; reword any of them freely. Keep the point values.
+// Each activity points at its rubric with rubric: '<key>' (the activity's own id).
+function pcWrLevels_(t7, t6, t5, t4, t0) {
+  return [{ score: 7, label: 'Excellent', text: t7 }, { score: 6, label: 'Very Good', text: t6 }, { score: 5, label: 'Good', text: t5 },
+    { score: 4, label: 'Decent', text: t4 }, { score: 0, label: 'No Marks', text: t0 }];
+}
+function pcDiscLevels_(t7, t6, t5, t4, t0) {
+  return [{ score: 7, label: 'Excellent', text: t7 }, { score: 6, label: 'Very Good', text: t6 }, { score: 5, label: 'Good', text: t5 },
+    { score: 4, label: 'Needs Improvement', text: t4 }, { score: 0, label: 'Incomplete', text: t0 }];
+}
+var PC_RUBRIC_POINTS = [7, 6, 5, 4, 0];
 var PC_RUBRICS = {
-  process: [
-    { score: 1, label: 'Incomplete', text: 'No process yet, or a list of steps with nothing else.' },
-    { score: 2, label: 'Minimal', text: 'A few stages, with no reasons and no timeline.' },
-    { score: 3, label: 'Developing', text: 'Stages and some milestones, but the reasons are thin (“because it’s important”) or the dates are vague.' },
-    { score: 4, label: 'Adequate', text: 'Clear stages, reasons and dated milestones, with a central question, source notes and a basic plan for another voice.' },
-    { score: 5, label: 'Proficient', text: 'A purposeful process with realistic milestones. At least two sources are identified and evaluated, evidence is connected to the episode, and five open questions plus two follow-ups prepare a meaningful second voice. Roles and recording permission are clear.' },
-    { score: 6, label: 'Strong', text: 'An organized workflow with credible research, thoughtful questions and a plan to cross-check claims. It anticipates retakes, a guest’s schedule and a backup voice; milestones and roles fit together.' },
-    { score: 7, label: 'Exemplary', text: 'An achievable process designed for this topic: sources and missing perspectives are weighed carefully, questions invite specific stories, and every production choice has a clear purpose. Someone else could run the project from it.' }
-  ],
-  script: [
-    { score: 1, label: 'Incomplete', text: 'No script or run sheet yet.' },
-    { score: 2, label: 'Minimal', text: 'A few lines or a list of topics; nothing an episode could follow.' },
-    { score: 3, label: 'Developing', text: 'A run sheet or draft exists, but the hook, the segments or the ending are missing.' },
-    { score: 4, label: 'Adequate', text: 'A complete run sheet (open → segments → close) and a script or talking points for each part.' },
-    { score: 5, label: 'Proficient', text: 'A hook in the first 20 seconds, clear segments with transitions, planned sound, and a real ending with a call to action. Written to be heard, not read.' },
-    { score: 6, label: 'Strong', text: 'Tight, purposeful writing: every segment earns its time, sound bites and music have a reason, and the voice fits the show’s tone.' },
-    { score: 7, label: 'Exemplary', text: 'It already sounds like a real episode: a memorable hook, smooth transitions and an ending that stays with the listener.' }
-  ]
+  listen1: pcWrLevels_(
+    'Every box was answered with specific moments from the episode, with times. At least four parts were mapped using the names from Anatomy of a Podcast, each with what it does for the listener. The notes on sound and voice explained what each choice added, and the move to borrow fit the student’s own show. Conventions were flawless.',
+    'Every box was answered with specific moments and times. At least four parts were mapped, most with what they do for the listener. The sound, voice and move-to-borrow notes were specific. Conventions were almost flawless.',
+    'Most boxes were answered, but some notes summarized what the episode is about instead of how it is built, or gave few times. Four parts were mapped, some without the right term or purpose. Conventions were generally correct.',
+    'Several boxes were missing or general, fewer than four parts were mapped, or there were no times. More effort was needed. Conventions could be improved.',
+    'Not submitted, or the log did not address an episode.'),
+  listen2: pcWrLevels_(
+    'A different kind of episode from Log 1. Every box was answered with specific moments and times, at least four parts were mapped with what each does, and the comparison explained clearly how the two episodes are built differently and which approach fits the student’s own show, and why. Conventions were flawless.',
+    'A different kind of episode from Log 1, every box answered with specific moments, at least four parts mapped, and a clear comparison with a reason. Conventions were almost flawless.',
+    'A different kind of episode, but some boxes were general, or the comparison described the two episodes without saying which approach fits the student’s show and why. Conventions were generally correct.',
+    'The same kind of episode as Log 1, missing boxes, fewer than four parts mapped, or no real comparison. Conventions could be improved.',
+    'Not submitted, or the log did not address an episode.'),
+  goodpod: pcDiscLevels_(
+    'The post named three ingredients of a good podcast and tied each one to a specific moment in a real episode (the show and about when). The reply added an ingredient the classmate missed, or pushed back on one with its own example, and moved the conversation forward.',
+    'The post named three ingredients, each with a real example, and the reply added to or challenged a classmate’s list with an example.',
+    'The post named three ingredients, but some examples were vague or missing, or the reply agreed without adding an example of its own.',
+    'Fewer than three ingredients, no examples, or no reply to a classmate.',
+    'No post.'),
+  concept: pcWrLevels_(
+    'The show was specific and original: a clear niche (not just a topic) with a reason it matters to the student, a real audience, a name and tagline that match the tone, a format that suits the idea, and a first-episode idea built around a clear question or story. Conventions were flawless.',
+    'A specific niche, a named audience, a fitting name, tagline and format, and a first-episode idea with a clear question or story. Conventions were almost flawless.',
+    'The show was a broad topic more than a niche, or the audience, tone or first-episode idea was general. Conventions were generally correct.',
+    'Several boxes were missing or vague, or there was no first-episode idea. Conventions could be improved.',
+    'Not submitted.'),
+  pitch: pcDiscLevels_(
+    'In 4–5 sentences the pitch named the show, what it is about, who it is for, and a convincing reason to press play. Both replies named something specific to keep (“I’d listen because…”) and a specific, useful improvement (“It would grab me even more if…”).',
+    'A complete pitch with the name, niche, audience and a reason to listen, and two replies that each named something to keep and something to improve.',
+    'The pitch was missing one of the basics, or the replies were general (“sounds cool”) rather than specific.',
+    'The pitch was missing several basics, or there were fewer than two replies.',
+    'No pitch.'),
+  process: pcWrLevels_(
+    'An achievable process designed for this topic. The central question was clear; at least two sources were identified, evaluated and connected to the episode; and a claim to cross-check or a missing perspective was named. Five open questions and two follow-ups invited specific stories from a meaningful second voice, with a clear permission plan. Every stage had a reason, milestones were realistic and dated, and (for a crew) roles and communication fit together. Someone else could run the project from it.',
+    'A purposeful process with realistic, dated milestones. At least two sources were evaluated and linked to the episode, the five questions and two follow-ups were open and prepared a meaningful second voice, and permission and (for a crew) roles were clear.',
+    'Clear stages, reasons and dated milestones, with a central question, source notes and a basic plan for another voice, but some reasons were thin, the sources weren’t evaluated, or the questions were closed or leading.',
+    'A list of stages with few reasons, vague or missing dates, one source or none, or fewer than five questions. More planning was needed.',
+    'Not submitted, or no process yet.'),
+  script: pcWrLevels_(
+    'It already sounded like a real episode: a hook in the first 20 seconds, segments that each earned their time, smooth transitions, sound bites and music with a clear purpose, and an ending with a call to action that stays with the listener. The run sheet was timed to about 8 minutes (longer for a crew), and the writing was made to be heard. Conventions were flawless.',
+    'A complete, timed run sheet and a script with a hook, clear segments and transitions, planned sound, and a real ending with a call to action, written to be heard rather than read. Conventions were almost flawless.',
+    'A run sheet from open to close and a script or talking points for each part, but the hook, transitions or sound plan were thin, or the timing didn’t add up. Conventions were generally correct.',
+    'A partial run sheet or draft: the hook, the segments or the ending were missing, or the script was a list of topics. Conventions could be improved.',
+    'Not submitted, or no script or run sheet yet.'),
+  cover: pcWrLevels_(
+    'A working view-only link to a square cover that looks like a real podcast’s. The show name was readable at thumbnail size, and three design choices (color, font, image, layout) were each tied clearly to the show’s tone or audience.',
+    'A working link to a square cover with a readable show name, and three design choices, each with a reason.',
+    'A working link, but the show name was hard to read at thumbnail size, or some design choices had no clear reason.',
+    'The link didn’t open, the cover wasn’t square or had no show name, or fewer than three choices were explained.',
+    'Not submitted.'),
+  party: pcDiscLevels_(
+    'The post had the episode title, a teaser that made people want to listen, and a working link. Both replies named a specific part that worked, using the term from Anatomy of a Podcast and when it happens, and one specific, useful thing to try.',
+    'Title, teaser and a working link, and two replies that each named a specific part that worked (with the time) and one thing to try.',
+    'The post was missing its teaser or a working link, or the replies were general (no term, no time, or no “grow”).',
+    'No working link, or fewer than two replies.',
+    'No post.'),
+  reflect: pcWrLevels_(
+    'Every box was answered honestly and specifically: the Week 2 process compared with what really happened (with dates and stages), the milestones hit and missed and what was done about them, a proud moment with its time and why it works, a concrete change for Episode 2, and a changed or deepened answer to what makes a good podcast. Conventions were flawless.',
+    'Every box was answered with specifics from the student’s own project, including an honest look at what didn’t go to plan. Conventions were almost flawless.',
+    'Most boxes were answered, but some were general statements that could be about anyone’s project. Conventions were generally correct.',
+    'Several boxes were missing or very brief. Conventions could be improved.',
+    'Not submitted.')
 };
-// The Final Episode rubric: the teacher's own Canvas rubric, word for word. Each criterion is scored
-// 0–7 (halves allowed); the bands are the teacher's point levels.
+// The Final Episode rubric: the teacher's own Canvas rubric. Each criterion is scored 7 / 6 / 5 / 4 / 0
+// like the Short Story Lab's story rubric (any score 0–7 in halves is still allowed).
+// 7, 6 and 5 are the teacher's wording, word for word. 4 is the teacher's lowest band (it was worth 2
+// points in Canvas). 0 ("No evidence…") was added to match the Short Story Lab.
 var PC_FINAL_RUBRIC = [
   { id: 'ideas', label: 'Ideas, Research, and Organization', standards: 'W.11-12.2, W.11-12.4, W.11-12.7, W.11-12.8', max: 7, bands: [
     { score: 7, text: 'The podcast presents an insightful, engaging, and well-developed topic. Research is thorough, evidence is seamlessly integrated, and ideas are organized with strong transitions. The episode flows logically with a clear introduction and conclusion.' },
     { score: 6, text: 'The podcast presents a clear and focused topic with relevant research and supporting ideas. Organization is logical and easy to follow, with a clear beginning, middle, and end.' },
     { score: 5, text: 'The topic is somewhat clear but lacks depth or consistent focus. Research and supporting evidence are limited or inconsistently connected. Organization is uneven, with weak transitions.' },
-    { score: 2, text: 'The topic is unclear or underdeveloped. Research is minimal or missing, and ideas are disorganized or incomplete.' } ] },
+    { score: 4, text: 'The topic is unclear or underdeveloped. Research is minimal or missing, and ideas are disorganized or incomplete.' },
+    { score: 0, text: 'No evidence of a topic, research or organization is present in the podcast.' } ] },
   { id: 'voice', label: 'Voice, Style, and Delivery', standards: 'SL.11-12.4, SL.11-12.5, W.11-12.4', max: 7, bands: [
     { score: 7, text: 'Delivery is confident, engaging, and polished. Tone, pacing, and emphasis enhance meaning and hold the listener’s attention. Sound quality, music, and effects are clear, balanced, and purposeful.' },
     { score: 6, text: 'Delivery is clear and expressive. Tone and pacing generally fit the content. Sound is mostly clear with minimal distractions.' },
     { score: 5, text: 'Delivery is uneven or lacks energy. Tone or pacing sometimes distracts from content. Audio or effects may be inconsistent or poorly balanced.' },
-    { score: 2, text: 'Delivery is unclear, monotone, or rushed. Audio quality or technical issues make the podcast difficult to follow.' } ] }
+    { score: 4, text: 'Delivery is unclear, monotone, or rushed. Audio quality or technical issues make the podcast difficult to follow.' },
+    { score: 0, text: 'No evidence of delivery: there is no recording, or it cannot be heard.' } ] }
 ];
+// Scores entered before 2026-10-26a were out of these maxima (Complete / Partly / Incomplete). They
+// are rescaled to 7 once (pcRescaleOldScores_ in Grading.js) and snapped to the nearest band.
+var PC_OLD_MAX = { listen1: 5, listen2: 5, concept: 5, cover: 5, reflect: 5, goodpod: 3, pitch: 3, party: 3 };
 
 // ---------------------------------------------------------------------------- the three weeks
 var PC_CANVA_DEFAULTS = { cover: '', runsheet: '' };   // optional teacher Canva links; built-in starters are always available
@@ -150,9 +212,8 @@ var PC_UNIT = [
         { id: 'q7', q: 'Why do many shows play a short music sting between segments?', choices: ['To make the episode longer', 'To signal that one part is ending and another is starting', 'Podcast apps require it', 'To hide mistakes'], answer: 1, why: 'Transitions help the listener follow the structure, since they can’t see headings.' },
         { id: 'q8', q: 'Which is true about a freeform (unscripted) conversation show?', choices: ['It needs no preparation at all', 'It still needs a plan: talking points, questions and an order', 'It can’t have segments', 'It is always better than a scripted show'], answer: 1, why: 'Either way, you need to be prepared and organized before you record.' }
       ] },
-      { id: 'listen1', form: 'fields', icon: '🎧', title: 'Listening Log 1', points: 5,
+      { id: 'listen1', form: 'fields', icon: '🎧', title: 'Listening Log 1', points: 7, rubric: 'listen1',
         prompt: 'Choose an episode from the Listening Library and listen like a producer. Pause and jot down times as you go.',
-        complete: { complete: 'Every box answered with specific moments from the episode (times or quotes in your own words), at least four parts mapped, and one move to borrow.', incomplete: 'Missing boxes, a summary of what the episode is about instead of how it’s built, or no times.' },
         fields: [
           { id: 'episode', kind: 'episode', label: 'Which episode?', required: true },
           { id: 'hook', kind: 'long', label: 'The first 30 seconds', hint: 'How does it open? What made you want to keep listening (or not)?' },
@@ -162,9 +223,8 @@ var PC_UNIT = [
           { id: 'stay', kind: 'long', label: 'Where you leaned in, and where you drifted', hint: 'Give one moment of each, with the time.' },
           { id: 'steal', kind: 'long', label: 'One move to borrow', hint: 'Something this episode does that you could use in yours.', rows: 3 }
         ] },
-      { id: 'listen2', form: 'fields', icon: '🎧', title: 'Listening Log 2', points: 5,
+      { id: 'listen2', form: 'fields', icon: '🎧', title: 'Listening Log 2', points: 7, rubric: 'listen2',
         prompt: 'Choose a DIFFERENT kind of episode from your first one (if Log 1 was an interview, try a story, an explainer or fiction).',
-        complete: { complete: 'A different format from Log 1, every box answered with specific moments, at least four parts mapped, and a real comparison.', incomplete: 'The same kind of episode as Log 1, missing boxes, or no comparison.' },
         fields: [
           { id: 'episode', kind: 'episode', label: 'Which episode?', required: true },
           { id: 'hook', kind: 'long', label: 'The first 30 seconds', hint: 'How does it open? What made you want to keep listening (or not)?' },
@@ -173,9 +233,8 @@ var PC_UNIT = [
           { id: 'compare', kind: 'long', label: 'Built differently', hint: 'How is this episode built differently from the one in Log 1? Which approach fits the show YOU want to make, and why?' },
           { id: 'steal', kind: 'long', label: 'One move to borrow', rows: 3 }
         ] },
-      { id: 'goodpod', form: 'discussion', icon: '💬', title: 'What Makes a Good Podcast?', points: 3,
-        prompt: 'Name the three ingredients you think matter most in a good podcast. For each one, point to a moment from an episode you heard (the show and about when it happens). Then reply to a classmate: add an ingredient they missed, or push back on one with your own example.',
-        complete: { complete: 'A post with three ingredients, each tied to a specific moment in a real episode, and a reply that adds to or challenges a classmate’s list with an example.', incomplete: 'No post, ingredients with no examples, or no reply.' } }
+      { id: 'goodpod', form: 'discussion', icon: '💬', title: 'What Makes a Good Podcast?', points: 7, rubric: 'goodpod',
+        prompt: 'Name the three ingredients you think matter most in a good podcast. For each one, point to a moment from an episode you heard (the show and about when it happens). Then reply to a classmate: add an ingredient they missed, or push back on one with your own example.', }
     ] },
 
   // ======================================================== WEEK 2
@@ -201,9 +260,8 @@ var PC_UNIT = [
           { h: 'Check and close', p: '“How do you know that?” “Who sees this differently?” “What have I not asked that matters?” Verify factual claims after the conversation.' } ] },
         { h: 'Solo or crew?', p: ['You can make your show alone or with a crew of 2–4. A solo episode should run 8 minutes. Crew episodes should be longer than 8 minutes, with meaningful contributions from every member. Plan enough substance for the running time; do not pad it with silence or extra music. Either way, you turn in your own planning and your own reflection, and you’re graded on your own work. Crews share one finished episode. If you’re in a crew, your Creation Process includes a Collaboration Plan.'] }
       ] },
-      { id: 'concept', form: 'fields', icon: '💡', title: 'Show Concept', points: 5,
+      { id: 'concept', form: 'fields', icon: '💡', title: 'Show Concept', points: 7, rubric: 'concept',
         prompt: 'Decide what your show is. Be specific: “a podcast about sports” is a topic; “a podcast where two benchwarmers rank the weirdest rules in high school sports” is a show.',
-        complete: { complete: 'A specific niche, a real audience, a name and tagline that fit the tone, a format, and a first-episode idea with a clear question or story.', incomplete: 'A broad topic only, missing boxes, or no episode idea.' },
         fields: [
           { id: 'name', kind: 'short', label: 'Show name', required: true },
           { id: 'tagline', kind: 'short', label: 'Tagline', hint: 'One line under the name: “A podcast about…”' },
@@ -215,9 +273,8 @@ var PC_UNIT = [
           { id: 'members', kind: 'short', label: 'Your crew', hint: 'Names of everyone in your crew', showIf: { field: 'crew', eq: 'Crew' } },
           { id: 'ep1', kind: 'long', label: 'Episode 1 idea', hint: 'What is the first episode about? What question does it answer or what story does it tell?', rows: 4 }
         ] },
-      { id: 'pitch', form: 'discussion', icon: '📣', title: 'Pitch Board', points: 3,
-        prompt: 'Pitch your show in 4–5 sentences: the name, what it’s about, who it’s for, and why someone would press play on episode 1. Then reply to TWO classmates: “I’d listen because…” and “It would grab me even more if…”.',
-        complete: { complete: 'A pitch with the name, niche, audience and a reason to listen, plus two replies that each name something specific to keep and something to improve.', incomplete: 'No pitch, a pitch missing the basics, or fewer than two useful replies.' } },
+      { id: 'pitch', form: 'discussion', icon: '📣', title: 'Pitch Board', points: 7, rubric: 'pitch',
+        prompt: 'Pitch your show in 4–5 sentences: the name, what it’s about, who it’s for, and why someone would press play on episode 1. Then reply to TWO classmates: “I’d listen because…” and “It would grab me even more if…”.', },
       { id: 'process', form: 'fields', icon: '🎙️', title: 'Research, Questions & Process', points: 7, rubric: 'process',
         assignment: true,
         prompt: 'Prepare the evidence and voices your episode needs, then design your production process. Write a central question, take notes from at least two sources, plan another voice, and prepare five open questions plus two possible follow-ups. For a performed or co-hosted piece, use the questions to explore the perspective you are adding. Keep your own planning even when working with a crew.',
@@ -291,9 +348,8 @@ var PC_UNIT = [
           { h: 'Template Customization', p: 'Customize templates in Canva to reflect your podcast\'s theme and style. Adjust colors, fonts, and images to ensure your branding is consistent across all visual materials for a professional look.' },
           { h: 'Engaging Audience', p: 'Use visually appealing designs to engage your audience on social media platforms. Regularly share updates, clips, and graphics to promote new episodes and maintain interest among your listeners.' } ], canva: 'cover' }
       ] },
-      { id: 'cover', form: 'fields', icon: '🎨', title: 'Cover Art', points: 5,
+      { id: 'cover', form: 'fields', icon: '🎨', title: 'Cover Art', points: 7, rubric: 'cover',
         prompt: 'Use the built-in cover maker below or design your own square cover in Canva. Download your cover as a PNG, upload it into your Canva episode, and keep the show name readable at thumbnail size.',
-        complete: { complete: 'A working Canva view-only link to square cover art with the show name readable at thumbnail size, and three design choices each tied to the show’s tone or audience.', incomplete: 'No link, a link that doesn’t open, or choices with no reasons.' },
         fields: [
           { id: 'coverTitle', kind: 'short', label: 'Cover title', hint: 'Used by the built-in cover maker. Leave blank to use your show name.' },
           { id: 'coverSubtitle', kind: 'short', label: 'Cover tagline', hint: 'A short line that helps listeners understand your show.' },
@@ -310,12 +366,10 @@ var PC_UNIT = [
           { id: 'voicecheck', kind: 'long', label: 'Where can we hear the other voice?', hint: 'Give the timestamp, who is speaking, what their contribution adds, and confirm permission to use the recording.', rows: 3 },
           { id: 'credits', kind: 'long', label: 'Credits and sources', hint: 'Crew and what each person did, guests, music and where it came from, research sources.', rows: 4 }
         ] },
-      { id: 'party', form: 'discussion', icon: '🎉', title: 'Listening Party', points: 3,
-        prompt: 'Post your episode’s title, a one-sentence teaser, and your Canva view-only link. Then listen to TWO classmates’ episodes and reply to each: one “glow” (a part of the podcast that worked, named with the term from Anatomy of a Podcast, and when it happens) and one “grow”.',
-        complete: { complete: 'A post with the title, a teaser and a working link, plus two replies that each name a specific part (with the time) that worked and one thing to try.', incomplete: 'No post or link, or fewer than two specific replies.' } },
-      { id: 'reflect', form: 'fields', icon: '↩', title: 'Producer’s Reflection', points: 5,
+      { id: 'party', form: 'discussion', icon: '🎉', title: 'Listening Party', points: 7, rubric: 'party',
+        prompt: 'Post your episode’s title, a one-sentence teaser, and your Canva view-only link. Then listen to TWO classmates’ episodes and reply to each: one “glow” (a part of the podcast that worked, named with the term from Anatomy of a Podcast, and when it happens) and one “grow”.', },
+      { id: 'reflect', form: 'fields', icon: '↩', title: 'Producer’s Reflection', points: 7, rubric: 'reflect',
         prompt: 'Look back at the process you designed in Week 2. Be honest: the point is what you learned about making things.',
-        complete: { complete: 'Every box answered with specifics from your own project (dates, stages, moments in the episode), including an honest look at what didn’t go to plan.', incomplete: 'Missing boxes, or general statements that could be about anyone’s project.' },
         fields: [
           { id: 'plan', kind: 'long', label: 'Your process vs. what really happened', hint: 'Which stages went as planned? Which changed, and why?' },
           { id: 'milestones', kind: 'long', label: 'Your milestones', hint: 'Which did you hit? Where did you fall behind, and what did you do about it?' },
