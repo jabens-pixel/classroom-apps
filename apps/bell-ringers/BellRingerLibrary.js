@@ -1,6 +1,6 @@
 /**
  * SchEnglish Bell Ringers — built-in library
- * Build 2026.10.15.1 · 140 bell ringers
+ * Build 2026.10.27.1 · 150 bell ringers
  *
  * Six strands, five bell ringers each, for every grade 9–12:
  *   Paragraph Surgery     fix a weak paragraph by rewriting it better
@@ -14,6 +14,11 @@
  *   Story Craft           one short-story skill practised on a small scene
  *                         (showing emotion, dialogue, point of view, pacing,
  *                         subtext, flashback, foreshadowing, endings...)
+ *
+ * And, for grades 11 and 12, the same five in each bank:
+ *   Podcast Craft         podcast-unit skills: interview questions, a
+ *                         two-person partner interview, cold opens,
+ *                         writing for the ear, the 30-second pitch
  *
  * REPLACE the entire contents of your BellRingerLibrary file with this file.
  * Bell ringers already assigned to classes are stored in the backend sheet
@@ -3440,6 +3445,276 @@ const BELL_RINGER_LIBRARY = [
     "gradeLabel": "Grade 12",
     "testStyle": "",
     "learningPoint": "An epiphany is a character’s moment of sudden understanding. The most powerful ones are shown, not announced: a small discovery and a small action let the reader experience the realization alongside the character."
+  },
+  {
+    "id": "g11-pod-questions",
+    "title": "Podcast Craft: Fix the Interview Questions",
+    "category": "Podcast Craft",
+    "preview": "Turn closed, leading questions into ones that get a guest talking.",
+    "prompt": "THE GUEST\nA senior who started a small business in high school: making and selling custom phone cases.\n\nSIX WEAK QUESTIONS\n1. Do you like running a business?\n2. Was it hard?\n3. Don’t you think more students should start businesses?\n4. How did you start, and how much money do you make, and what’s next?\n5. Tell me about your life.\n6. Did your parents help you?",
+    "directions": "LEARNING POINT\nA closed question gets a one-word answer. A leading question tells the guest what to say. A double question lets them pick the easy half. Good interview questions are open, neutral, and ask for ONE story at a time: they often start with “What,” “How,” “Tell me about a time…,” or “Walk me through…”.\n\nYOUR TASK\nLabel each weak question with its problem: closed, leading, double, or too broad. Then rewrite all six as open questions that would get a story, not a yes or no (number them 1–6, and split question 4 into separate questions if you need to).\n\nLast, pick your best rewrite and write ONE follow-up question you would ask after the guest answers it.\n\nBelow your writing, write one line that begins “Producer’s note:” and name the rewrite you think would get the best story, and why.",
+    "responseType": "writing",
+    "assessmentType": "rubric5",
+    "pointsPossible": 5,
+    "teacherNote": "Podcast unit skill builder. Problems: 1 and 2 and 6 are closed; 3 is leading; 4 is a double (triple) question; 5 is too broad. Look for: accurate labels; six genuinely open, neutral rewrites that each ask for one story; a follow-up that builds on the answer rather than starting a new topic.",
+    "skill": "Interview questions",
+    "tags": [
+      "podcast craft",
+      "podcast",
+      "podcast unit",
+      "interviewing",
+      "open questions",
+      "follow-up questions"
+    ],
+    "duration": "10 min",
+    "grade": 11,
+    "gradeLabel": "Grade 11",
+    "testStyle": "",
+    "learningPoint": "A closed question gets a one-word answer. A leading question tells the guest what to say. A double question lets them pick the easy half. Good interview questions are open, neutral, and ask for ONE story at a time: they often start with “What,” “How,” “Tell me about a time…,” or “Walk me through…”."
+  },
+  {
+    "id": "g11-pod-partner",
+    "title": "Podcast Craft: Partner Interview",
+    "category": "Podcast Craft",
+    "preview": "Two-person bell ringer: interview a partner, then introduce them like a podcast guest.",
+    "prompt": "WORK WITH A PARTNER\nYou will take turns. First you are the HOST and your partner is the GUEST, then you switch.\n\nTHE GUEST CHOOSES ONE TOPIC\n• A skill or hobby they are proud of\n• A place that matters to them\n• A time they changed their mind about something\n\nTIMING\n• 2 minutes: on your own, write two open questions for each topic (you don’t know which one your guest will pick).\n• 3 minutes: you interview your partner. Listen for the most interesting answer, and ask at least one follow-up about it.\n• 3 minutes: switch roles.\n• The rest of the time: write up YOUR interview below. Each of you submits your own.",
+    "directions": "LEARNING POINT\nIn a real interview, the best material usually comes from the follow-up, not the planned question. A good host listens for the surprising detail, asks “What do you mean by…?” or “What happened next?”, and keeps the guest’s exact words so they can be quoted accurately.\n\nYOUR TASK\nWrite up the interview you hosted, using these labels:\nPARTNER: your partner’s first name and the topic they chose\nMY QUESTIONS: the open questions you actually asked, in order\nFOLLOW-UP: the follow-up you asked, and what it got that the planned question didn’t\nBEST QUOTE: your partner’s exact words, in quotation marks (one or two sentences)\nGUEST INTRO: 3–4 sentences a host would say to introduce your partner as a guest on a podcast. Make a listener want to hear them, and build it from what you learned in the interview.\n\nBelow your writing, write one line that begins “Producer’s note:” and name one thing you would do differently as a host next time.",
+    "responseType": "writing",
+    "assessmentType": "rubric5",
+    "pointsPossible": 5,
+    "teacherNote": "Podcast unit skill builder. Two-person bell ringer: students pair up and each submits their own write-up of the interview they hosted. Look for: a partner named with the topic; open questions; a real follow-up and what it added; a quote in quotation marks that sounds like spoken words; a guest intro built from specific details of the interview, written to be read aloud. Gemini can’t confirm the interview happened; listen in while pairs talk.",
+    "skill": "Interviewing a partner",
+    "tags": [
+      "podcast craft",
+      "podcast",
+      "podcast unit",
+      "interviewing",
+      "partner work",
+      "follow-up questions",
+      "speaking and listening",
+      "two-person"
+    ],
+    "duration": "15 min",
+    "grade": 11,
+    "gradeLabel": "Grade 11",
+    "testStyle": "",
+    "learningPoint": "In a real interview, the best material usually comes from the follow-up, not the planned question. A good host listens for the surprising detail, asks “What do you mean by…?” or “What happened next?”, and keeps the guest’s exact words so they can be quoted accurately."
+  },
+  {
+    "id": "g11-pod-coldopen",
+    "title": "Podcast Craft: Write a Cold Open",
+    "category": "Podcast Craft",
+    "preview": "Drop the listener into the middle of a moment before the show says hello.",
+    "prompt": "PICK ONE EPISODE\nA. “The Night the Power Went Out”: an episode about a storm that knocked out power across the island for three days\nB. “First Shift”: an episode about teenagers’ first jobs\nC. “Lost and Found”: an episode about an object someone lost and got back years later",
+    "directions": "LEARNING POINT\nA cold open starts the episode in the middle of the action, before the theme music or the welcome. It can be a sound bite from a guest, a scene set with ambient sound, or one sentence that raises a question. Its only job is to make the listener stay for the next minute.\n\nYOUR TASK\nWrite a cold open of 5–8 lines for the episode you picked. Write it as a script:\n• Put sound in square brackets on its own line, e.g. [AMBIENT: rain on a tin roof] or [SOUND BITE: …].\n• Label who is speaking, e.g. HOST: or GUEST:.\n• Include at least one sound cue and at least one line of speech.\n• End on a question, a surprise, or an unfinished moment, then write [THEME MUSIC]. Do not write “Welcome to the show” or the host’s name before the music.\n\nBelow your writing, write one line that begins “Producer’s note:” and name the question your cold open plants in the listener’s mind.",
+    "responseType": "writing",
+    "assessmentType": "rubric5",
+    "pointsPossible": 5,
+    "teacherNote": "Podcast unit skill builder. Look for: starts mid-moment (no welcome or introductions before the theme); script format with speaker labels and bracketed sound cues; at least one sound cue that sets a place; an ending that leaves the listener wanting the answer.",
+    "skill": "Cold opens",
+    "tags": [
+      "podcast craft",
+      "podcast",
+      "podcast unit",
+      "cold open",
+      "script",
+      "sound design",
+      "hook"
+    ],
+    "duration": "10 min",
+    "grade": 11,
+    "gradeLabel": "Grade 11",
+    "testStyle": "",
+    "learningPoint": "A cold open starts the episode in the middle of the action, before the theme music or the welcome. It can be a sound bite from a guest, a scene set with ambient sound, or one sentence that raises a question. Its only job is to make the listener stay for the next minute."
+  },
+  {
+    "id": "g11-pod-ear",
+    "title": "Podcast Craft: Write for the Ear",
+    "category": "Podcast Craft",
+    "preview": "Rewrite a paragraph written for the page so it works when it is heard.",
+    "prompt": "WRITTEN FOR THE PAGE\nAccording to a 2023 survey of 1,527 students (conducted across 14 schools), approximately 62.8% of respondents—a significant majority—reported that they listen to podcasts at least once per week, a figure which, when compared with the 41.2% reported in the same survey’s previous iteration, represents a substantial increase; however, the reasons for this increase, which may include commuting, studying, or exercise, remain unclear.",
+    "directions": "LEARNING POINT\nA listener can’t reread a sentence, see parentheses, or look back at a number. Writing for the ear means short sentences, one idea at a time, rounded numbers, everyday words, signposts (“Here’s the thing.”, “So why?”), and repeating the key point so it sticks.\n\nYOUR TASK\nRewrite the paragraph as a script a host would read aloud, in 6–9 short sentences. Keep the facts accurate, but round the numbers (“about six in ten”), cut the parentheses and dashes, use contractions, and ask the listener at least one question. End with a line that sets up what the episode will explore next.\n\nThen read it aloud to yourself (quietly!) and fix any spot where you stumbled.\n\nBelow your writing, write one line that begins “Producer’s note:” and name one change that made it easier to follow by ear, and why.",
+    "responseType": "writing",
+    "assessmentType": "rubric5",
+    "pointsPossible": 5,
+    "teacherNote": "Podcast unit skill builder. Look for: short, speakable sentences; rounded but accurate numbers (about 6 in 10, up from about 4 in 10); no parentheses or dash-asides; contractions and a question to the listener; a closing line that leads into the episode.",
+    "skill": "Writing for the ear",
+    "tags": [
+      "podcast craft",
+      "podcast",
+      "podcast unit",
+      "script",
+      "writing for the ear",
+      "audience",
+      "clarity"
+    ],
+    "duration": "10 min",
+    "grade": 11,
+    "gradeLabel": "Grade 11",
+    "testStyle": "",
+    "learningPoint": "A listener can’t reread a sentence, see parentheses, or look back at a number. Writing for the ear means short sentences, one idea at a time, rounded numbers, everyday words, signposts (“Here’s the thing.”, “So why?”), and repeating the key point so it sticks."
+  },
+  {
+    "id": "g11-pod-pitch",
+    "title": "Podcast Craft: The 30-Second Pitch",
+    "category": "Podcast Craft",
+    "preview": "Pitch a podcast idea so clearly that someone could picture the first episode.",
+    "prompt": "THE PRODUCER WANTS TO KNOW\n• The show’s name\n• Who it is for\n• What one episode sounds like (the format: interview, story, explainer, conversation, fiction)\n• Who hosts it, and who the guests or second voices might be\n• Why someone would choose it over everything else in their feed",
+    "directions": "LEARNING POINT\nA pitch is a promise in miniature. Producers say yes to an idea they can picture: a specific audience, a clear format, and one example episode, not a topic that is “about everything.” If you can’t say it in thirty seconds, the idea isn’t focused yet.\n\nYOUR TASK\nWrite a 30-second pitch (about 75–90 words, written to be said aloud) for a podcast you could make this unit. Answer every question the producer asked, and describe ONE specific first episode, including how it would open.\n\nUnderneath, write a one-sentence logline: “[Show name] is a [format] podcast for [audience] about [focus].”\n\nBelow your writing, write one line that begins “Producer’s note:” and name the part of your pitch you think is still weakest, and one question you need to answer before planning.",
+    "responseType": "writing",
+    "assessmentType": "rubric5",
+    "pointsPossible": 5,
+    "teacherNote": "Podcast unit skill builder. Look for: a named show; a specific audience (not “everyone”); a clear format; a concrete first episode with an opening; 75–90 words that read naturally aloud; a logline in the given pattern. This feeds Week 2’s Show Concept and Pitch Board.",
+    "skill": "Pitching a show",
+    "tags": [
+      "podcast craft",
+      "podcast",
+      "podcast unit",
+      "pitch",
+      "show concept",
+      "audience",
+      "format"
+    ],
+    "duration": "10 min",
+    "grade": 11,
+    "gradeLabel": "Grade 11",
+    "testStyle": "",
+    "learningPoint": "A pitch is a promise in miniature. Producers say yes to an idea they can picture: a specific audience, a clear format, and one example episode, not a topic that is “about everything.” If you can’t say it in thirty seconds, the idea isn’t focused yet."
+  },
+  {
+    "id": "g12-pod-questions",
+    "title": "Podcast Craft: Fix the Interview Questions",
+    "category": "Podcast Craft",
+    "preview": "Turn closed, leading questions into ones that get a guest talking.",
+    "prompt": "THE GUEST\nA senior who started a small business in high school: making and selling custom phone cases.\n\nSIX WEAK QUESTIONS\n1. Do you like running a business?\n2. Was it hard?\n3. Don’t you think more students should start businesses?\n4. How did you start, and how much money do you make, and what’s next?\n5. Tell me about your life.\n6. Did your parents help you?",
+    "directions": "LEARNING POINT\nA closed question gets a one-word answer. A leading question tells the guest what to say. A double question lets them pick the easy half. Good interview questions are open, neutral, and ask for ONE story at a time: they often start with “What,” “How,” “Tell me about a time…,” or “Walk me through…”.\n\nYOUR TASK\nLabel each weak question with its problem: closed, leading, double, or too broad. Then rewrite all six as open questions that would get a story, not a yes or no (number them 1–6, and split question 4 into separate questions if you need to).\n\nLast, pick your best rewrite and write ONE follow-up question you would ask after the guest answers it.\n\nBelow your writing, write one line that begins “Producer’s note:” and name the rewrite you think would get the best story, and why.",
+    "responseType": "writing",
+    "assessmentType": "rubric5",
+    "pointsPossible": 5,
+    "teacherNote": "Podcast unit skill builder. Problems: 1 and 2 and 6 are closed; 3 is leading; 4 is a double (triple) question; 5 is too broad. Look for: accurate labels; six genuinely open, neutral rewrites that each ask for one story; a follow-up that builds on the answer rather than starting a new topic.",
+    "skill": "Interview questions",
+    "tags": [
+      "podcast craft",
+      "podcast",
+      "podcast unit",
+      "interviewing",
+      "open questions",
+      "follow-up questions"
+    ],
+    "duration": "10 min",
+    "grade": 12,
+    "gradeLabel": "Grade 12",
+    "testStyle": "",
+    "learningPoint": "A closed question gets a one-word answer. A leading question tells the guest what to say. A double question lets them pick the easy half. Good interview questions are open, neutral, and ask for ONE story at a time: they often start with “What,” “How,” “Tell me about a time…,” or “Walk me through…”."
+  },
+  {
+    "id": "g12-pod-partner",
+    "title": "Podcast Craft: Partner Interview",
+    "category": "Podcast Craft",
+    "preview": "Two-person bell ringer: interview a partner, then introduce them like a podcast guest.",
+    "prompt": "WORK WITH A PARTNER\nYou will take turns. First you are the HOST and your partner is the GUEST, then you switch.\n\nTHE GUEST CHOOSES ONE TOPIC\n• A skill or hobby they are proud of\n• A place that matters to them\n• A time they changed their mind about something\n\nTIMING\n• 2 minutes: on your own, write two open questions for each topic (you don’t know which one your guest will pick).\n• 3 minutes: you interview your partner. Listen for the most interesting answer, and ask at least one follow-up about it.\n• 3 minutes: switch roles.\n• The rest of the time: write up YOUR interview below. Each of you submits your own.",
+    "directions": "LEARNING POINT\nIn a real interview, the best material usually comes from the follow-up, not the planned question. A good host listens for the surprising detail, asks “What do you mean by…?” or “What happened next?”, and keeps the guest’s exact words so they can be quoted accurately.\n\nYOUR TASK\nWrite up the interview you hosted, using these labels:\nPARTNER: your partner’s first name and the topic they chose\nMY QUESTIONS: the open questions you actually asked, in order\nFOLLOW-UP: the follow-up you asked, and what it got that the planned question didn’t\nBEST QUOTE: your partner’s exact words, in quotation marks (one or two sentences)\nGUEST INTRO: 3–4 sentences a host would say to introduce your partner as a guest on a podcast. Make a listener want to hear them, and build it from what you learned in the interview.\n\nBelow your writing, write one line that begins “Producer’s note:” and name one thing you would do differently as a host next time.",
+    "responseType": "writing",
+    "assessmentType": "rubric5",
+    "pointsPossible": 5,
+    "teacherNote": "Podcast unit skill builder. Two-person bell ringer: students pair up and each submits their own write-up of the interview they hosted. Look for: a partner named with the topic; open questions; a real follow-up and what it added; a quote in quotation marks that sounds like spoken words; a guest intro built from specific details of the interview, written to be read aloud. Gemini can’t confirm the interview happened; listen in while pairs talk.",
+    "skill": "Interviewing a partner",
+    "tags": [
+      "podcast craft",
+      "podcast",
+      "podcast unit",
+      "interviewing",
+      "partner work",
+      "follow-up questions",
+      "speaking and listening",
+      "two-person"
+    ],
+    "duration": "15 min",
+    "grade": 12,
+    "gradeLabel": "Grade 12",
+    "testStyle": "",
+    "learningPoint": "In a real interview, the best material usually comes from the follow-up, not the planned question. A good host listens for the surprising detail, asks “What do you mean by…?” or “What happened next?”, and keeps the guest’s exact words so they can be quoted accurately."
+  },
+  {
+    "id": "g12-pod-coldopen",
+    "title": "Podcast Craft: Write a Cold Open",
+    "category": "Podcast Craft",
+    "preview": "Drop the listener into the middle of a moment before the show says hello.",
+    "prompt": "PICK ONE EPISODE\nA. “The Night the Power Went Out”: an episode about a storm that knocked out power across the island for three days\nB. “First Shift”: an episode about teenagers’ first jobs\nC. “Lost and Found”: an episode about an object someone lost and got back years later",
+    "directions": "LEARNING POINT\nA cold open starts the episode in the middle of the action, before the theme music or the welcome. It can be a sound bite from a guest, a scene set with ambient sound, or one sentence that raises a question. Its only job is to make the listener stay for the next minute.\n\nYOUR TASK\nWrite a cold open of 5–8 lines for the episode you picked. Write it as a script:\n• Put sound in square brackets on its own line, e.g. [AMBIENT: rain on a tin roof] or [SOUND BITE: …].\n• Label who is speaking, e.g. HOST: or GUEST:.\n• Include at least one sound cue and at least one line of speech.\n• End on a question, a surprise, or an unfinished moment, then write [THEME MUSIC]. Do not write “Welcome to the show” or the host’s name before the music.\n\nBelow your writing, write one line that begins “Producer’s note:” and name the question your cold open plants in the listener’s mind.",
+    "responseType": "writing",
+    "assessmentType": "rubric5",
+    "pointsPossible": 5,
+    "teacherNote": "Podcast unit skill builder. Look for: starts mid-moment (no welcome or introductions before the theme); script format with speaker labels and bracketed sound cues; at least one sound cue that sets a place; an ending that leaves the listener wanting the answer.",
+    "skill": "Cold opens",
+    "tags": [
+      "podcast craft",
+      "podcast",
+      "podcast unit",
+      "cold open",
+      "script",
+      "sound design",
+      "hook"
+    ],
+    "duration": "10 min",
+    "grade": 12,
+    "gradeLabel": "Grade 12",
+    "testStyle": "",
+    "learningPoint": "A cold open starts the episode in the middle of the action, before the theme music or the welcome. It can be a sound bite from a guest, a scene set with ambient sound, or one sentence that raises a question. Its only job is to make the listener stay for the next minute."
+  },
+  {
+    "id": "g12-pod-ear",
+    "title": "Podcast Craft: Write for the Ear",
+    "category": "Podcast Craft",
+    "preview": "Rewrite a paragraph written for the page so it works when it is heard.",
+    "prompt": "WRITTEN FOR THE PAGE\nAccording to a 2023 survey of 1,527 students (conducted across 14 schools), approximately 62.8% of respondents—a significant majority—reported that they listen to podcasts at least once per week, a figure which, when compared with the 41.2% reported in the same survey’s previous iteration, represents a substantial increase; however, the reasons for this increase, which may include commuting, studying, or exercise, remain unclear.",
+    "directions": "LEARNING POINT\nA listener can’t reread a sentence, see parentheses, or look back at a number. Writing for the ear means short sentences, one idea at a time, rounded numbers, everyday words, signposts (“Here’s the thing.”, “So why?”), and repeating the key point so it sticks.\n\nYOUR TASK\nRewrite the paragraph as a script a host would read aloud, in 6–9 short sentences. Keep the facts accurate, but round the numbers (“about six in ten”), cut the parentheses and dashes, use contractions, and ask the listener at least one question. End with a line that sets up what the episode will explore next.\n\nThen read it aloud to yourself (quietly!) and fix any spot where you stumbled.\n\nBelow your writing, write one line that begins “Producer’s note:” and name one change that made it easier to follow by ear, and why.",
+    "responseType": "writing",
+    "assessmentType": "rubric5",
+    "pointsPossible": 5,
+    "teacherNote": "Podcast unit skill builder. Look for: short, speakable sentences; rounded but accurate numbers (about 6 in 10, up from about 4 in 10); no parentheses or dash-asides; contractions and a question to the listener; a closing line that leads into the episode.",
+    "skill": "Writing for the ear",
+    "tags": [
+      "podcast craft",
+      "podcast",
+      "podcast unit",
+      "script",
+      "writing for the ear",
+      "audience",
+      "clarity"
+    ],
+    "duration": "10 min",
+    "grade": 12,
+    "gradeLabel": "Grade 12",
+    "testStyle": "",
+    "learningPoint": "A listener can’t reread a sentence, see parentheses, or look back at a number. Writing for the ear means short sentences, one idea at a time, rounded numbers, everyday words, signposts (“Here’s the thing.”, “So why?”), and repeating the key point so it sticks."
+  },
+  {
+    "id": "g12-pod-pitch",
+    "title": "Podcast Craft: The 30-Second Pitch",
+    "category": "Podcast Craft",
+    "preview": "Pitch a podcast idea so clearly that someone could picture the first episode.",
+    "prompt": "THE PRODUCER WANTS TO KNOW\n• The show’s name\n• Who it is for\n• What one episode sounds like (the format: interview, story, explainer, conversation, fiction)\n• Who hosts it, and who the guests or second voices might be\n• Why someone would choose it over everything else in their feed",
+    "directions": "LEARNING POINT\nA pitch is a promise in miniature. Producers say yes to an idea they can picture: a specific audience, a clear format, and one example episode, not a topic that is “about everything.” If you can’t say it in thirty seconds, the idea isn’t focused yet.\n\nYOUR TASK\nWrite a 30-second pitch (about 75–90 words, written to be said aloud) for a podcast you could make this unit. Answer every question the producer asked, and describe ONE specific first episode, including how it would open.\n\nUnderneath, write a one-sentence logline: “[Show name] is a [format] podcast for [audience] about [focus].”\n\nBelow your writing, write one line that begins “Producer’s note:” and name the part of your pitch you think is still weakest, and one question you need to answer before planning.",
+    "responseType": "writing",
+    "assessmentType": "rubric5",
+    "pointsPossible": 5,
+    "teacherNote": "Podcast unit skill builder. Look for: a named show; a specific audience (not “everyone”); a clear format; a concrete first episode with an opening; 75–90 words that read naturally aloud; a logline in the given pattern. This feeds Week 2’s Show Concept and Pitch Board.",
+    "skill": "Pitching a show",
+    "tags": [
+      "podcast craft",
+      "podcast",
+      "podcast unit",
+      "pitch",
+      "show concept",
+      "audience",
+      "format"
+    ],
+    "duration": "10 min",
+    "grade": 12,
+    "gradeLabel": "Grade 12",
+    "testStyle": "",
+    "learningPoint": "A pitch is a promise in miniature. Producers say yes to an idea they can picture: a specific audience, a clear format, and one example episode, not a topic that is “about everything.” If you can’t say it in thirty seconds, the idea isn’t focused yet."
   }
 ];
 

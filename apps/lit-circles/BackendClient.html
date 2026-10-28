@@ -452,6 +452,10 @@ body:has(#lchFailBar) #app{padding-bottom:200px}
 .lch-qz-choice input[type=text]{flex:1;min-width:0;margin:0;padding:7px 9px;font-size:13.5px}
 .lch-qz-why{width:100%;margin:8px 0 0!important;font-size:13px}
 .lch-qz-export{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:12px}
+.lch-qz-bulk{position:sticky;top:64px;z-index:40;display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin:0 0 14px;padding:10px 14px;background:#F4FBD3;border:2px solid #111;color:#111;font-size:13.5px;box-shadow:0 6px 18px rgba(0,0,0,.25)}
+.lch-qz-bulk .lch-spacer{flex:1}
+header h1.lc-brand .lc-brand-home{cursor:pointer}
+header h1.lc-brand .lc-wordmark.lc-brand-home:hover,header h1.lc-brand .lc-wordmark.lc-brand-home:focus-visible{text-decoration:underline;text-underline-offset:4px;outline:none}
 #lchQzExportMsg{margin-top:8px}
 .lch-qz-notes{margin:0 0 10px;border:1px solid #dce9e2;border-radius:12px;background:#fbfdfc}
 .lch-qz-notes>summary{cursor:pointer;padding:9px 12px;font-size:13px;font-weight:800;color:#1c5c40}
@@ -489,7 +493,7 @@ window.__MB.BackendClient = 'loading';
   }
   // This file stamps the release (the badge + the version check), so a release that changes only
   // BackendClient and Code.gs doesn't need the 400 KB Index re-pasted. Keep in step with LC_APP_VERSION.
-  var LCH_RELEASE = '2026-10-23e';
+  var LCH_RELEASE = '2026-10-27b';
   W.LC_CLIENT_VERSION = LCH_RELEASE;
   (function () { var b = document.querySelector('.app-version'); if (b) b.textContent = 'v' + LCH_RELEASE; })();
 
@@ -733,6 +737,24 @@ window.__MB.BackendClient = 'loading';
     try { if (W.lcHistory) W.lcHistory.replaceNext = true; } catch (e) {}
     W.renderTeacherDashboard();
   }
+  // 2026-10-27a: the "Literature Circles" title in the top bar goes home — the student's page of all
+  // weeks, or the teacher's dashboard (same as the Home / Back to Dashboard buttons).
+  function brandHome() {
+    var P = W.platform || {};
+    if (P.mode === 'teacher') { if (P.teacherView === 'quizzes' && !qzConfirmLeave()) return; if (P.teacherView === 'quizzes') qzDiscardAll(); goDashboard(); return; }
+    if (P.mode === 'admin') return;
+    if (W.state && W.state.email && typeof W.goHome === 'function') W.goHome();
+  }
+  (function () {
+    function arm() {
+      var h = document.querySelector('header h1.lc-brand'); if (!h || h.__lcHome) return; h.__lcHome = true;
+      ['.lc-logo', '.lc-wordmark'].forEach(function (sel) { var el = h.querySelector(sel); if (el) el.classList.add('lc-brand-home'); });
+      var w = h.querySelector('.lc-wordmark'); if (w) { w.setAttribute('role', 'link'); w.setAttribute('tabindex', '0'); w.setAttribute('title', 'Home — all weeks'); }
+    }
+    arm(); if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', arm);
+    document.addEventListener('click', function (e) { var t = e.target && e.target.closest && e.target.closest('header h1.lc-brand .lc-brand-home'); if (t) { e.preventDefault(); brandHome(); } });
+    document.addEventListener('keydown', function (e) { if ((e.key === 'Enter' || e.key === ' ') && e.target && e.target.classList && e.target.classList.contains('lc-wordmark') && e.target.closest('header h1.lc-brand')) { e.preventDefault(); brandHome(); } });
+  })();
   /** Every route back to the dashboard (button, browser Back, class switch) refreshes counts. */
   function refreshAfterGrading() {
     var id = classId(), sentAt = 0;
@@ -2177,6 +2199,7 @@ window.__MB.BackendClient = 'loading';
       '<div class="lch-tile-msg" id="lchQzExportMsg" aria-live="polite">' + (LCH.qzExportMsg && LCH.qzExportMsg.cid === classId() ? LCH.qzExportMsg.html : '') + '</div>' +
       (!r.aiReady ? '<p class="lch-note lch-qz-warn">AI drafting isn’t set up for this app (no GEMINI_API_KEY in Script Properties). You can still write the questions yourself.</p>' : '') + '</section>';
     if (!groups.length) return head + '<div class="lch-empty-state">No groups in this class yet.</div>';
+    head += '<div id="lchQzBulkSlot">' + qzBulkHtml() + '</div>';
     // Each group folds: approved quizzes start folded, drafts and groups without a quiz start open.
     return head + groups.map(function (g) { return '<details class="card lch-card lch-qz-group" data-group="' + esc(g.groupId) + '" id="lchQz-' + esc(g.groupId) + '"' + (qzIsOpen(g) ? ' open' : '') + '>' + qzGroupInner(g) + '</details>'; }).join('');
   }
@@ -2190,7 +2213,7 @@ window.__MB.BackendClient = 'loading';
     var Z = qzState(); Z.openG = Z.openG || {}; Z.openG[d.getAttribute('data-group')] = d.open;
   }, true);
   function qzGroup(gid) { var r = qzState().data; return r ? (r.groups || []).filter(function (g) { return g.groupId === gid; })[0] : null; }
-  function qzRepaintGroup(gid) { var el = $('lchQz-' + gid), g = qzGroup(gid); if (el && g) el.innerHTML = qzGroupInner(g); }
+  function qzRepaintGroup(gid) { var el = $('lchQz-' + gid), g = qzGroup(gid); if (el && g) el.innerHTML = qzGroupInner(g); paintBulk(); }
   function qzReadyCount(e) { return (e && e.questions || []).filter(function (q) { return q.q.trim() && q.choices.every(function (c) { return c.trim(); }) && q.answer >= 0 && new Set(q.choices.map(function (c) { return c.trim().toLowerCase(); })).size === 4; }).length; }
   function qzGroupInner(g) {
     var w = quizWeek(), Z = qzState(w), e = Z.edit[g.groupId], busy = Z.busy[g.groupId] || '', msg = Z.msg[g.groupId] || '', dirty = !!Z.dirty[g.groupId], started = g.started > 0, r = Z.data;
@@ -2267,7 +2290,7 @@ window.__MB.BackendClient = 'loading';
     else if (f === 'q' || f === 'why') e.questions[i][f] = el.value;
     if (e && e.questions[i] && f !== 'section' && e.questions[i].src === 'ai') e.questions[i].src = 'edited';
     if (e && e.questions[i] && f !== 'section') e.questions[i].flag = e.questions[i].flag; // the ⚑ stays until the quiz is saved
-    Z.dirty[gid] = true;
+    var wasDirty = !!Z.dirty[gid]; Z.dirty[gid] = true; if (!wasDirty) paintBulk();
     var cnt = document.querySelector('[data-count-for="' + CSS.escape(gid) + '"]');
     if (cnt && e) { var need = (Z.data && Z.data.count) || 10, ready = qzReadyCount(e); cnt.innerHTML = esc(ready + ' of ' + need + ' questions ready') + ' · <b>unsaved changes</b>'; cnt.classList.toggle('is-ok', ready === need && e.questions.length === need); }
   }
@@ -2360,15 +2383,18 @@ window.__MB.BackendClient = 'loading';
   function qzExport(week, btn) {
     var id = classId(), all = week === 'all', label = all ? 'all weeks' : 'Week ' + week;
     if (qzAnyDirty() && !W.confirm('Some quiz edits aren’t saved yet, so they won’t be in the export. Export anyway?')) return;
-    btn.disabled = true;
+    btn.disabled = true; var btnText = btn.textContent;
+    // 2026-10-27a: the button itself says it's working (a week of 13 quizzes takes about 30 s)
+    btn.textContent = 'Making the Google Doc… (about ' + (all ? 'a minute or two' : '30 seconds') + ')';
+    function back() { var b = document.querySelector('[data-lch="quiz-export"][data-week="' + week + '"]'); if (b) { b.disabled = false; b.textContent = btnText; } }
     function msg(html, isErr) { LCH.qzExportMsg = { cid: id, html: html }; var el = $('lchQzExportMsg'); if (el) { el.innerHTML = html; el.classList.toggle('is-error', !!isErr); } }
-    msg('Making a Google Doc of the quizzes for ' + label + '…');
+    msg('Making a Google Doc of the quizzes for ' + label + '… keep this page open.');
     rpc('exportLiteratureQuizzes', { classId: id, week: all ? 'all' : Number(week) }).then(function (r) {
-      var b = document.querySelector('[data-lch="quiz-export"][data-week="' + week + '"]'); if (b) b.disabled = false;
+      back();
       msg('<b>Done</b> — ' + plural(Number(r.questions || 0), 'question') + ' from ' + plural(Number(r.groups || 0), 'group') + '. <a href="' + esc(r.url) + '" target="_blank" rel="noopener"><b>Open “' + esc(r.name) + '” ↗</b></a> (it’s in your Google Drive).');
     }, function (e) {
-      var b = document.querySelector('[data-lch="quiz-export"][data-week="' + week + '"]'); if (b) b.disabled = false;
-      msg('The export didn’t work: ' + esc(errMsg(e)), true);
+      back();
+      msg('The export didn’t work: ' + esc(errMsg(e)) + ' — press Export again; if it keeps failing, tell Claude what this says.', true);
     });
   }
   function qzDraftAll(btn) {
@@ -2402,7 +2428,7 @@ window.__MB.BackendClient = 'loading';
     }, function (err) { btn.disabled = false; btn.textContent = '↻ New AI question'; toast(errMsg(err), true); });
   }
   function qzSave(gid, approve, btn) {
-    var w = quizWeek(), Z = qzState(w), e = Z.edit[gid], g = qzGroup(gid); if (!e || !g) return;
+    var w = quizWeek(), Z = qzState(w), e = Z.edit[gid], g = qzGroup(gid); if (!e || !g) return Promise.resolve(false);
     var secEl = $('lchQzSec-' + gid); if (secEl) e.section = secEl.value;
     var need = (Z.data && Z.data.count) || 10;
     if (approve) {
@@ -2410,19 +2436,73 @@ window.__MB.BackendClient = 'loading';
       if (e.questions.length !== need) probs.push('a quiz needs exactly ' + need + ' questions (this one has ' + e.questions.length + ')');
       e.questions.forEach(function (q, i) { var ok = q.q.trim() && q.choices.every(function (c) { return c.trim(); }) && q.answer >= 0 && new Set(q.choices.map(function (c) { return c.trim().toLowerCase(); })).size === 4; if (!ok) probs.push('question ' + (i + 1) + ' needs the question, four different choices and the right answer picked'); });
       if (!String(e.section || '').trim()) probs.push('type the section it covers');
-      if (probs.length) { qzSetMsg(gid, 'Not approved yet: ' + esc(probs.slice(0, 4).join('; ')) + (probs.length > 4 ? '; and ' + (probs.length - 4) + ' more' : '') + '.', true); qzRepaintGroup(gid); return; }
+      if (probs.length) { qzSetMsg(gid, 'Not approved yet: ' + esc(probs.slice(0, 4).join('; ')) + (probs.length > 4 ? '; and ' + (probs.length - 4) + ' more' : '') + '.', true); qzRepaintGroup(gid); return Promise.resolve(false); }
     }
-    btn.disabled = true; btn.textContent = 'Saving…';
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
     var id = classId();
-    track(rpc('saveLiteratureQuiz', { classId: id, groupId: gid, week: w, section: e.section, approve: approve, base: e.updatedAt || '', questions: e.questions.map(function (q) { var o = { q: q.q, choices: q.choices, answer: q.answer, why: q.why, where: q.where, kind: q.kind, flag: q.flag, src: q.src }; if (q.id) o.id = q.id; return o; }) })).then(function (res) {
+    return track(rpc('saveLiteratureQuiz', { classId: id, groupId: gid, week: w, section: e.section, approve: approve, base: e.updatedAt || '', questions: e.questions.map(function (q) { var o = { q: q.q, choices: q.choices, answer: q.answer, why: q.why, where: q.where, kind: q.kind, flag: q.flag, src: q.src }; if (q.id) o.id = q.id; return o; }) })).then(function (res) {
       Z.edit[gid] = qzFromServer(res.quiz); Z.dirty[gid] = false;
       qzSetMsg(gid, approve ? '<b>Approved.</b> ' + (quizOpen(w) ? 'The quiz is open, so this group can take it now.' : 'Students can take it once you switch <b>Quiz open now</b> on.') : 'Draft saved — students can’t see it.');
       if (classId() === id && quizWeek() === w) qzRepaintGroup(gid);
       if (classId() === id) loadHub(id, true).catch(function () {});
+      paintBulk();
       var hd = document.querySelector('.lch-qz-openbox .lch-mini'); if (hd && Z.data) { var ap = Z.data.groups.filter(function (x) { var ed = Z.edit[x.groupId]; return ed && ed.status === 'approved'; }).length; hd.textContent = ap + ' of ' + plural(Z.data.groups.length, 'group') + ' approved'; hd.classList.toggle('is-clear', ap === Z.data.groups.length); }
+      return true;
     }, function (err) {
-      btn.disabled = false; btn.textContent = approve ? 'Approve for students' : 'Save draft';
+      if (btn) { btn.disabled = false; btn.textContent = approve ? 'Approve for students' : 'Save draft'; }
       qzSetMsg(gid, esc(errMsg(err)), true); qzRepaintGroup(gid);
+      return false;
+    });
+  }
+  // ---------- bulk: accept every suggested fix, save every changed quiz, approve every quiz (2026-10-27a)
+  function qzBulkCounts() {
+    var Z = qzState(), groups = (Z.data && Z.data.groups) || [], c = { dirty: 0, fixes: 0, fixQ: 0, toApprove: 0, busy: false };
+    groups.forEach(function (g) {
+      var e = Z.edit[g.groupId]; if (Z.busy[g.groupId]) c.busy = true; if (!e) return;
+      if (Z.dirty[g.groupId]) c.dirty++;
+      var S = (Z.sugg || {})[g.groupId]; if (S && S.list.length) { c.fixes += S.list.length; c.fixQ++; }
+      if (e.status !== 'approved' || Z.dirty[g.groupId]) c.toApprove++;
+    });
+    return c;
+  }
+  function qzBulkHtml() {
+    var Z = qzState(), c = qzBulkCounts(); if (!c.dirty && !c.fixes && !c.toApprove) return '';
+    var off = Z.bulkBusy || c.busy ? ' disabled' : '';
+    var bits = [];
+    if (c.fixes) bits.push('<b>' + plural(c.fixes, 'suggested fix', 'suggested fixes') + '</b> waiting in ' + plural(c.fixQ, 'quiz', 'quizzes'));
+    if (c.dirty) bits.push('<b>' + plural(c.dirty, 'quiz', 'quizzes') + '</b> with unsaved changes');
+    if (c.toApprove) bits.push('<b>' + c.toApprove + '</b> not approved yet');
+    return '<div class="lch-qz-bulk" id="lchQzBulk" role="region" aria-label="All quizzes this week"><span class="lch-qz-bulk-txt">' + bits.join(' · ') + (Z.bulkBusy ? ' · <b>' + esc(Z.bulkBusy) + '</b>' : c.busy ? ' · the AI is still working on a quiz…' : '') + '</span><span class="lch-spacer"></span>' +
+      (c.fixes ? '<button class="lch-btn small" data-lch="quiz-fix-every"' + off + ' title="Use every suggested fix on every quiz this week (nothing is saved until you Save or Approve)">✓ Accept all ' + c.fixes + ' fixes</button>' : '') +
+      (c.dirty ? '<button class="lch-btn small" data-lch="quiz-save-all"' + off + ' title="Save every quiz with unsaved changes (approved quizzes stay approved)">Save all (' + c.dirty + ')</button>' : '') +
+      (c.toApprove ? '<button class="lch-btn small primary" data-lch="quiz-approve-all"' + off + ' title="Save and approve every quiz that’s ready; any that aren’t say why">Approve all (' + c.toApprove + ')</button>' : '') + '</div>';
+  }
+  function paintBulk() { var slot = $('lchQzBulkSlot'); if (!slot) return; var h = qzBulkHtml(); if (slot.innerHTML !== h) slot.innerHTML = h; }
+  function qzBulkMsg(html, isErr) { var id = classId(); LCH.qzExportMsg = { cid: id, html: html }; var el = $('lchQzExportMsg'); if (el) { el.innerHTML = html; el.classList.toggle('is-error', !!isErr); } }
+  function qzAcceptEvery() {
+    var Z = qzState(), groups = (Z.data && Z.data.groups) || [], n = 0, q = 0;
+    groups.forEach(function (g) { var S = (Z.sugg || {})[g.groupId]; if (!S || !S.list.length || Z.busy[g.groupId]) return; n += S.list.length; q++; qzUseAll(g.groupId); });
+    paintBulk();
+    if (n) toast(plural(n, 'fix', 'fixes') + ' used in ' + plural(q, 'quiz', 'quizzes') + '. Read them over, then Save all or Approve all.');
+  }
+  function qzBulkRun(approveAll) {
+    var w = quizWeek(), Z = qzState(w), groups = (Z.data && Z.data.groups) || [], id = classId();
+    var list = groups.filter(function (g) { var e = Z.edit[g.groupId]; if (!e || Z.busy[g.groupId]) return false; return approveAll ? (e.status !== 'approved' || Z.dirty[g.groupId]) : !!Z.dirty[g.groupId]; });
+    if (!list.length || Z.bulkBusy) return;
+    if (approveAll && !W.confirm('Approve ' + plural(list.length, 'quiz', 'quizzes') + ' for students?\n\nStudents can take an approved quiz whenever Quiz open now is on. Any quiz that isn’t ready (missing questions or answers) stays as it is and says why.')) return;
+    var ok = 0, bad = [];
+    Z.bulkBusy = (approveAll ? 'Approving' : 'Saving') + ' 1 of ' + list.length + '…'; paintBulk();
+    list.reduce(function (p, g, i) {
+      return p.then(function () {
+        if (classId() !== id || quizWeek() !== w) return;
+        Z.bulkBusy = (approveAll ? 'Approving' : 'Saving') + ' ' + (i + 1) + ' of ' + list.length + '…'; paintBulk();
+        var e = Z.edit[g.groupId];
+        return qzSave(g.groupId, approveAll ? true : e.status === 'approved', null).then(function (done) { if (done) ok++; else bad.push(g.bookTitle + ' (' + g.members.join(', ') + ')'); });
+      });
+    }, Promise.resolve()).then(function () {
+      Z.bulkBusy = '';
+      if (classId() === id && quizWeek() === w) { paintBulk(); paintQuizzes(); }
+      qzBulkMsg((ok ? '<b>' + (approveAll ? 'Approved' : 'Saved') + ' ' + plural(ok, 'quiz', 'quizzes') + '.</b> ' : '') + (bad.length ? '<b>' + plural(bad.length, 'quiz', 'quizzes') + ' still need' + (bad.length === 1 ? 's' : '') + ' you:</b> ' + esc(bad.join('; ')) + ' — each one says why.' : approveAll ? (quizOpen(w) ? 'The quiz is open, so groups can take them now.' : 'Students can take them once you switch Quiz open now on.') : 'Students can’t see drafts.'), !!bad.length);
     });
   }
   function qzDelete(gid, btn) {
@@ -2538,6 +2618,9 @@ window.__MB.BackendClient = 'loading';
       case 'quiz-fix-use': qzUseFix(el.getAttribute('data-group'), Number(el.getAttribute('data-i'))); break;
       case 'quiz-fix-dismiss': qzDropFix(el.getAttribute('data-group'), Number(el.getAttribute('data-i'))); break;
       case 'quiz-fix-all': qzUseAll(el.getAttribute('data-group')); break;
+      case 'quiz-fix-every': qzAcceptEvery(); break;
+      case 'quiz-save-all': qzBulkRun(false); break;
+      case 'quiz-approve-all': qzBulkRun(true); break;
       case 'quiz-fix-clear': delete qzState().sugg[el.getAttribute('data-group')]; qzRepaintGroup(el.getAttribute('data-group')); break;
       case 'quiz-write': qzWrite(el.getAttribute('data-group')); break;
       case 'quiz-add': qzAdd(el.getAttribute('data-group')); break;

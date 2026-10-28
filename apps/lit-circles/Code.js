@@ -45,7 +45,7 @@ var GEMINI_MODEL = 'gemini-3.7-flash';
 // Bump on every release: here, LCH_RELEASE at the top of BackendClient.html (it sets the badge and
 // LC_CLIENT_VERSION, so Index.html only needs re-pasting when Index itself changes) and
 // FILE_FINGERPRINTS.release at the bottom of this file.
-var LC_APP_VERSION = '2026-10-23e';
+var LC_APP_VERSION = '2026-10-27b';
 var LC_LIVE_VERSION_PROP = 'LC_LIVE_APP_VERSION';
 
 var SHEET_NAMES = { GROUPS: 'Groups', WORK: 'WeeklyWork', DRAFTS: 'WeeklyDrafts', PEER: 'PeerAssessments', HISTORY: 'BookHistory', REFLECT: 'Reflections', RESUME: 'StudentResume', SELF: 'DiscussionSelfAssessments', STEP: 'StepDrafts', BACKUP: 'WorkBackups', WSTATS: 'WritingStats', JIMG: 'JournalImages', AWAY: 'DiscussionAway' };
@@ -90,7 +90,7 @@ function doGet(e) {
  *  the 400 KB Index.html. WritingStats (per-box writing stats) and WritingFocus (focus mode for Step 1
  *  writing) ride along too. Checklists (the Step 1 writing checklists) and SaveGuard (keeps student
  *  writing safe: stale tabs, unsaved text, Steps 2 and 4 drafts) ride along with BackendClient. */
-var LC_INCLUDE_WITH = {"BackendClient": ["Checklists","SaveGuard","StrategyArt","WritingStats","WritingFocus","ReadingQuiz","DiscussionDeck","JournalPictures","DiscussionAway","CommentBank"]};
+var LC_INCLUDE_WITH = {"BackendClient": ["Checklists","SaveGuard","StrategyArt","WritingStats","WritingFocus","ReadingQuiz","DiscussionDeck","JournalPictures","DiscussionAway","CommentBank","WeekDueDates","Bullets"]};
 
 /** Splices another HTML file into Index. A missing file becomes a visible warning, not a blank page. */
 function include_(name) {
@@ -1801,6 +1801,17 @@ function lcNormalizeClassSettings_(value) {
   d.quizOpenedAt = Object.assign({}, raw.quizOpenedAt || {});
   return d;
 }
+/** { 'w1_submission': dueAt, ... } — each step's due date from "Week N · Due dates & Canvas" (or Canvas). */
+function lcStepDueDates_(settings) {
+  var out = {}, sch = (settings && settings.assignmentSchedule) || {}, links = ((settings && settings.canvas) || {}).assignments || {};
+  [1, 2, 3, 4].forEach(function (w) {
+    LC_STAGES.forEach(function (st) {
+      var k = lcCanvasAssessmentKey_(w, st), due = String((sch[k] || {}).dueAt || (links[k] || {}).dueAt || '');
+      if (due) out[lcItemKey_(w, st)] = due;
+    });
+  });
+  return out;
+}
 function lcPublicClass_(c) {
   return { classId: String(c.ClassId), teacherEmail: normEmail_(c.TeacherEmail), className: String(c.ClassName || ''), period: cellToText_(c.Period), joinCode: String(c.JoinCode || ''), settings: lcNormalizeClassSettings_(c.SettingsJson), active: lcTruth_(c.Active) };
 }
@@ -1858,7 +1869,8 @@ function getLiteratureBootstrap() {
     classes = lcSheetObjects_(LC_PLATFORM_SHEETS.CLASSES).filter(function (c) { return ids.indexOf(String(c.ClassId)) >= 0 && lcTruth_(c.Active); }).map(function (c) {
       // students only need the release switches, not Canvas links or tokens of any kind
       var pc = lcPublicClass_(c);
-      pc.settings = { releasedWeeks: pc.settings.releasedWeeks, teacherResources: pc.settings.teacherResources, quizOpen: pc.settings.quizOpen };
+      pc.settings = { releasedWeeks: pc.settings.releasedWeeks, teacherResources: pc.settings.teacherResources, quizOpen: pc.settings.quizOpen,
+        stepDue: lcStepDueDates_(pc.settings), notGraded: Object.keys(pc.settings.excluded || {}) }; // 2026-10-26a: due dates on the week page
       pc.joinCode = '';
       return pc;
     });
@@ -3531,22 +3543,22 @@ function teacherRestoreLiteratureArchive(payload){
 // Regenerate FILE_FINGERPRINTS with Node every release.
 // ============================================================================
 var FILE_FINGERPRINTS = {
-  "release": "2026-10-23e",
+  "release": "2026-10-27b",
   "files": {
     "Index": {
-      "chars": 403155,
-      "md5": "3df1f47794d644a7c31e300891ffa4f6",
-      "md5ws": "cdcb7cb9f5f32026c7af4e49959fb074"
+      "chars": 412123,
+      "md5": "f8ba948471c50f53241c3bbdd139b1c3",
+      "md5ws": "33da7c4131765f878a13edf556931f66"
     },
     "BackendClient": {
-      "chars": 274589,
-      "md5": "bad813a40bf8c7a86d876d2c042d0da8",
-      "md5ws": "c04f57a0d6f51c7c90e4173c1956fdd2"
+      "chars": 282230,
+      "md5": "64543c7e9b6e28ec62f28cd977cf3683",
+      "md5ws": "c547d73e004170b8ff4e7dcb1c55a971"
     },
     "Checklists": {
-      "chars": 37703,
-      "md5": "a8b7a9ec1e0819a00658ee12cb5ace57",
-      "md5ws": "432a075978a6a0447bcd84e0018acc50"
+      "chars": 37708,
+      "md5": "e142662a05ddddebcbebfcf599017a08",
+      "md5ws": "8ced0b6c9c34f42e2c77c23e4675e9fc"
     },
     "SaveGuard": {
       "chars": 69934,
@@ -3592,6 +3604,16 @@ var FILE_FINGERPRINTS = {
       "chars": 8440,
       "md5": "ed80ae6318e8ed28388165d7badeb89b",
       "md5ws": "2614fe902070bc8f82030a73a495604e"
+    },
+    "WeekDueDates": {
+      "chars": 11869,
+      "md5": "900bdbc8aef4eea9e0dee8467cadc6df",
+      "md5ws": "3c3ecc1aba1f02c5b6a0bf5727fd53ae"
+    },
+    "Bullets": {
+      "chars": 8020,
+      "md5": "d8aee7ba288c6f9ababc9a9e564a1ef7",
+      "md5ws": "b63ac98c4d757eca759e72092e0b3d78"
     },
     "LibraryTheme": {
       "chars": 232280,

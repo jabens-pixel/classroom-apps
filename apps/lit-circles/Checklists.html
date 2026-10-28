@@ -227,7 +227,7 @@ window.__MB.Checklists = 'loading';
       checks: [
         { label: 'Write all 3 moments (60+ words each)', eachMoment: function (m) { return words(m.text) >= 60; }, tip: 'Write a paragraph for each moment that shows your thinking, not just what happened.' },
         { label: 'A page number in every moment', chip: 'Page #', eachMoment: function (m) { return hasPage(m.text); }, tip: 'Start with the page: “Page 45 — …”.' },
-        { label: 'Use 2+ of your strategies in each moment, highlighted', chip: '2+ strategies', eachMoment: function (m, choices) { return m.tags.filter(function (t) { return !choices.length || choices.indexOf(t) >= 0; }).length >= 2; }, tip: 'Select the sentences that show each strategy, then tag them with the highlighter.' },
+        { label: 'Use 2+ of your strategies in each moment, underlined', chip: '2+ strategies', eachMoment: function (m, choices) { return m.tags.filter(function (t) { return !choices.length || choices.indexOf(t) >= 0; }).length >= 2; }, tip: 'Select the sentences that show each strategy, then tag them with the underline buttons.' },
         { label: 'Use all 3 of your strategies across the moments', allMoments: true, tip: 'Make sure each of your three strategies shows up at least once.' },
         { label: 'Say how each moment helps you understand the book', chip: 'How it helps', eachMoment: function (m) { return explains(m.text); }, tip: 'Show how one reading strategy leads to another and deepens your understanding.' }
       ],
@@ -237,7 +237,7 @@ window.__MB.Checklists = 'loading';
       checks: [
         { label: 'About a page of writing (250+ words)', test: function (j) { return words(j.text) >= 250; }, detail: function (j) { return words(j.text) + ' words'; }, tip: 'Your journal should be at least a full page. Keep jotting ideas, questions and reactions.' },
         { label: 'Page numbers throughout (3 or more)', test: function (j) { return { have: Math.min(pageNumbers(j.text).length, 3), need: 3 }; }, detail: function (j) { var n = pageNumbers(j.text).length; return n + ' page number' + (n === 1 ? '' : 's'); }, tip: 'Add the page whenever you react to a specific part of the book.' },
-        { label: 'A mix of reading strategies (3 or more)', test: function (j) { return journalMoves(j.text, j.tags).length >= 3; }, detail: function (j) { var f = journalMoves(j.text, j.tags); return f.length ? 'Found: ' + f.join(', ') : 'None found yet'; }, tip: 'Use at least three reading strategies — questions, connections, predictions, passages, research… Highlight them to show which is which.' },
+        { label: 'A mix of reading strategies (3 or more)', test: function (j) { return journalMoves(j.text, j.tags).length >= 3; }, detail: function (j) { var f = journalMoves(j.text, j.tags); return f.length ? 'Found: ' + f.join(', ') : 'None found yet'; }, tip: 'Use at least three reading strategies — questions, connections, predictions, passages, research… Underline them to show which is which.' },
         { label: 'Questions to bring to your group (2 or more)', test: function (j) { return (str(j.text).match(/\?/g) || []).length + (str(j.text).match(/\bI wonder\b/gi) || []).length >= 2; }, tip: 'Your journal should guide your five-minute discussion. What will you ask the group?' },
         { label: 'Explain your thinking, not just what happened', test: function (j) { return explainedSentences(j.text) >= 3; }, tip: 'After a moment, say why it matters or what it shows. It should read like a journal, not an essay.' }
       ],

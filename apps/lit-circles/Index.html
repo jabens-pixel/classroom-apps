@@ -96,14 +96,15 @@
     .rich-editor:focus { outline: none; border-color: var(--accent-green); box-shadow: 0 0 0 2px rgba(0,173,103,0.25); }
     .rich-editor:empty:before { content: attr(data-placeholder); color: var(--text-dim); opacity: 0.7; }
     mark { padding: 1px 2px; border-radius: 2px; }
-    .hl-summarizer { background: #fff176; color: #1a1a1a; }
-    .hl-researcher { background: #aed581; color: #1a1a1a; }
-    .hl-connector { background: #81d4fa; color: #1a1a1a; }
-    .hl-questioner { background: #f48fb1; color: #1a1a1a; }
-    .hl-literaryLuminary { background: #ffcc80; color: #1a1a1a; }
-    .hl-predictor { background: #ce93d8; color: #1a1a1a; }
-    .hl-inferences { background: #80cbc4; color: #1a1a1a; }
-    .hl-illustrator { background: #ef9a9a; color: #1a1a1a; }
+    /* 2026-10-27b: strategies are UNDERLINED in their colour (easier to read than highlighter) */
+    mark.hl-summarizer{background:transparent!important;color:inherit;padding:0;border-radius:0;text-decoration:underline;text-decoration-color:#d4ad00;text-decoration-thickness:3px;text-underline-offset:4px;text-decoration-skip-ink:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    mark.hl-researcher{background:transparent!important;color:inherit;padding:0;border-radius:0;text-decoration:underline;text-decoration-color:#5e9e2a;text-decoration-thickness:3px;text-underline-offset:4px;text-decoration-skip-ink:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    mark.hl-connector{background:transparent!important;color:inherit;padding:0;border-radius:0;text-decoration:underline;text-decoration-color:#1b8fd0;text-decoration-thickness:3px;text-underline-offset:4px;text-decoration-skip-ink:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    mark.hl-questioner{background:transparent!important;color:inherit;padding:0;border-radius:0;text-decoration:underline;text-decoration-color:#d63d74;text-decoration-thickness:3px;text-underline-offset:4px;text-decoration-skip-ink:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    mark.hl-literaryLuminary{background:transparent!important;color:inherit;padding:0;border-radius:0;text-decoration:underline;text-decoration-color:#e07b12;text-decoration-thickness:3px;text-underline-offset:4px;text-decoration-skip-ink:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    mark.hl-predictor{background:transparent!important;color:inherit;padding:0;border-radius:0;text-decoration:underline;text-decoration-color:#9440ad;text-decoration-thickness:3px;text-underline-offset:4px;text-decoration-skip-ink:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    mark.hl-inferences{background:transparent!important;color:inherit;padding:0;border-radius:0;text-decoration:underline;text-decoration-color:#1f978b;text-decoration-thickness:3px;text-underline-offset:4px;text-decoration-skip-ink:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+    mark.hl-illustrator{background:transparent!important;color:inherit;padding:0;border-radius:0;text-decoration:underline;text-decoration-color:#cf3f3f;text-decoration-thickness:3px;text-underline-offset:4px;text-decoration-skip-ink:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
     .hl-pill { padding: 6px 12px; font-size: 12px; }
     .check-row { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding: 8px 10px; border: 1px solid rgba(0,173,103,0.2); border-radius: var(--radius); }
     .check-row input { width: auto; }
@@ -1159,7 +1160,7 @@ function setPrepType(wk, type) {
 // ---------------------------------------------------------------------------
 // Rich-text highlighting for Journal / Hybrid free-write boxes. Students select a
 // passage of their own writing and click a strategy tag to wrap just that
-// selection in a colored <mark> — a real highlighter, not a whole-entry tag.
+// selection in a colored <mark> (shown as a coloured underline since 2026-10-27b).
 // ---------------------------------------------------------------------------
 var RICH_EDITOR_ALLOWED_TAGS = { MARK: 1, BR: 1, DIV: 1, SPAN: 1, B: 1, I: 1, U: 1 };
 
@@ -1170,6 +1171,7 @@ function sanitizeEditorHtml(html) {
   var tmp = document.createElement('div');
   tmp.innerHTML = html || '';
   sanitizeNode_(tmp);
+  try { if (tmp.querySelector('mark')) lcHlTidy_(tmp); } catch (e) {}
   return tmp.innerHTML;
 }
 function sanitizeNode_(node) {
@@ -1242,11 +1244,89 @@ function unwrapEl(el) {
   parent.normalize();
 }
 
+// 2026-10-27b: highlighting works word by word. The old version wrapped the selection in ONE <mark>;
+// a selection across lines then put whole lines inside the mark, which colours nothing but leaves thin
+// coloured bars above and below the writing and splits the first word onto its own line ("P" / "g.").
+// Now every piece of text in the selection gets its own mark inside its own line, and highlighting over
+// an existing highlight replaces its colour for just that part.
+function lcHlIsHl_(n) { return !!(n && n.nodeType === 1 && n.tagName === 'MARK' && (n.hasAttribute('data-tag') || /(^|\s)hl-/.test(n.className || ''))); }
+function lcHlOuter_(n, container) { var p = n.parentNode; while (p && p !== container) { if (lcHlIsHl_(p)) return p; p = p.parentNode; } return null; }
+function lcHlSkip_(n, container) { // text inside a picture card or anything not editable is never wrapped
+  var p = n.parentNode; while (p && p !== container) { if (p.nodeType === 1 && (p.hasAttribute('data-jp') || p.getAttribute('contenteditable') === 'false')) return true; p = p.parentNode; } return false;
+}
+var LC_HL_BLOCK = { DIV: 1, P: 1, LI: 1, UL: 1, OL: 1, BLOCKQUOTE: 1, H1: 1, H2: 1, H3: 1, H4: 1, H5: 1, H6: 1 };
+// Wrap each selected piece of text in its own element made by make(); returns the new elements.
+function lcHlWrapRange_(container, range, make) {
+  var root = range.commonAncestorContainer; if (root.nodeType === 3) root = root.parentNode;
+  var w = document.createTreeWalker(root, 4, null), n, jobs = [];
+  while ((n = w.nextNode())) {
+    if (!range.intersectsNode(n) || !container.contains(n) || lcHlSkip_(n, container)) continue;
+    var s = n === range.startContainer ? range.startOffset : 0, e = n === range.endContainer ? range.endOffset : n.nodeValue.length;
+    if (e > s) jobs.push([n, s, e]);
+  }
+  var made = [];
+  jobs.forEach(function (j) {
+    var t = j[0];
+    if (j[2] < t.nodeValue.length) t.splitText(j[2]);
+    if (j[1] > 0) t = t.splitText(j[1]);
+    if (!t.nodeValue.replace(/[\s\u200b\u00a0]+/g, '')) return; // don't colour bare spaces / line breaks
+    var el = make(); t.parentNode.insertBefore(el, t); el.appendChild(t); made.push(el);
+  });
+  return made;
+}
+// Take el out of any highlight around it, splitting that highlight so the parts before/after keep their colour.
+function lcHlLift_(el, container) {
+  var o;
+  while ((o = lcHlOuter_(el, container))) {
+    var r = document.createRange();
+    r.setStartBefore(o); r.setEndBefore(el); o.parentNode.insertBefore(r.extractContents(), o);
+    r = document.createRange(); r.setStartAfter(el); r.setEndAfter(o); o.parentNode.insertBefore(r.extractContents(), o.nextSibling);
+    unwrapEl(o);
+  }
+}
+// Repairs and tidies the highlights in an editor (or a loose element holding saved writing):
+// a highlight holding whole lines (the old bug) becomes word-level highlights again and the split lines
+// at its edges are joined back up; empty highlights (the thin bars) go; touching same-colour ones merge.
+function lcHlTidy_(box) {
+  var marks = Array.prototype.slice.call(box.querySelectorAll('mark')).filter(lcHlIsHl_);
+  marks.forEach(function (m) {
+    if (!m.parentNode) return;
+    var hasBlock = false; Array.prototype.forEach.call(m.childNodes, function (c) { if (c.nodeType === 1 && (LC_HL_BLOCK[c.tagName] || c.querySelector('div,p,li,[data-jp]') || c.hasAttribute('data-jp'))) hasBlock = true; });
+    if (!hasBlock) return;
+    var cls = m.className, tag = m.getAttribute('data-tag');
+    var first = m.firstChild, last = m.lastChild, prev = m.previousSibling, next = m.nextSibling;
+    // join the line the selection started in with the piece of it that was pulled into the mark (same at the end)
+    var join = function (a, b, atEnd) { // a stays, b's contents move into a
+      if (!a || !b || a.nodeType !== 1 || b.nodeType !== 1 || !LC_HL_BLOCK[a.tagName] || !LC_HL_BLOCK[b.tagName] || a.hasAttribute('data-jp') || b.hasAttribute('data-jp')) return false;
+      if (atEnd) { while (b.firstChild) a.appendChild(b.firstChild); } else { while (b.lastChild) a.insertBefore(b.lastChild, a.firstChild); }
+      return true;
+    };
+    var r = document.createRange(); r.selectNodeContents(m);
+    var made = lcHlWrapRange_(m, r, function () { var x = document.createElement('mark'); x.className = cls; if (tag) x.setAttribute('data-tag', tag); return x; });
+    made.forEach(function (x) { lcHlLift_(x, m); });
+    if (join(prev, first, true)) { first.parentNode && first.parentNode.removeChild(first); }
+    if (join(next, last === first ? null : last, false)) { last.parentNode && last.parentNode.removeChild(last); }
+    unwrapEl(m);
+  });
+  Array.prototype.slice.call(box.querySelectorAll('mark')).filter(lcHlIsHl_).forEach(function (m) {
+    if (m.parentNode && !String(m.textContent || '').replace(/[\s\u200b\u00a0]+/g, '') && !m.querySelector('[data-jp]')) unwrapEl(m);
+  });
+  Array.prototype.slice.call(box.querySelectorAll('mark')).filter(lcHlIsHl_).forEach(function (m) {
+    var n = m.nextSibling;
+    if (n && lcHlIsHl_(n) && n.className === m.className && n.getAttribute('data-tag') === m.getAttribute('data-tag')) { while (m.firstChild) n.insertBefore(m.firstChild, n.firstChild); m.parentNode.removeChild(m); }
+  });
+}
+function lcHlChanged_(container) {
+  try { lcHlTidy_(container); } catch (e) {}
+  try { container.normalize(); } catch (e) {}
+  if (state.view === 'week_strategies' && prepFlowStage(state.week) === 'workspace') scheduleFocusedAutosave(state.week);
+}
+
 function applyHighlight(editorId, key) {
   var container = $(editorId);
   var sel = window.getSelection();
   if (!container || !sel.rangeCount || sel.isCollapsed) {
-    showError('Select some text in your entry first, then click a strategy to highlight it.');
+    showError('Select some text in your entry first, then click a strategy to underline it.');
     return;
   }
   var range = sel.getRangeAt(0);
@@ -1254,20 +1334,13 @@ function applyHighlight(editorId, key) {
     showError('Select text inside your entry first.');
     return;
   }
-  var mark = document.createElement('mark');
-  mark.className = 'hl-' + key;
-  mark.setAttribute('data-tag', key);
-  try {
-    range.surroundContents(mark);
-  } catch (e) {
-    // surroundContents throws if the selection crosses element boundaries awkwardly — fall back
-    // to extracting the selected fragment and re-inserting it wrapped in the mark.
-    var content = range.extractContents();
-    mark.appendChild(content);
-    range.insertNode(mark);
-  }
+  var made = lcHlWrapRange_(container, range.cloneRange(), function () {
+    var mark = document.createElement('mark'); mark.className = 'hl-' + key; mark.setAttribute('data-tag', key); return mark;
+  });
+  if (!made.length) { showError('Select some words in your entry first, then click a strategy to underline them.'); return; }
+  made.forEach(function (m) { lcHlLift_(m, container); });
   sel.removeAllRanges();
-  if(state.view==='week_strategies'&&prepFlowStage(state.week)==='workspace')scheduleFocusedAutosave(state.week);
+  lcHlChanged_(container);
 }
 
 function removeHighlightInSelection(editorId) {
@@ -1276,11 +1349,15 @@ function removeHighlightInSelection(editorId) {
   if (!container || !sel.rangeCount) return;
   var range = sel.getRangeAt(0);
   if (!container.contains(range.commonAncestorContainer)) return;
-  var marks = container.querySelectorAll('mark');
-  Array.prototype.forEach.call(marks, function (m) {
-    if (range.intersectsNode(m)) unwrapEl(m);
-  });
+  if (sel.isCollapsed) { // just the cursor: take off the highlight it is in
+    var m = range.startContainer; m = m.nodeType === 3 ? lcHlOuter_(m, container) : (lcHlIsHl_(m) ? m : lcHlOuter_(m, container));
+    if (m) unwrapEl(m);
+  } else { // only the selected words lose their colour
+    var made = lcHlWrapRange_(container, range.cloneRange(), function () { var x = document.createElement('span'); x.setAttribute('data-lc-unhl', '1'); return x; });
+    made.forEach(function (x) { lcHlLift_(x, container); unwrapEl(x); });
+  }
   sel.removeAllRanges();
+  lcHlChanged_(container);
 }
 
 function renderHighlightToolbar(editorId) {
@@ -1291,9 +1368,9 @@ function renderHighlightToolbar(editorId) {
   var pills = STRATEGY_KEYS.map(function (k) {
     return '<div class="pill hl-pill ' + 'hl-' + k + '" onmousedown="event.preventDefault()" onclick="applyHighlight(\'' + editorId + '\',\'' + k + '\')">' + STRATEGY_DEFS[k].label + '</div>';
   }).join('');
-  return '<p class="hint" style="margin-top:12px;">Select some text above, then click a strategy to highlight it in that color (optional):</p>' +
+  return '<p class="hint" style="margin-top:12px;">Select some text above, then click a strategy to underline it in that color (optional):</p>' +
     '<div class="pill-row">' + pills +
-    '<div class="pill hl-pill" style="background:transparent;border-color:var(--error);color:var(--error);" onmousedown="event.preventDefault()" onclick="removeHighlightInSelection(\'' + editorId + '\')">✕ Remove Highlight</div>' +
+    '<div class="pill hl-pill" style="background:transparent;border-color:var(--error);color:var(--error);" onmousedown="event.preventDefault()" onclick="removeHighlightInSelection(\'' + editorId + '\')">✕ Remove underline</div>' +
     '</div>';
 }
 
@@ -1308,14 +1385,14 @@ function renderPrepForm(wk, d) {
       '</div>';
   }
   // Hybrid no longer has students click to pick 3 named strategies — instead they get 3 fixed
-  // "moment" boxes and write a paragraph in each, then use the highlight tool to mark which parts
+  // "moment" boxes and write a paragraph in each, then use the underline tool to mark which parts
   // of their own paragraph show which strategy (a single paragraph can show more than one).
   if (d.prepType === 'hybrid') {
     var moments = d.data.hybridMoments || ['', '', ''];
     var intro = '<div class="strategy-block"><p class="muted">Reading strategies aren\'t meant to stand alone — one naturally leads to another. Think of 3 moments from this week\'s reading where you noticed yourself using more than one strategy at once (a connection might spark a prediction; a striking passage might raise a question). For each moment, write a paragraph about what happened and what you noticed. Then use the highlight tool under each box to mark the sentences that show each strategy, in that strategy\'s color — the same paragraph can show more than one strategy.</p></div>';
     var boxes = [0, 1, 2].map(function (i) {
       return '<div class="strategy-block"><label style="margin-top:0;">Moment #' + (i + 1) + '</label>' +
-        '<p class="hint reminder">📌 Remember to: reference the page number, and highlight the sentences that show each strategy you used.</p>' +
+        '<p class="hint reminder">📌 Remember to: reference the page number, and underline the sentences that show each strategy you used.</p>' +
         '<div id="hybridMoment' + i + '" class="rich-editor" contenteditable="true" data-placeholder="Write about this moment..." style="min-height:130px;">' + toSafeEditorHtml(moments[i] || '') + '</div>' +
         renderHighlightToolbar('hybridMoment' + i) +
         '</div>';
@@ -1484,7 +1561,7 @@ function buildPrepSummaryText(g) {
   if (g.prepType === 'journal') {
     var tags = tagLabels(g.data.journalTags);
     return 'Journal entry:\n' + (stripHtmlToText(g.data.journalText) || '(nothing written yet)') +
-      (tags ? '\n\n(Highlighted as: ' + tags + ')' : '');
+      (tags ? '\n\n(Underlined as: ' + tags + ')' : '');
   }
   if (g.prepType === 'hybrid') {
     var moments = g.data.hybridMoments || [];
@@ -1493,7 +1570,7 @@ function buildPrepSummaryText(g) {
     moments.forEach(function (m, i) {
       hLines.push('Moment #' + (i + 1) + ': ' + (stripHtmlToText(m) || '(nothing written yet)'));
       var tagsForMoment = tagLabels(momentTags[i]);
-      if (tagsForMoment) hLines.push('(Highlighted as: ' + tagsForMoment + ')');
+      if (tagsForMoment) hLines.push('(Underlined as: ' + tagsForMoment + ')');
       hLines.push('');
     });
     return hLines.join('\n');
@@ -2662,7 +2739,7 @@ function renderFocusedWorkspace(wk,d){
   }
   if(d.prepType==='hybrid'){
     var mi=hybridMomentIndex(wk),moments=d.data.hybridMoments||['','',''],editor='hybridMoment'+mi,names=d.choices.map(function(k){return STRATEGY_DEFS[k].label;});
-    return '<a class="backlink" onclick="returnToPicker('+wk+')">← Change strategies</a>'+focusHero(wk,'Hybrid Moment '+(mi+1)+' of 3','🧩','Use your three chosen strategies together. Write about one meaningful moment from the book, then mark where each strategy appears.','Week '+wk+' · Hybrid')+'<div class="focus-guide"><h3>Your three strategies</h3><div class="hybrid-selected">'+names.map(function(n){return '<span>'+esc(n)+'</span>';}).join('')+'</div><ol><li>Choose one important moment from this week’s reading and include the page number.</li><li>Write a paragraph that shows your thinking—not just what happened.</li><li>Use more than one of your chosen strategies naturally in the same response.</li><li>Highlight the sentences that show each strategy so your thinking is visible.</li></ol><div class="quality-callout"><strong>Goal:</strong> Show how one reading strategy can lead to another and deepen your understanding.</div></div><div class="focused-strategy-form"><h3 class="hybrid-moment-title">Moment #'+(mi+1)+'</h3><div id="'+editor+'" class="rich-editor hybrid-editor-big" contenteditable="true" data-placeholder="Page ___ — Write about the moment and your thinking…">'+toSafeEditorHtml(moments[mi]||'')+'</div>'+renderSelectedHighlightToolbar(editor,d.choices)+'</div>'+renderFocusActions(wk,d,mi,3,true);
+    return '<a class="backlink" onclick="returnToPicker('+wk+')">← Change strategies</a>'+focusHero(wk,'Hybrid Moment '+(mi+1)+' of 3','🧩','Use your three chosen strategies together. Write about one meaningful moment from the book, then mark where each strategy appears.','Week '+wk+' · Hybrid')+'<div class="focus-guide"><h3>Your three strategies</h3><div class="hybrid-selected">'+names.map(function(n){return '<span>'+esc(n)+'</span>';}).join('')+'</div><ol><li>Choose one important moment from this week’s reading and include the page number.</li><li>Write a paragraph that shows your thinking—not just what happened.</li><li>Use more than one of your chosen strategies naturally in the same response.</li><li>Underline the sentences that show each strategy so your thinking is visible.</li></ol><div class="quality-callout"><strong>Goal:</strong> Show how one reading strategy can lead to another and deepen your understanding.</div></div><div class="focused-strategy-form"><h3 class="hybrid-moment-title">Moment #'+(mi+1)+'</h3><div id="'+editor+'" class="rich-editor hybrid-editor-big" contenteditable="true" data-placeholder="Page ___ — Write about the moment and your thinking…">'+toSafeEditorHtml(moments[mi]||'')+'</div>'+renderSelectedHighlightToolbar(editor,d.choices)+'</div>'+renderFocusActions(wk,d,mi,3,true);
   }
   var fi=Math.min(prepFocusIndex(wk),Math.max(0,d.choices.length-1)),key=d.choices[fi],v=STRATEGY_VISUALS[key]||{icon:'📖',tag:''};setPrepFocusIndex(wk,fi);
   return '<a class="backlink" onclick="returnToPicker('+wk+')">← Change strategies</a><div class="focus-progress"><div class="crumbs">'+d.choices.map(function(k,i){return '<span class="focus-crumb '+(i===fi?'active':'')+'">'+(i+1)+'. '+esc(STRATEGY_DEFS[k].label)+'</span>';}).join('')+'</div><span class="muted">One strategy at a time</span></div>'+focusHero(wk,STRATEGY_DEFS[key].label,v.icon,esc(v.tag),'Week '+wk+' · Strategy '+(fi+1)+' of '+d.choices.length)+renderStrategyFocusedForm(key,d.data[key]||{})+renderFocusActions(wk,d,fi,d.choices.length,false);
@@ -3315,8 +3392,8 @@ renderTeacherStagePanel=function(data){
 
 <style>
 /* 2026-09-18: completion grading layout + journal highlight polish */
-.hl-theme{background:#d8eaf8;color:#1a1a1a}
-.hl-symbolism{background:#f4d9ee;color:#1a1a1a}
+mark.hl-theme{background:transparent!important;color:inherit;padding:0;border-radius:0;text-decoration:underline;text-decoration-color:#3a72b3;text-decoration-thickness:3px;text-underline-offset:4px;text-decoration-skip-ink:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+mark.hl-symbolism{background:transparent!important;color:inherit;padding:0;border-radius:0;text-decoration:underline;text-decoration-color:#bb4f99;text-decoration-thickness:3px;text-underline-offset:4px;text-decoration-skip-ink:none;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .auto-stage-row{grid-template-columns:minmax(190px,.9fr) minmax(280px,1.55fr) minmax(240px,.8fr)!important;gap:18px!important;align-items:start!important}
 .auto-stage-gradebox{min-width:0!important;width:100%!important;align-items:flex-start!important;padding-left:4px}
 .auto-stage-gradebox .auto-current small,.auto-override-note{text-align:left!important}
@@ -3340,7 +3417,7 @@ renderHighlightToolbar=function(editorId){
     pills.push('<div class="pill hl-pill hl-theme" onmousedown="event.preventDefault()" onclick="applyHighlight(\''+editorId+'\',\'theme\')">Theme</div>');
     pills.push('<div class="pill hl-pill hl-symbolism" onmousedown="event.preventDefault()" onclick="applyHighlight(\''+editorId+'\',\'symbolism\')">Symbolism</div>');
   }
-  return '<p class="hint" style="margin-top:12px;">Select some text above, then click a reading lens to highlight it in that color (optional):</p><div class="pill-row">'+pills.join('')+'<div class="pill hl-pill" style="background:transparent;border-color:var(--error);color:var(--error);" onmousedown="event.preventDefault()" onclick="removeHighlightInSelection(\''+editorId+'\')">✕ Remove Highlight</div></div>';
+  return '<p class="hint" style="margin-top:12px;">Select some text above, then click a reading lens to underline it in that color (optional):</p><div class="pill-row">'+pills.join('')+'<div class="pill hl-pill" style="background:transparent;border-color:var(--error);color:var(--error);" onmousedown="event.preventDefault()" onclick="removeHighlightInSelection(\''+editorId+'\')">✕ Remove underline</div></div>';
 };
 
 // A teacher-entered grade counts even when the student never submitted the work.
@@ -3430,6 +3507,16 @@ lcWeekGradeClient=function(stu,w){
 .hl-pill.hl-theme{background:#d8eaf8!important;border-color:#8ebbdc!important;color:#1a1a1a!important}
 .hl-pill.hl-symbolism{background:#f4d9ee!important;border-color:#d49ac6!important;color:#1a1a1a!important}
 .hl-pill:not([style]):hover{filter:brightness(.96)}
+.hl-pill.hl-summarizer{box-shadow:inset 0 -4px 0 #d4ad00!important}
+.hl-pill.hl-researcher{box-shadow:inset 0 -4px 0 #5e9e2a!important}
+.hl-pill.hl-connector{box-shadow:inset 0 -4px 0 #1b8fd0!important}
+.hl-pill.hl-questioner{box-shadow:inset 0 -4px 0 #d63d74!important}
+.hl-pill.hl-literaryLuminary{box-shadow:inset 0 -4px 0 #e07b12!important}
+.hl-pill.hl-predictor{box-shadow:inset 0 -4px 0 #9440ad!important}
+.hl-pill.hl-inferences{box-shadow:inset 0 -4px 0 #1f978b!important}
+.hl-pill.hl-illustrator{box-shadow:inset 0 -4px 0 #cf3f3f!important}
+.hl-pill.hl-theme{box-shadow:inset 0 -4px 0 #3a72b3!important}
+.hl-pill.hl-symbolism{box-shadow:inset 0 -4px 0 #bb4f99!important}
 </style>
 <script>
 // Auto-scored overrides now update in place. This avoids rebuilding the teacher
