@@ -29,6 +29,10 @@ Free Google Apps Script apps for high-school English, built and used in real cla
 
 Ideas, bug reports and improvements are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Support this project
+
+These apps are free, but building them costs real money for tools and hosting. If they help your class, you can [Support on Ko-fi](https://ko-fi.com/jabenschalk).
+
 ## For schools and districts
 
 Setup help, Canvas connections, custom versions and teacher training are available. [Send a request](../../issues/new?title=School%20or%20district%20request).
