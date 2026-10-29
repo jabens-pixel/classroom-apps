@@ -28,9 +28,10 @@ function classroomAppSetup() {
     var ss = null;
     try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) {}
     if (props.getProperty(CAS_PROP_FOR) !== ScriptApp.getScriptId()) {
-      // A fresh copy: forget any settings that came along from the Sheet it was copied from.
-      props.deleteProperty(CAS_PROP_URL);
-      if (CAS_APP.dbProp) props.deleteProperty(CAS_APP.dbProp);
+      // A fresh copy: forget every setting that came along from the Sheet it was copied from
+      // (database, student link, folders, admin). A key the teacher added themselves is kept.
+      var keep = { GEMINI_API_KEY: true };
+      props.getKeys().forEach(function (k) { if (!keep[k]) props.deleteProperty(k); });
     }
     if (CAS_APP.dbProp && ss && !props.getProperty(CAS_APP.dbProp)) props.setProperty(CAS_APP.dbProp, ss.getId());
     if (CAS_APP.setup && typeof globalThis[CAS_APP.setup] === 'function') globalThis[CAS_APP.setup]();
@@ -107,7 +108,7 @@ function casDoneHtml_(url, again) {
     '<input id="u" readonly value="' + casEsc_(url) + '" onclick="this.select()">' +
     '<div class="row"><button class="btn" onclick="var u=document.getElementById(\'u\');u.select();document.execCommand(\'copy\');this.textContent=\'Copied\'">Copy link</button>' +
     '<a class="btn light" href="' + casEsc_(url) + '" target="_blank">Open my app</a></div>' +
-    '<p class="small">Open it yourself first: you’ll see the Teacher button at the top, where you can make a class.</p>' +
+    '<p class="small">Open it yourself first and make a class. You’re the admin, so you’ll see the teacher tools.</p>' +
     '<p class="small"><b>After an update:</b> on the code page, click <span class="k">Deploy</span> ▸ <span class="k">Manage deployments</span> ▸ the pencil ✎ ▸ Version: <span class="k">New version</span> ▸ <span class="k">Deploy</span>. The student link stays the same.</p>';
 }
 
