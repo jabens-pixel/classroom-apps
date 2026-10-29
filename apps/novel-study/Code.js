@@ -14,7 +14,7 @@
 // AI, Index (page shell), Student, SaveGuard, WritingStats, Teacher, Marking, NovelTheme (last).
 // ============================================================================
 
-var NV_APP_VERSION = '2026-10-23a';
+var NV_APP_VERSION = '2026-10-28a';
 var NV_DB_PROP = 'NOVEL_STUDY_DB_ID';
 var NV_LIVE_VERSION_PROP = 'NOVEL_STUDY_LIVE_VERSION';
 var NV_DEMO_DOMAIN = 'demo.novelstudy.local';
@@ -101,8 +101,11 @@ function setupNovelStudy() {
   if (id) {
     // Never makes a second database: an existing one is reopened (and only an admin may run this again).
     nvDb_();
+    // A database with no admin yet (a teacher's fresh copy, linked to its own Sheet) may be set up by anyone;
+    // once it has an admin, only an admin can run setup again.
     var u = nvUser_(email);
-    if (!u || u.Role !== 'admin') throw new Error('Novel Study is already set up. Only an admin can run setup again.');
+    var hasAdmin = nvUsers_().some(function (r) { return String(r.Role) === 'admin' && String(r.Status || 'active') === 'active'; });
+    if (hasAdmin && (!u || u.Role !== 'admin')) throw new Error('Novel Study is already set up. Only an admin can run setup again.');
   } else {
     var ss = SpreadsheetApp.create('Novel Study - Backend');
     p.setProperty(NV_DB_PROP, ss.getId());
@@ -650,7 +653,7 @@ function restoreWorkBackup() {
 // checkFiles: proves every file in the project is the one this release shipped.
 // ============================================================================
 
-var FILE_FINGERPRINTS = {"Build":{"chars":82072,"md5":"bf9a8da07fe511466c697a03343086bb","loose":"34125f1a742507d3d7cf562f68845875"},"Guide":{"chars":56494,"md5":"02dc57f1e14e3a57b467e734d00ece6b","loose":"26f9e13f761899dff895db477b1f92dd"},"Index":{"chars":13907,"md5":"c404fda3c14bb13c34cc467ab48a6a36","loose":"d4a3d95c2a4baf6dcd4040e413f5b8e0"},"Marking":{"chars":36431,"md5":"87c75a3899c224f4aeee47960cd38cc9","loose":"80017e387d6b202ebbd260582605c19a"},"NovelTheme":{"chars":67018,"md5":"b1adcee4b09b57567ecff0a14b104d6f","loose":"288d2658f0a8a1d16737c2818371c463"},"SaveGuard":{"chars":12909,"md5":"96a68c6d598a88a64cfd50482b20fd81","loose":"d1326ba30012b614732bac7d834bc916"},"Student":{"chars":70141,"md5":"2780992b9de8dcbf575eeefe50219df1","loose":"39a92510650871396822d10a46f9e857"},"Teacher":{"chars":48594,"md5":"0cef1401141e57f6c10bed4370e766b5","loose":"199bee9bb8d26cbbc545f03fae03d5c9"},"WritingStats":{"chars":5075,"md5":"d4a458a7487746294cdcd5f78c0b497c","loose":"300edae45e156cada5af8f80f7146af5"}};
+var FILE_FINGERPRINTS = {"Build":{"chars":82072,"md5":"bf9a8da07fe511466c697a03343086bb","loose":"34125f1a742507d3d7cf562f68845875"},"Guide":{"chars":56494,"md5":"02dc57f1e14e3a57b467e734d00ece6b","loose":"26f9e13f761899dff895db477b1f92dd"},"Index":{"chars":13907,"md5":"d8af350cd5c8d64e2bdb4dc81cd1ea89","loose":"3a9bb44cfe22896e357673d177fceb1a"},"Marking":{"chars":36431,"md5":"87c75a3899c224f4aeee47960cd38cc9","loose":"80017e387d6b202ebbd260582605c19a"},"NovelTheme":{"chars":67018,"md5":"b1adcee4b09b57567ecff0a14b104d6f","loose":"288d2658f0a8a1d16737c2818371c463"},"SaveGuard":{"chars":12909,"md5":"96a68c6d598a88a64cfd50482b20fd81","loose":"d1326ba30012b614732bac7d834bc916"},"Student":{"chars":70141,"md5":"2780992b9de8dcbf575eeefe50219df1","loose":"39a92510650871396822d10a46f9e857"},"Teacher":{"chars":48594,"md5":"0cef1401141e57f6c10bed4370e766b5","loose":"199bee9bb8d26cbbc545f03fae03d5c9"},"WritingStats":{"chars":5075,"md5":"d4a458a7487746294cdcd5f78c0b497c","loose":"300edae45e156cada5af8f80f7146af5"}};
 function checkFiles() {
   var lines = [];
   Object.keys(FILE_FINGERPRINTS).forEach(function (name) {

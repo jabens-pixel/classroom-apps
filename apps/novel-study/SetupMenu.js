@@ -10,7 +10,7 @@
  *   3. saves the student link the teacher pastes back, so it can be found again.
  * Running it again is safe: the setup keeps the existing data.
  */
-var CAS_APP = {"title":"Novel Study","setup":"setupNovelStudy","dbProp":""};
+var CAS_APP = {"title":"Novel Study","setup":"setupNovelStudy","dbProp":"NOVEL_STUDY_DB_ID"};
 var CAS_PROP_URL = 'CLASSROOM_APP_STUDENT_URL';
 var CAS_PROP_FOR = 'CLASSROOM_APP_SET_UP_FOR';   // the script these settings belong to (a copied Sheet brings the old ones along)
 

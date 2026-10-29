@@ -14,7 +14,7 @@
 // Student, Teacher, Marking, PodcastTheme (last). (Read aloud was removed in 2026-10-26a.)
 // ============================================================================
 
-var PC_APP_VERSION = '2026-10-28a';
+var PC_APP_VERSION = '2026-10-28b';
 var PC_DB_PROP = 'PODCAST_STUDIO_DB_ID';
 var PC_LIVE_VERSION_PROP = 'PODCAST_STUDIO_LIVE_VERSION';
 var PC_DEMO_DOMAIN = 'demo.podcaststudio.local';
@@ -100,8 +100,11 @@ function setupPodcastStudio() {
   if (id) {
     // Never makes a second database: an existing one is reopened (and only an admin may run this again).
     pcDb_();
+    // A database with no admin yet (a teacher's fresh copy, linked to its own Sheet) may be set up by anyone;
+    // once it has an admin, only an admin can run setup again.
     var u = pcUser_(email);
-    if (!u || u.Role !== 'admin') throw new Error('Podcast Studio is already set up. Only an admin can run setup again.');
+    var hasAdmin = pcUsers_().some(function (r) { return String(r.Role) === 'admin' && String(r.Status || 'active') === 'active'; });
+    if (hasAdmin && (!u || u.Role !== 'admin')) throw new Error('Podcast Studio is already set up. Only an admin can run setup again.');
   } else {
     var ss = SpreadsheetApp.create('Podcast Studio - Backend');
     p.setProperty(PC_DB_PROP, ss.getId());
@@ -740,7 +743,7 @@ function restoreWorkBackup() {
 // checkFiles: proves every file in the project is the one this release shipped.
 // ============================================================================
 
-var FILE_FINGERPRINTS = {"Index":{"chars":15283,"md5":"50fd4c7e66fa5ace3c888753793b8599","loose":"761775879b24ede2eea8dedbda4c8639"},"Marking":{"chars":45363,"md5":"2d044266012c000e2b2c3d8bfa2910a6","loose":"381f97a691b759e146c22d30df7cdbd1"},"PodcastTheme":{"chars":967118,"md5":"3bfe74cee43c81e01d4b4363e4405936","loose":"3ba5811dcca851796efae84323502ee2"},"SaveGuard":{"chars":13490,"md5":"502c603f291f88145f86cf77b318d426","loose":"dc67d5c95c2d30e31226be8533fa9a20"},"Student":{"chars":86680,"md5":"e66fe36ce34ae5cb3fdcba5c01ede7fd","loose":"2935992935f9a6658585201c46640ffa"},"Teacher":{"chars":66316,"md5":"81aa5fc364900c11fa8db30bee3aa263","loose":"774fa114688477acd419dba232cbfea4"},"WritingStats":{"chars":5075,"md5":"204ca2e52966b59319a8d88f4d66373a","loose":"b1ffb94ec4014918688ca9d78a498a09"}};
+var FILE_FINGERPRINTS = {"Index":{"chars":15283,"md5":"14ec2b86df40f662b4f4829eaa801811","loose":"0377aaa3b28e26edd07bcc4e0e84533c"},"Marking":{"chars":45363,"md5":"2d044266012c000e2b2c3d8bfa2910a6","loose":"381f97a691b759e146c22d30df7cdbd1"},"PodcastTheme":{"chars":967118,"md5":"3bfe74cee43c81e01d4b4363e4405936","loose":"3ba5811dcca851796efae84323502ee2"},"SaveGuard":{"chars":13490,"md5":"502c603f291f88145f86cf77b318d426","loose":"dc67d5c95c2d30e31226be8533fa9a20"},"Student":{"chars":86680,"md5":"e66fe36ce34ae5cb3fdcba5c01ede7fd","loose":"2935992935f9a6658585201c46640ffa"},"Teacher":{"chars":66316,"md5":"81aa5fc364900c11fa8db30bee3aa263","loose":"774fa114688477acd419dba232cbfea4"},"WritingStats":{"chars":5075,"md5":"204ca2e52966b59319a8d88f4d66373a","loose":"b1ffb94ec4014918688ca9d78a498a09"}};
 function checkFiles() {
   var lines = [];
   Object.keys(FILE_FINGERPRINTS).forEach(function (name) {

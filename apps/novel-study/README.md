@@ -13,7 +13,7 @@ Grades 6–12 · Google Apps Script · free for teachers and schools · works wi
    **Open the app's code page ▸ Deploy ▸ New deployment ▸ ⚙ Web app ▸ Execute as: Me ▸ Who has access: Anyone within your school ▸ Deploy.**
 5. Copy the **Web app** link (it ends in `/exec`), paste it into the box and click **Save my student link**. Share it in Canvas, Google Classroom or your class page. Open it yourself first to make a class.
 
-Your students' work saves to a new Sheet in your Drive called **Novel Study - Backend** (setup makes it). You can find the link again under **Classroom App ▸ Show my student link**.
+Your students' work saves to this Sheet, in your Drive. You can find the link again under **Classroom App ▸ Show my student link**.
 
 ## Optional extras
 
