@@ -8,15 +8,15 @@ Free Google Apps Script apps for high-school English, built and used in real cla
 
 | App | What it is | |
 |---|---|---|
-| [Macbeth Curriculum](apps/macbeth-curriculum/) | A full Macbeth unit: the play act by act with side-by-side support, activities, discussion, grading and Canvas. |  |
-| [The Great Gatsby](apps/great-gatsby/) | A Great Gatsby unit with the full novel (public domain in the US since 2021), activities, grading and Canvas. |  |
-| [Memoir](apps/memoir/) | A memoir writing unit: mentor ideas, drafting, revision, grading and Canvas. |  |
-| [Novel Study](apps/novel-study/) | A simple novel study built around books students read in Sora (or any copy they have). |  |
-| [Podcast Studio](apps/podcast-studio/) | A podcast unit: planning, scripting, read-aloud practice, grading and Canvas. |  |
-| [Bell Ringers](apps/bell-ringers/) | Daily writing warm-ups with a built-in library of craft lessons, scoring and Canvas. |  |
-| [Lit Circles](apps/lit-circles/) | Literature circles: weekly roles and steps, discussion, peer and self assessment, grading and Canvas. |  |
-| [Root Word Study](apps/root-word-study/) | Weekly Greek and Latin roots: sentences, flashcards, pretests and a self-scoring final quiz. |  |
-| [Short Story Lab](apps/short-story-lab/) | A short story unit: ten stories with reading support (three public-domain texts included; you paste in the rest), a writing workshop, grading and Canvas. |  |
+| [Macbeth Curriculum](apps/macbeth-curriculum/) | A full Macbeth unit: the play act by act with side-by-side support, activities, discussion, grading and Canvas. | [Make a copy](https://docs.google.com/spreadsheets/d/18axTT492SozC-Hm58W3Wlxhltz1P3ra3SV2lPbupo-M/copy) |
+| [The Great Gatsby](apps/great-gatsby/) | A Great Gatsby unit with the full novel (public domain in the US since 2021), activities, grading and Canvas. | [Make a copy](https://docs.google.com/spreadsheets/d/1lQVNOhQgdyiHyqW1W91u3ZFOQ5DjvPyH35fJbIwJLyQ/copy) |
+| [Memoir](apps/memoir/) | A memoir writing unit: mentor ideas, drafting, revision, grading and Canvas. | [Make a copy](https://docs.google.com/spreadsheets/d/1hoW5dByuvNmlzMB_HR_uWdXudnwVgdX35bU-r1DEcdc/copy) |
+| [Novel Study](apps/novel-study/) | A simple novel study built around books students read in Sora (or any copy they have). | [Make a copy](https://docs.google.com/spreadsheets/d/1P-UddWYQyj-VCAFTFGRotiNcO_CEgZnCvrQ8JnmvhY0/copy) |
+| [Podcast Studio](apps/podcast-studio/) | A podcast unit: planning, scripting, read-aloud practice, grading and Canvas. | [Make a copy](https://docs.google.com/spreadsheets/d/1228gIdrr4K0K-xtpQ0x423oD4A6lKycMXOr84WNGUy0/copy) |
+| [Bell Ringers](apps/bell-ringers/) | Daily writing warm-ups with a built-in library of craft lessons, scoring and Canvas. | [Make a copy](https://docs.google.com/spreadsheets/d/1GVgqIBrLinbX3YQQ_lhyy3tEDe5FC-e-0Hj2YFQA8uc/copy) |
+| [Lit Circles](apps/lit-circles/) | Literature circles: weekly roles and steps, discussion, peer and self assessment, grading and Canvas. | [Make a copy](https://docs.google.com/spreadsheets/d/1BmsksuPD6p4CSNcVy2Q8BojVah01oZi2bB-y-DfecAU/copy) |
+| [Root Word Study](apps/root-word-study/) | Weekly Greek and Latin roots: sentences, flashcards, pretests and a self-scoring final quiz. | [Make a copy](https://docs.google.com/spreadsheets/d/1AMGLM_JQJK-AaJYkOygqCCQMv210a5Try5tVysW2Gvw/copy) |
+| [Short Story Lab](apps/short-story-lab/) | A short story unit: ten stories with reading support (three public-domain texts included; you paste in the rest), a writing workshop, grading and Canvas. | [Make a copy](https://docs.google.com/spreadsheets/d/1WRYRh2CFpuB5tdOzVdsA-0A23cWD3yC96QLUoemntbU/copy) |
 
 ## How it works
 

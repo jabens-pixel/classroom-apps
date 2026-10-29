@@ -1,19 +1,17 @@
 /**
- * "Set up my app" — one-click setup for a teacher's copy of this app.
+ * "Set up my app" — guided setup for a teacher's copy of this app.
  *
  * This file is added to the PUBLIC copy by public-release-tools/build-public-copy.js.
  * It is not part of Jaben's classroom version.
  *
  * In the copied Google Sheet: Classroom App ▸ Set up my app.
- *   1. makes this Sheet the app's backend and makes the teacher the admin (the app's own setup),
- *   2. publishes the app as a web app through Google's Apps Script API, and
- *   3. shows the student link.
- * Running it again keeps the same student link and publishes the latest code to it.
+ *   1. makes this Sheet the app's backend and makes the teacher the admin (automatic),
+ *   2. shows 5 short steps to publish the app as a web app (Google only lets the owner do this), and
+ *   3. saves the student link the teacher pastes back, so it can be found again.
+ * Running it again is safe: the setup keeps the existing data.
  */
 var CAS_APP = {"title":"Macbeth Curriculum","setup":"setupMacbethBackend","dbProp":"MACBETH_DB_ID"};
-var CAS_PROP_DEPLOY = 'CLASSROOM_APP_DEPLOYMENT_ID';
 var CAS_PROP_URL = 'CLASSROOM_APP_STUDENT_URL';
-var CAS_API_SETTINGS = 'https://script.google.com/home/usersettings';
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Classroom App')
@@ -25,106 +23,88 @@ function onOpen() {
 /** Menu: Classroom App ▸ Set up my app */
 function classroomAppSetup() {
   var props = PropertiesService.getScriptProperties();
-  var step = 'setup';
   try {
-    // 1. This Sheet becomes the app's backend, unless the app already has one.
     var ss = null;
     try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) {}
     if (CAS_APP.dbProp && ss && !props.getProperty(CAS_APP.dbProp)) props.setProperty(CAS_APP.dbProp, ss.getId());
     if (CAS_APP.setup && typeof globalThis[CAS_APP.setup] === 'function') globalThis[CAS_APP.setup]();
-    // 2. Publish as a web app.
-    step = 'publish';
-    var url = casPublish_(props);
-    casShow_(casDoneHtml_(url), 'Your app is ready');
-    return url;
   } catch (err) {
-    var html = step === 'publish' && err.casApiOff ? casApiOffHtml_() : casProblemHtml_(step, err);
-    casShow_(html, step === 'publish' && err.casApiOff ? 'One switch to turn on' : 'Setup needs a hand');
-    Logger.log('Set up my app (' + step + '): ' + (err && err.message));
+    Logger.log('Set up my app: ' + (err && err.message));
+    casShow_(casProblemHtml_(err), 'Setup needs a hand');
     return '';
   }
+  var url = casSavedUrl_();
+  casShow_(url ? casDoneHtml_(url, true) : casPublishHtml_(), url ? 'Your app is ready' : 'Step 2: publish it for students');
+  return url;
 }
 
 /** Menu: Classroom App ▸ Show my student link */
 function classroomAppShowLink() {
-  var url = PropertiesService.getScriptProperties().getProperty(CAS_PROP_URL) || '';
-  if (!url) { try { url = ScriptApp.getService().getUrl() || ''; } catch (e) {} }
-  casShow_(url ? casDoneHtml_(url) : '<p>The app isn’t set up yet. Click <b>Classroom App ▸ Set up my app</b>.</p>', 'Student link');
+  var url = casSavedUrl_();
+  casShow_(url ? casDoneHtml_(url, false) : casPublishHtml_(), url ? 'Student link' : 'Publish it for students');
   return url;
 }
 
-/** Creates a new version and puts it on the app's web-app deployment (made the first time). */
-function casPublish_(props) {
-  var id = ScriptApp.getScriptId();
-  var base = 'https://script.googleapis.com/v1/projects/' + id;
-  var token = ScriptApp.getOAuthToken();
-  function call(method, path, body) {
-    var opts = { method: method, headers: { Authorization: 'Bearer ' + token }, muteHttpExceptions: true };
-    if (body) { opts.contentType = 'application/json'; opts.payload = JSON.stringify(body); }
-    var res = UrlFetchApp.fetch(base + path, opts);
-    var code = res.getResponseCode(), text = res.getContentText(), json = {};
-    try { json = JSON.parse(text); } catch (e) {}
-    if (code >= 300) {
-      var msg = (json.error && json.error.message) || text || ('HTTP ' + code);
-      var err = new Error(msg);
-      err.casCode = code;
-      err.casApiOff = code === 403 && /Apps Script API|usersettings/i.test(msg);
-      throw err;
-    }
-    return json;
+/** Called from the box when the teacher pastes the web-app link. */
+function classroomAppSaveLink(url) {
+  url = String(url || '').trim();
+  if (!/^https:\/\/script\.google\.com\/.+\/exec(\?.*)?$/.test(url)) {
+    throw new Error(/\/dev(\?|$)/.test(url)
+      ? 'That is the test link (it ends in /dev). Use the Web app link from the Deploy box. It ends in /exec.'
+      : 'That doesn’t look like a web-app link. It starts with https://script.google.com/ and ends in /exec.');
   }
-  var version = call('post', '/versions', { description: 'Set up my app · ' + new Date().toISOString().slice(0, 10) });
-  var config = { scriptId: id, versionNumber: version.versionNumber, manifestFileName: 'appsscript', description: 'Student link' };
-  var depId = props.getProperty(CAS_PROP_DEPLOY), dep = null;
-  if (depId) {
-    try { dep = call('put', '/deployments/' + depId, { deploymentConfig: config }); }
-    catch (e) { if (e.casApiOff) throw e; dep = null; }   // deleted by hand: make a new one
-  }
-  if (!dep) dep = call('post', '/deployments', { versionNumber: config.versionNumber, manifestFileName: 'appsscript', description: 'Student link' });
-  var url = '';
-  (dep.entryPoints || []).forEach(function (ep) { if (ep.entryPointType === 'WEB_APP' && ep.webApp && ep.webApp.url) url = ep.webApp.url; });
-  if (!url) throw new Error('Google published the app but didn’t return a web-app link. Is the "webapp" section missing from appsscript.json?');
-  props.setProperty(CAS_PROP_DEPLOY, dep.deploymentId);
-  props.setProperty(CAS_PROP_URL, url);
+  PropertiesService.getScriptProperties().setProperty(CAS_PROP_URL, url);
+  return url;
+}
+
+function casSavedUrl_() {
+  var url = PropertiesService.getScriptProperties().getProperty(CAS_PROP_URL) || '';
+  if (!url) { try { var u = ScriptApp.getService().getUrl() || ''; if (/\/exec$/.test(u)) url = u; } catch (e) {} }
   return url;
 }
 
 // ---------------- the boxes the teacher sees ----------------
 function casEsc_(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-var CAS_STYLE = '<style>body{font:14px/1.5 Arial,sans-serif;color:#1f1b16;margin:0}h2{font-size:18px;margin:0 0 8px}' +
+var CAS_STYLE = '<style>body{font:14px/1.45 Arial,sans-serif;color:#1f1b16;margin:0}h2{font-size:17px;margin:0 0 6px}' +
   'input{width:100%;box-sizing:border-box;padding:8px;font:13px monospace;border:1px solid #c9bfae;border-radius:4px}' +
-  '.row{display:flex;gap:8px;margin:10px 0}.btn{display:inline-block;padding:8px 14px;border-radius:4px;border:1px solid #7d2235;background:#7d2235;color:#fff;text-decoration:none;font-weight:bold;cursor:pointer}' +
-  '.btn.light{background:#fff;color:#7d2235}ol{padding-left:20px;margin:6px 0}li{margin-bottom:4px}.small{color:#5f574c;font-size:12.5px}</style>';
+  '.row{display:flex;gap:8px;margin:10px 0;align-items:center}.btn{display:inline-block;padding:7px 13px;border-radius:4px;border:1px solid #7d2235;background:#7d2235;color:#fff;text-decoration:none;font-weight:bold;cursor:pointer;font-size:13px}' +
+  '.btn.light{background:#fff;color:#7d2235}ol{padding-left:20px;margin:6px 0}li{margin-bottom:5px}.small{color:#5f574c;font-size:12.5px}' +
+  '.ok{color:#2e6b2e;font-weight:bold}.err{color:#a3261b}.k{background:#f3efe7;border:1px solid #ddd3c2;border-radius:3px;padding:0 4px;white-space:nowrap}</style>';
 
-function casDoneHtml_(url) {
+function casPublishHtml_() {
+  var editor = 'https://script.google.com/d/' + ScriptApp.getScriptId() + '/edit';
+  return CAS_STYLE + '<h2>✓ Setup done. Now publish it (about a minute)</h2>' +
+    '<p class="small">Google only lets the owner publish an app, so this part is yours. You only do it once.</p>' +
+    '<ol><li><a class="btn light" href="' + editor + '" target="_blank">Open the app’s code page</a> (a new tab).</li>' +
+    '<li>Click the blue <span class="k">Deploy</span> button (top right) ▸ <span class="k">New deployment</span>.</li>' +
+    '<li>Click the gear ⚙ next to “Select type” ▸ <span class="k">Web app</span>.</li>' +
+    '<li>Set <b>Execute as</b> to <span class="k">Me</span> and <b>Who has access</b> to <span class="k">Anyone within your school</span>. Click <span class="k">Deploy</span> (approve again if Google asks).</li>' +
+    '<li>Copy the <b>Web app</b> link (it ends in <b>/exec</b>) and paste it here:</li></ol>' +
+    '<input id="u" placeholder="https://script.google.com/…/exec">' +
+    '<div class="row"><button class="btn" id="b" onclick="save()">Save my student link</button><span id="m" class="small"></span></div>' +
+    '<script>function save(){var m=document.getElementById("m"),b=document.getElementById("b");b.disabled=true;m.className="small";m.textContent="Saving…";' +
+    'google.script.run.withSuccessHandler(function(u){m.className="ok";m.innerHTML="Saved. Share this link with your students. Find it again any time under Classroom App ▸ Show my student link.";b.textContent="Saved";})' +
+    '.withFailureHandler(function(e){b.disabled=false;m.className="err";m.textContent=e.message;}).classroomAppSaveLink(document.getElementById("u").value);}</script>';
+}
+
+function casDoneHtml_(url, again) {
   return CAS_STYLE + '<h2>' + casEsc_(CAS_APP.title) + ' is ready</h2>' +
+    (again ? '<p class="small">Setup ran again. Your students’ work and your student link are unchanged.</p>' : '') +
     '<p>Share this link with your students (in Canvas, Google Classroom or your class page):</p>' +
     '<input id="u" readonly value="' + casEsc_(url) + '" onclick="this.select()">' +
     '<div class="row"><button class="btn" onclick="var u=document.getElementById(\'u\');u.select();document.execCommand(\'copy\');this.textContent=\'Copied\'">Copy link</button>' +
     '<a class="btn light" href="' + casEsc_(url) + '" target="_blank">Open my app</a></div>' +
-    '<p class="small">Open it yourself first: you’ll see the Teacher button at the top, where you can make a class. ' +
-    'You can find this link again any time under <b>Classroom App ▸ Show my student link</b>.</p>';
+    '<p class="small">Open it yourself first: you’ll see the Teacher button at the top, where you can make a class.</p>' +
+    '<p class="small"><b>After an update:</b> on the code page, click <span class="k">Deploy</span> ▸ <span class="k">Manage deployments</span> ▸ the pencil ✎ ▸ Version: <span class="k">New version</span> ▸ <span class="k">Deploy</span>. The student link stays the same.</p>';
 }
-function casApiOffHtml_() {
-  return CAS_STYLE + '<h2>Turn on one Google setting</h2>' +
-    '<p>Your app is set up. To publish it for students, Google needs the Apps Script API switched on for your account (this only needs doing once).</p>' +
-    '<ol><li><a href="' + CAS_API_SETTINGS + '" target="_blank">Open your Apps Script settings</a>.</li>' +
-    '<li>Turn on <b>Google Apps Script API</b>.</li>' +
-    '<li>Come back here, close this box, and click <b>Classroom App ▸ Set up my app</b> again.</li></ol>' +
-    '<p class="small">If the switch is greyed out, your school has turned it off. Use the manual steps instead: ' + casManualSteps_() + '</p>';
-}
-function casProblemHtml_(step, err) {
-  return CAS_STYLE + '<h2>' + (step === 'setup' ? 'Setup didn’t finish' : 'Publishing didn’t finish') + '</h2>' +
+
+function casProblemHtml_(err) {
+  return CAS_STYLE + '<h2>Setup didn’t finish</h2>' +
     '<p>Google said: <i>' + casEsc_(err && err.message) + '</i></p>' +
-    (step === 'setup'
-      ? '<p>Make sure you’re signed in with your school Google account, then try <b>Classroom App ▸ Set up my app</b> again.</p>'
-      : '<p>Your app is set up, but it isn’t published yet. Try again, or publish it by hand: ' + casManualSteps_() + '</p>');
+    '<p>Make sure you’re signed in with your school Google account, then try <b>Classroom App ▸ Set up my app</b> again.</p>';
 }
-function casManualSteps_() {
-  return 'Extensions ▸ Apps Script ▸ <b>Deploy ▸ New deployment</b> ▸ type <b>Web app</b>, execute as <b>Me</b>, ' +
-    'who has access <b>anyone in your school</b> ▸ <b>Deploy</b>, then copy the web-app link.';
-}
+
 function casShow_(html, title) {
-  try { SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(460).setHeight(330), title); }
-  catch (e) { Logger.log(title + ': ' + String(html).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')); }   // run from the editor
+  try { SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(520).setHeight(470), title); }
+  catch (e) { Logger.log(title + ': ' + String(html).replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')); }
 }

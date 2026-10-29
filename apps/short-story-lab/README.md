@@ -6,7 +6,7 @@ Grades 9–10 · Google Apps Script · free · works with any Google Workspace f
 
 ## Use it in your classroom (about 10 minutes)
 
-**Easiest: make a copy** from the [website](https://jabens-pixel.github.io/classroom-apps/) once this app's copy link is up. Your students' work saves to *your* Google Drive.
+**Easiest: [make a copy](https://docs.google.com/spreadsheets/d/1WRYRh2CFpuB5tdOzVdsA-0A23cWD3yC96QLUoemntbU/copy).** Google makes a copy of the app's Sheet (with the app inside it) in *your* account. Then open **Extensions → Apps Script** in your copy and continue at step 3. Your students' work saves to *your* Google Drive.
 
 **Or build it from this folder:**
 1. Go to [script.google.com](https://script.google.com) and start a **New project** named "Short Story Lab".

@@ -4,16 +4,16 @@ A full Macbeth unit: the play act by act with side-by-side support, activities, 
 
 Grades 9–12 · Google Apps Script · free for teachers and schools · works with any Google Workspace for Education school.
 
-## Use it in your classroom (about 3 minutes)
+## Use it in your classroom (about 5 minutes)
 
-1. **Make a copy** from the [website](https://jabens-pixel.github.io/classroom-apps/) and click **Make a copy** in Google's box. The copy is a Google Sheet in *your* Drive.
+1. **[Make a copy](https://docs.google.com/spreadsheets/d/18axTT492SozC-Hm58W3Wlxhltz1P3ra3SV2lPbupo-M/copy)** and click **Make a copy** in Google's box. The copy is a Google Sheet in *your* Drive.
 2. In your copy, click **Classroom App ▸ Set up my app** (the menu appears a few seconds after the Sheet opens).
-3. Approve Google's permission screen. Because your copy is your own app, Google says **"Google hasn't verified this app"**. That's expected: click **Advanced ▸ Go to Macbeth Curriculum**, then **Allow**.
-4. A box shows your **student link**. Copy it into Canvas, Google Classroom or your class page. Open it yourself first to make a class.
+3. Approve Google's permission screen. Because your copy is your own app, Google says **"Google hasn't verified this app"**. That's expected: click **Advanced ▸ Go to Macbeth Curriculum**, then **Allow**. Then click **Set up my app** once more if the box didn't appear.
+4. The setup runs by itself. A box then walks you through publishing (Google only lets the owner do this part):
+   **Open the app's code page ▸ Deploy ▸ New deployment ▸ ⚙ Web app ▸ Execute as: Me ▸ Who has access: Anyone within your school ▸ Deploy.**
+5. Copy the **Web app** link (it ends in `/exec`), paste it into the box and click **Save my student link**. Share it in Canvas, Google Classroom or your class page. Open it yourself first to make a class.
 
 Your students' work saves to this Sheet, in your Drive. You can find the link again under **Classroom App ▸ Show my student link**.
-
-**If the box says "Turn on one Google setting":** open [script.google.com/home/usersettings](https://script.google.com/home/usersettings), switch on **Google Apps Script API**, and run **Set up my app** again. If your school has switched it off, the box shows three manual steps instead.
 
 ## Optional extras
 
@@ -23,4 +23,4 @@ Your students' work saves to this Sheet, in your Drive. You can find the link ag
 
 ## Updates
 
-New versions are posted here. Paste the new files into your copy (Extensions ▸ Apps Script), then click **Classroom App ▸ Set up my app** again. It publishes the new version to the same student link. Your students' work is never touched by an update.
+New versions are posted here. Paste the new files into your copy (Extensions ▸ Apps Script), then click **Deploy ▸ Manage deployments ▸ ✎ ▸ Version: New version ▸ Deploy**. The student link stays the same, and your students' work is never touched by an update.
