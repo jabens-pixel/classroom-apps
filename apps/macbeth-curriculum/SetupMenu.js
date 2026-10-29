@@ -34,14 +34,14 @@ function classroomAppSetup() {
     return '';
   }
   var url = casSavedUrl_();
-  casShow_(url ? casDoneHtml_(url, true) : casPublishHtml_(), url ? 'Your app is ready' : 'Step 2: publish it for students');
+  if (url) casShow_(casDoneHtml_(url, true), 'Your app is ready'); else casSide_(casPublishHtml_(), 'Publish it for students');
   return url;
 }
 
 /** Menu: Classroom App ▸ Show my student link */
 function classroomAppShowLink() {
   var url = casSavedUrl_();
-  casShow_(url ? casDoneHtml_(url, false) : casPublishHtml_(), url ? 'Student link' : 'Publish it for students');
+  if (url) casShow_(casDoneHtml_(url, false), 'Student link'); else casSide_(casPublishHtml_(), 'Publish it for students');
   return url;
 }
 
@@ -72,10 +72,13 @@ var CAS_STYLE = '<style>body{font:14px/1.45 Arial,sans-serif;color:#1f1b16;margi
   '.ok{color:#2e6b2e;font-weight:bold}.err{color:#a3261b}.k{background:#f3efe7;border:1px solid #ddd3c2;border-radius:3px;padding:0 4px;white-space:nowrap}</style>';
 
 function casPublishHtml_() {
-  var editor = 'https://script.google.com/d/' + ScriptApp.getScriptId() + '/edit';
+  var who = '';
+  try { who = Session.getActiveUser().getEmail() || ''; } catch (e) {}
+  var editor = 'https://script.google.com/d/' + ScriptApp.getScriptId() + '/edit' + (who ? '?authuser=' + encodeURIComponent(who) : '');
   return CAS_STYLE + '<h2>✓ Setup done. Now publish it (about a minute)</h2>' +
-    '<p class="small">Google only lets the owner publish an app, so this part is yours. You only do it once.</p>' +
-    '<ol><li><a class="btn light" href="' + editor + '" target="_blank">Open the app’s code page</a> (a new tab).</li>' +
+    '<p class="small">Google only lets the owner publish an app, so this part is yours. You only do it once. Keep this panel open while you work.</p>' +
+    '<ol><li>In this Sheet’s menu, click <span class="k">Extensions</span> ▸ <span class="k">Apps Script</span>. The app’s code page opens in a new tab. ' +
+    '<span class="small">(Or <a href="' + casEsc_(editor) + '" target="_blank">open it here</a>.)</span></li>' +
     '<li>Click the blue <span class="k">Deploy</span> button (top right) ▸ <span class="k">New deployment</span>.</li>' +
     '<li>Click the gear ⚙ next to “Select type” ▸ <span class="k">Web app</span>.</li>' +
     '<li>Set <b>Execute as</b> to <span class="k">Me</span> and <b>Who has access</b> to <span class="k">Anyone within your school</span>. Click <span class="k">Deploy</span> (approve again if Google asks).</li>' +
@@ -107,4 +110,9 @@ function casProblemHtml_(err) {
 function casShow_(html, title) {
   try { SpreadsheetApp.getUi().showModalDialog(HtmlService.createHtmlOutput(html).setWidth(520).setHeight(470), title); }
   catch (e) { Logger.log(title + ': ' + String(html).replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ')); }
+}
+/** A side panel, so the Sheet's menus still work while the steps stay on screen. */
+function casSide_(html, title) {
+  try { SpreadsheetApp.getUi().showSidebar(HtmlService.createHtmlOutput(html).setTitle(title)); }
+  catch (e) { casShow_(html, title); }
 }
