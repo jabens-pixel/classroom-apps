@@ -12,6 +12,7 @@
  */
 var CAS_APP = {"title":"Macbeth Curriculum","setup":"setupMacbethBackend","dbProp":"MACBETH_DB_ID"};
 var CAS_PROP_URL = 'CLASSROOM_APP_STUDENT_URL';
+var CAS_PROP_FOR = 'CLASSROOM_APP_SET_UP_FOR';   // the script these settings belong to (a copied Sheet brings the old ones along)
 
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('Classroom App')
@@ -26,8 +27,14 @@ function classroomAppSetup() {
   try {
     var ss = null;
     try { ss = SpreadsheetApp.getActiveSpreadsheet(); } catch (e) {}
+    if (props.getProperty(CAS_PROP_FOR) !== ScriptApp.getScriptId()) {
+      // A fresh copy: forget any settings that came along from the Sheet it was copied from.
+      props.deleteProperty(CAS_PROP_URL);
+      if (CAS_APP.dbProp) props.deleteProperty(CAS_APP.dbProp);
+    }
     if (CAS_APP.dbProp && ss && !props.getProperty(CAS_APP.dbProp)) props.setProperty(CAS_APP.dbProp, ss.getId());
     if (CAS_APP.setup && typeof globalThis[CAS_APP.setup] === 'function') globalThis[CAS_APP.setup]();
+    props.setProperty(CAS_PROP_FOR, ScriptApp.getScriptId());
   } catch (err) {
     Logger.log('Set up my app: ' + (err && err.message));
     casShow_(casProblemHtml_(err), 'Setup needs a hand');
@@ -53,14 +60,17 @@ function classroomAppSaveLink(url) {
       ? 'That is the test link (it ends in /dev). Use the Web app link from the Deploy box. It ends in /exec.'
       : 'That doesn’t look like a web-app link. It starts with https://script.google.com/ and ends in /exec.');
   }
-  PropertiesService.getScriptProperties().setProperty(CAS_PROP_URL, url);
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty(CAS_PROP_FOR) !== ScriptApp.getScriptId()) throw new Error('Click Classroom App ▸ Set up my app first, then paste the link again.');
+  props.setProperty(CAS_PROP_URL, url);
   return url;
 }
 
+/** The link the teacher saved for THIS copy (never one copied from another Sheet). */
 function casSavedUrl_() {
-  var url = PropertiesService.getScriptProperties().getProperty(CAS_PROP_URL) || '';
-  if (!url) { try { var u = ScriptApp.getService().getUrl() || ''; if (/\/exec$/.test(u)) url = u; } catch (e) {} }
-  return url;
+  var props = PropertiesService.getScriptProperties();
+  if (props.getProperty(CAS_PROP_FOR) !== ScriptApp.getScriptId()) return '';
+  return props.getProperty(CAS_PROP_URL) || '';
 }
 
 // ---------------- the boxes the teacher sees ----------------
