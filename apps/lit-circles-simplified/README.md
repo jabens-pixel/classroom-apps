@@ -8,7 +8,7 @@ Grades 9–12 · Google Apps Script · free for teachers and schools · works wi
 
 **[Step-by-step with pictures](https://jabens-pixel.github.io/classroom-apps/setup/)**, including Google's "hasn't verified this app" screen.
 
-1. **Make a copy** from the [website](https://jabens-pixel.github.io/classroom-apps/) and click **Make a copy** in Google's box. The copy is a Google Sheet in *your* Drive.
+1. **[Make a copy](https://docs.google.com/spreadsheets/d/1YTp1JK25PvYBTpTagptmP9bbtUwtiNxbMWbUWsEpNXY/copy)** and click **Make a copy** in Google's box. The copy is a Google Sheet in *your* Drive.
 2. In your copy, click **Classroom App ▸ Set up my app** (the menu appears a few seconds after the Sheet opens).
 3. Approve Google's permission screen. Because your copy is your own app, which Google hasn't reviewed, Google says **"Google hasn't verified this app"** (a note in the corner of the Sheet warns you first). That's expected, and only you see it, once: click **Advanced ▸ Go to … (unsafe)**, then **Allow**. Your students never get this screen. Then click **Set up my app** once more if the box didn't appear.
 4. The setup runs by itself. A box then walks you through publishing (Google only lets the owner do this part):
