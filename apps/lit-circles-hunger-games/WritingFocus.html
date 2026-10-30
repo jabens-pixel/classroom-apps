@@ -1,0 +1,237 @@
+<!-- ======================================================================
+     Literature Circles — WritingFocus (focus mode for Step 1 writing)
+     A distraction-free way to write the Lit Circle submission: Reading Strategies,
+     Hybrid moments and the Reader's Journal. The student presses "Focus mode" and
+     everything except their writing steps aside: the site header, the big picture and the
+     how-to guide. The checklist stays docked on the left and the writing box fills the
+     rest of the page in larger type. A slim bar at the top keeps the essentials close:
+       - "Guide" shows the what-to-do steps, example and sentence starters again,
+       - "Hide checklist" / "Checklist" tucks the checklist away or brings it back
+         (on a phone it opens as a panel instead),
+       - "Exit focus" (or Esc) puts the page back.
+     The Back / Continue / Submit bar, autosave, the checklists, the writing stats and
+     the highlight buttons are the same elements as before, so they all keep working.
+     The choice is remembered on this device, so moving to the next strategy or moment
+     (or coming back tomorrow) stays in focus mode until the student exits it.
+
+     Rides along after BackendClient (LC_INCLUDE_WITH in Code.gs). Changes nothing that
+     is saved.
+     ====================================================================== -->
+<style id="lcWfStyles">
+.lc-ck-main{position:relative}
+.lc-wf-enterbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px 16px;margin:0 0 14px;padding:12px 16px;background:#17372b;color:#fff}
+.lc-wf-enterbar span{font:500 14px/1.35 Roboto,Arial,sans-serif;color:#fff}
+.lc-wf-enterbar span b{display:block;font-weight:800;font-size:15.5px}
+.lc-wf-enterbar button.lc-wf-btn{min-height:42px;padding:9px 18px;font-size:15px}
+button.lc-wf-btn{clip-path:none;display:inline-flex;align-items:center;gap:6px;min-height:36px;margin:0;padding:7px 14px;border-radius:999px;border:1px solid #bcd0c6;background:#fff;color:#17372b;font:800 13.5px/1.2 Roboto,Arial,sans-serif;letter-spacing:0;text-transform:none;cursor:pointer;box-shadow:none;width:auto}
+button.lc-wf-btn:hover{background:#f1f6f3;border-color:#7fa797;box-shadow:none;transform:none}
+button.lc-wf-btn.is-primary{background:#17372b;border-color:#17372b;color:#fff}
+button.lc-wf-btn.is-primary:hover{background:#0f2a20}
+button.lc-wf-btn[aria-pressed="true"]{background:#e6efe9;border-color:#17372b}
+button.lc-wf-btn b{font-weight:900}
+.lc-wf-top{display:none}
+
+/* ---- focus mode on */
+body.lc-wf{background:#f6f1e7}
+body.lc-wf > header,body.lc-wf header.lc-header{display:none!important}
+body.lc-wf main#app{max-width:none;padding-top:0!important;margin-top:0}
+body.lc-wf .focus-workspace{max-width:none;margin:0}
+body.lc-wf .lc-wf-top{display:flex;position:sticky;top:0;z-index:30;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin:0 0 18px;padding:10px 4px;background:rgba(246,241,231,.97);backdrop-filter:blur(8px);border-bottom:1px solid #e3dccf}
+.lc-wf-title{min-width:0}
+.lc-wf-title small{display:block;font:800 11px/1.2 Roboto,Arial,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#6b4e0f}
+.lc-wf-title strong{display:block;margin-top:2px;font:600 20px/1.2 Georgia,'Times New Roman',serif;color:#17372b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lc-wf-tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+body.lc-wf .lc-wf-enterbar{display:none}
+/* Wide screens: the checklist stays put on the left; the writing fills the rest of the page. */
+body.lc-wf .lc-ck-layout{display:grid;grid-template-columns:300px minmax(0,1fr);gap:24px;align-items:start}
+body.lc-wf .lc-ck-main{grid-column:2;grid-row:1;max-width:1180px;margin:0}
+body.lc-wf.lc-wf-nocheck .lc-ck-layout{grid-template-columns:minmax(0,1fr)}
+body.lc-wf.lc-wf-nocheck .lc-ck-main{grid-column:1}
+body.lc-wf .lc-ck-main > .backlink,
+body.lc-wf .focus-progress,
+body.lc-wf .focus-strategy-hero,
+body.lc-wf .focus-guide,
+body.lc-wf .focus-example,
+body.lc-wf .focus-starters,
+body.lc-wf .lc-ws-note{display:none}
+body.lc-wf.lc-wf-guide .focus-guide,
+body.lc-wf.lc-wf-guide .focus-example,
+body.lc-wf.lc-wf-guide .focus-starters{display:block}
+body.lc-wf.lc-wf-guide .focus-starters{display:flex}
+body.lc-wf .lc-ck-side{display:block;grid-column:1;grid-row:1;position:sticky;top:84px;max-height:calc(100vh - 100px);overflow:auto;box-shadow:none}
+body.lc-wf.lc-wf-nocheck .lc-ck-side{display:none}
+body.lc-wf .lc-ck-side.lc-wf-flash{box-shadow:0 0 0 3px #7fb99a}
+body.lc-wf .focused-strategy-form{margin-top:0}
+body.lc-wf .focus-workspace textarea{font-size:18px;line-height:1.7;min-height:220px;padding:16px 18px;background:#fff}
+body.lc-wf .journal-editor-big{min-height:calc(100vh - 260px)!important;font-size:19px!important;line-height:1.8!important;padding:28px 32px!important;background:#fff}
+body.lc-wf .hybrid-editor-big{min-height:calc(100vh - 360px)!important;font-size:19px!important;line-height:1.8!important;padding:26px 30px!important;background:#fff}
+body.lc-wf .focus-action-bar,body.lc-wf #aiFeedbackResult,body.lc-wf #afterSaveContinue{max-width:1180px;margin-left:324px;margin-right:0}
+body.lc-wf .focus-action-bar{margin-top:18px}
+body.lc-wf.lc-wf-nocheck .focus-action-bar,body.lc-wf.lc-wf-nocheck #aiFeedbackResult,body.lc-wf.lc-wf-nocheck #afterSaveContinue{margin-left:0}
+/* Narrow screens (phones, small windows): one column; the checklist opens as a panel. */
+@media(max-width:900px){
+  body.lc-wf .lc-ck-layout{display:block}
+  body.lc-wf .lc-ck-side{display:none}
+  body.lc-wf.lc-wf-check .lc-ck-side{display:block;position:fixed;top:auto;left:12px;right:12px;bottom:12px;z-index:40;width:auto;max-height:70vh;overflow:auto;box-shadow:0 18px 50px rgba(23,55,43,.22)}
+  body.lc-wf .focus-action-bar,body.lc-wf #aiFeedbackResult,body.lc-wf #afterSaveContinue{margin-left:0}
+}
+@media(max-width:700px){
+  body.lc-wf .lc-wf-top{padding:8px 0}
+  .lc-wf-title strong{font-size:17px;white-space:normal}
+  body.lc-wf .journal-editor-big{padding:18px!important;font-size:18px!important}
+  body.lc-wf .hybrid-editor-big{padding:16px!important;font-size:18px!important}
+}
+</style>
+<script>
+window.__MB = window.__MB || {};
+window.__MB.WritingFocus = 'loading';
+(function () {
+  'use strict';
+  var W = window;
+  if (W.LC_FOCUSWRITE) { W.__MB.WritingFocus = 'ok'; return; } // included twice — keep the first copy
+  var FW = W.LC_FOCUSWRITE = { mem: false };
+
+  function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function me() { return String((W.state && W.state.email) || '').toLowerCase(); }
+  function prefKey() { return 'lc_focuswrite_' + me(); }
+  function pref() { try { var v = W.localStorage.getItem(prefKey()); return v === null ? FW.mem : v === '1'; } catch (e) { return FW.mem; } }
+  function noCheckKey() { return 'lc_focuswrite_nocheck_' + me(); }
+  function setNoCheck(on) { try { if (on) W.localStorage.setItem(noCheckKey(), '1'); else W.localStorage.removeItem(noCheckKey()); } catch (e) {} }
+  function noCheckPref() { try { return W.localStorage.getItem(noCheckKey()) === '1'; } catch (e) { return false; } }
+  function setPref(on) { FW.mem = !!on; try { if (on) W.localStorage.setItem(prefKey(), '1'); else W.localStorage.removeItem(prefKey()); } catch (e) {} }
+
+  /** The Step 1 writing workspace, when it is on screen (not the pathway or strategy pickers). */
+  function workspace() {
+    if (!W.platform || W.platform.mode !== 'student' || !W.state || W.state.view !== 'week_strategies') return null;
+    var w = document.querySelector('#app .focus-workspace');
+    return w && w.querySelector('.focused-strategy-form') ? w : null;
+  }
+  function isOn() { return document.body.classList.contains('lc-wf'); }
+  /** Wide screens keep the checklist docked on the left; narrow ones open it as a panel. */
+  function wide() { try { return W.matchMedia('(min-width: 901px)').matches; } catch (e) { return W.innerWidth > 900; } }
+  function checkShown() { return wide() ? !document.body.classList.contains('lc-wf-nocheck') : document.body.classList.contains('lc-wf-check'); }
+
+  function titleParts(w) {
+    var kick = w.querySelector('.focus-strategy-hero .small-label'), h = w.querySelector('.focus-strategy-hero h2');
+    return { kicker: kick ? kick.textContent.trim() : 'Lit Circle Submission', title: h ? h.textContent.trim() : 'Your writing' };
+  }
+  function checkCount(w) { var b = w.querySelector('[data-ck-count]'); return b ? b.textContent.trim() : ''; }
+
+  /** Adds the "Focus mode" button and the slim top bar if a re-render took them away. */
+  function ensureChrome(w) {
+    var main = w.querySelector('.lc-ck-main') || w;
+    // The way in sits right above the writing boxes, where students start typing.
+    var form = w.querySelector('.focused-strategy-form');
+    var bar = w.querySelector('.lc-wf-enterbar');
+    if (!bar) {
+      bar = document.createElement('div');
+      bar.className = 'lc-wf-enterbar';
+      bar.innerHTML = '<span><b>Ready to write?</b>Focus mode hides everything but your writing and the checklist.</span><button type="button" class="lc-wf-btn is-primary" data-wf="enter" title="Write without distractions. Press Esc to come back.">⤢ Write in focus mode</button>';
+    }
+    if (form && form.parentNode && bar.nextSibling !== form) form.parentNode.insertBefore(bar, form);
+    else if (!form && !bar.parentNode) { var back = main.querySelector(':scope > .backlink'); main.insertBefore(bar, back ? back.nextSibling : main.firstChild); }
+    var top = w.querySelector(':scope > .lc-wf-top');
+    if (!top) {
+      top = document.createElement('div');
+      top.className = 'lc-wf-top';
+      top.setAttribute('role', 'toolbar');
+      top.setAttribute('aria-label', 'Focus mode');
+      w.insertBefore(top, w.firstChild);
+    }
+    var t = titleParts(w), n = checkCount(w), guide = document.body.classList.contains('lc-wf-guide'), check = checkShown();
+    var hasCheck = !!w.querySelector('.lc-ck-side');
+    var html = '<div class="lc-wf-title"><small>' + esc(t.kicker) + '</small><strong>' + esc(t.title) + '</strong></div>' +
+      '<div class="lc-wf-tools">' +
+      '<button type="button" class="lc-wf-btn" data-wf="guide" aria-pressed="' + guide + '" title="Show the steps, example and sentence starters">' + (guide ? 'Hide guide' : 'Guide') + '</button>' +
+      (hasCheck ? '<button type="button" class="lc-wf-btn" data-wf="check" aria-pressed="' + check + '" title="' + (check ? 'Hide' : 'Show') + ' the checklist">' + (check ? 'Hide checklist' : 'Checklist') + (n ? ' <b>' + esc(n) + '</b>' : '') + '</button>' : '') +
+      '<button type="button" class="lc-wf-btn is-primary" data-wf="exit" title="Back to the full page (Esc)">✕ Exit focus</button></div>';
+    if (top.innerHTML !== html) top.innerHTML = html;
+  }
+
+  /** Focus mode is on only while the writing workspace is on screen and the student chose it. */
+  function sync() {
+    syncQueued = false;
+    var w = workspace(), on = !!w && pref();
+    var was = isOn();
+    document.body.classList.toggle('lc-wf', on);
+    if (on && !was) document.body.classList.toggle('lc-wf-nocheck', noCheckPref());
+    if (!on) document.body.classList.remove('lc-wf-guide', 'lc-wf-check', 'lc-wf-nocheck');
+    if (w) ensureChrome(w);
+  }
+  var syncQueued = false;
+  function syncSoon() { if (syncQueued) return; syncQueued = true; setTimeout(sync, 0); }
+
+  function firstBox(w) {
+    var boxes = w.querySelectorAll('.focused-strategy-form textarea, .focused-strategy-form [contenteditable="true"]');
+    for (var i = 0; i < boxes.length; i++) { var b = boxes[i], v = b.tagName === 'TEXTAREA' ? b.value : b.textContent; if (!String(v).trim()) return b; }
+    return boxes[0] || null;
+  }
+  function caretToEnd(el) {
+    try {
+      el.focus({ preventScroll: true });
+      if (el.tagName === 'TEXTAREA') { el.selectionStart = el.selectionEnd = el.value.length; return; }
+      var r = document.createRange(); r.selectNodeContents(el); r.collapse(false);
+      var s = W.getSelection(); s.removeAllRanges(); s.addRange(r);
+    } catch (e) {}
+  }
+  function enter() {
+    var w = workspace(); if (!w) return;
+    setPref(true); sync();
+    W.scrollTo(0, 0);
+    var box = firstBox(w);
+    if (box) { caretToEnd(box); if (box.getBoundingClientRect().top > W.innerHeight * 0.6) box.scrollIntoView({ block: 'center' }); }
+  }
+  function exit() {
+    var active = document.activeElement;
+    setPref(false); sync();
+    if (active && active.scrollIntoView && active.closest && active.closest('.focused-strategy-form')) active.scrollIntoView({ block: 'center' });
+  }
+  function toggle(cls) {
+    document.body.classList.toggle(cls);
+    if (cls === 'lc-wf-check' && document.body.classList.contains(cls)) { var side = document.querySelector('.lc-ck-side'); if (side) side.scrollTop = 0; }
+    if (cls === 'lc-wf-nocheck') setNoCheck(document.body.classList.contains(cls));
+    if (cls === 'lc-wf-guide' && document.body.classList.contains(cls)) W.scrollTo({ top: 0, behavior: 'smooth' });
+    sync();
+  }
+  FW.enter = enter; FW.exit = exit; FW.isOn = isOn; FW.sync = sync;
+
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest && e.target.closest('[data-wf]');
+    if (b) {
+      e.preventDefault();
+      var a = b.getAttribute('data-wf');
+      if (a === 'enter') enter();
+      else if (a === 'exit') exit();
+      else if (a === 'guide') toggle('lc-wf-guide');
+      else if (a === 'check') toggle(wide() ? 'lc-wf-nocheck' : 'lc-wf-check');
+      return;
+    }
+    // In focus mode the checklist button on the bottom bar opens the checklist drawer.
+    if (isOn() && e.target.closest && e.target.closest('.lc-ck-jump')) {
+      e.preventDefault(); e.stopPropagation();
+      if (!wide()) { toggle('lc-wf-check'); return; }
+      if (document.body.classList.contains('lc-wf-nocheck')) toggle('lc-wf-nocheck');
+      var side = document.querySelector('.lc-ck-side');
+      if (side) { side.scrollTop = 0; side.classList.add('lc-wf-flash'); setTimeout(function () { side.classList.remove('lc-wf-flash'); }, 900); }
+    }
+  }, true);
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !isOn()) return;
+    if (document.body.classList.contains('lc-wf-check')) { document.body.classList.remove('lc-wf-check'); sync(); return; }
+    if (document.body.classList.contains('lc-wf-guide')) { document.body.classList.remove('lc-wf-guide'); sync(); return; }
+    exit();
+  });
+  // Every screen change repaints #app: put the controls back and turn focus mode on / off to match.
+  try {
+    new MutationObserver(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        var t = list[i].target;
+        if (t && t.closest && t.closest('.lc-wf-top,.lc-wf-enterbar')) continue;
+        syncSoon(); return;
+      }
+    }).observe(document.body || document.documentElement, { childList: true, subtree: true });
+  } catch (e) {}
+
+  W.__MB.WritingFocus = 'ok';
+})();
+</script>

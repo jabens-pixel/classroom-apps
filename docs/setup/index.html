@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Set Up Your Copy</title>
+<meta name="description" content="Step-by-step pictures for setting up your own copy of a classroom app, including Google's 'hasn't verified this app' screen.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg: #f7f3ec; --surface: #fffdf9; --ink: #1f1b16; --muted: #5d554b; --line: #e3dacb; --brand: #8c2f39; --brand-ink: #fff; --note: #fbf3d9; --focus: #1f5f74; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #17140f; --surface: #211d17; --ink: #f1ebe1; --muted: #b8ad9d; --line: #3a332a; --brand: #d9707b; --brand-ink: #1b0d0f; --note: #2e2717; --focus: #7cc3d8; } }
+  :root[data-theme="dark"] { --bg: #17140f; --surface: #211d17; --ink: #f1ebe1; --muted: #b8ad9d; --line: #3a332a; --brand: #d9707b; --brand-ink: #1b0d0f; --note: #2e2717; --focus: #7cc3d8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  a { color: inherit; text-underline-offset: 3px; }
+  a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
+  .wrap { max-width: 820px; margin: 0 auto; padding: 0 16px; }
+  h1, h2 { font-family: Literata, Georgia, serif; line-height: 1.2; margin: 0; }
+  header { padding: 48px 0 24px; border-bottom: 1px solid var(--line); }
+  .back { font-size: 15px; color: var(--muted); }
+  h1 { font-size: clamp(32px, 5vw, 46px); margin: 14px 0 10px; }
+  .lede { color: var(--muted); font-size: 19px; margin: 0; max-width: 52ch; }
+  .calm { background: var(--note); border: 1px solid var(--line); border-radius: 12px; padding: 16px 18px; margin: 24px 0 0; }
+  ol.guide { list-style: none; counter-reset: s; padding: 0; margin: 28px 0 56px; }
+  ol.guide > li { counter-increment: s; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin-bottom: 18px; }
+  ol.guide h2 { font-size: 21px; display: flex; gap: 12px; align-items: baseline; }
+  ol.guide h2::before { content: counter(s); flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font: 700 15px/1 "Source Sans 3", sans-serif; }
+  ol.guide p { margin: 8px 0 0; }
+  figure { margin: 16px 0 0; }
+  figure img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
+  code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 15px; }
+  footer { color: var(--muted); font-size: 15px; padding: 0 0 48px; }
+</style>
+</head>
+<body>
+<header><div class="wrap">
+  <a class="back" href="../">← All classroom apps</a>
+  <h1>Set up your copy</h1>
+  <p class="lede">About 5 minutes, once. The same steps for every app with a <strong>Make a copy</strong> button. You need a school Google account; your students sign in with theirs.</p>
+  <p class="calm"><strong>About the warning:</strong> Google will say <em>“Google hasn’t verified this app.”</em> That is normal for your own copy (step 5). Only you see it, once, and your students never do.</p>
+</div></header>
+<main class="wrap">
+  <ol class="guide">
+    <li><h2>Make your copy</h2><p>Click <strong>Make a copy</strong> on the app’s card, then <strong>Make a copy</strong> again in Google’s box. Google says the attached Apps Script will be copied too: that’s the app. The copy is a Google Sheet in <em>your</em> Drive, and your students’ work saves there. Nobody else can see it.</p><figure><img src="step-1-copy.png" alt="Google’s “Copy document” page with the Make a copy button" loading="lazy"></figure></li>
+    <li><h2>Find the Classroom App menu</h2><p>A few seconds after your copy opens, a <strong>Classroom App</strong> menu appears at the top, and a note in the bottom-right corner tells you what comes next. Click <strong>Classroom App ▸ Set up my app</strong>.</p><figure><img src="step-2-menu.png" alt="The Classroom App menu open, showing Set up my app and Show my student link" loading="lazy"></figure></li>
+    <li><h2>A note warns you what Google will say</h2><p>Until your copy is set up, this note appears each time you open it. It explains Google’s warning a few steps on, before you meet it.</p><figure><img src="step-2b-note.png" alt="The note in the corner of the Sheet: Next, Classroom App, Set up my app" loading="lazy"></figure></li>
+    <li><h2>Give the app permission</h2><p>Google asks for permission the first time. Click <strong>OK</strong>, then choose <strong>your school Google account</strong>.</p><figure><img src="step-3-authreq.png" alt="Google’s Authorization required box with OK and Cancel" loading="lazy"></figure></li>
+    <li><h2>“Google hasn’t verified this app” — this is expected</h2><p>Google shows this for every app it hasn’t reviewed itself, and your copy is a brand-new app that only you own. Nothing is sent to anyone else. Only you see this screen, once; your students never do. Click <strong>Advanced</strong> (small, bottom left).</p></li>
+    <li><h2>Go to the app</h2><p>Under Advanced, click <strong>Go to … (unsafe)</strong>. Google uses the word “unsafe” for any app it hasn’t reviewed.</p></li>
+    <li><h2>Allow</h2><p>Google lists what the app may do: keep its data in your Sheets, make Google Docs you export, send you email and connect to Canvas if you use it. Click <strong>Allow</strong> (on some screens, tick <strong>Select all</strong> first). If the setup box doesn’t appear afterwards, click <strong>Classroom App ▸ Set up my app</strong> once more.</p></li>
+    <li><h2>Publish it for your students (about a minute)</h2><p>A side panel walks you through it: <strong>Extensions ▸ Apps Script ▸ Deploy ▸ New deployment ▸ ⚙ Web app</strong>, Execute as <strong>Me</strong>, Who has access <strong>Anyone within your school</strong>, then <strong>Deploy</strong>. Google may ask for permission once more; it’s the same as before.</p></li>
+    <li><h2>Save your student link</h2><p>Copy the <strong>Web app</strong> link (it ends in <code>/exec</code>), paste it into the side panel and click <strong>Save my student link</strong>. Open it yourself first, choose <strong>Teacher</strong> and make your class, then share the link in Canvas, Google Classroom or your class page. You can find it again under <strong>Classroom App ▸ Show my student link</strong>.</p></li>
+  </ol>
+</main>
+<footer><div class="wrap">Stuck? <a href="https://github.com/jabens-pixel/classroom-apps/issues/new?title=Setup%20question" target="_blank" rel="noopener">Ask a question</a> and include which step you’re on.</div></footer>
+</body>
+</html>

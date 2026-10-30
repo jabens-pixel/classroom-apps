@@ -616,6 +616,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     b.writing.finalText = b.writing.finalText || "";
     b.writing.finalReflection = b.writing.finalReflection || "";
     b.writing.finalSelfEval = b.writing.finalSelfEval || {};
+    migrateFinalSelfEval_(b.writing);
     b.writing.finalSelfComments = b.writing.finalSelfComments || {};
     b.writing.aiFeedback = b.writing.aiFeedback || null;
     b.writing.aiRevisionFeedback = b.writing.aiRevisionFeedback || null;
@@ -1570,23 +1571,23 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     const rows = r.items.map((it) => {
       const id = secId_(it.aKey);
       const itemSel = it.itemModule ? (it.itemModule.moduleId || "__none") : "__section";
-      const stateTxt = it.link ? `<a href="${esc(it.link.htmlUrl)}" target="_blank" rel="noopener">In Canvas ↗</a>${it.link.moduleName ? " · module “" + esc(it.link.moduleName) + "”" : " · no module"}` : it.deleted ? "Deleted in Canvas — Save makes it again" : "Not in Canvas yet";
+      const stateTxt = it.link ? `${it.link.htmlUrl ? `<a href="${esc(it.link.htmlUrl)}" target="_blank" rel="noopener">Open in Canvas ↗</a>` : "In Canvas"}${it.link.moduleName ? " · module “" + esc(it.link.moduleName) + "”" : " · no module"}` : it.deleted ? "Deleted in Canvas — Save makes it again" : "Not in Canvas yet";
       const checked = it.link || it.released || it.deleted;
       const groupSel = (r.groups || []).length ? `<label class="sec-field"><span>Assignment group</span><select class="secGroup" data-akey="${esc(it.aKey)}" data-orig="${esc(it.groupId || "")}">${it.groupId ? "" : `<option value="">${it.link ? "Course default" : "Class default"}</option>`}${(r.groups || []).map((g) => `<option value="${esc(g.id)}" ${String(g.id) === String(it.groupId || "") ? "selected" : ""}>${esc(g.name)}</option>`).join("")}</select></label>` : "";
       return `<div class="sec-row${it.aKey === focusKey ? " is-focus" : ""}${checked ? "" : " is-off"}" data-akey="${esc(it.aKey)}">
-        <label class="sec-include"><input type="checkbox" class="secInclude" data-akey="${esc(it.aKey)}" ${checked ? "checked" : ""}><span><strong>${esc(it.label)}</strong><small>${stateTxt}${it.released ? "" : " · Hidden from students, so it stays unpublished"}</small></span></label>
-        <div class="sec-dates">${dueDateFieldHtml_("Due", "secDue_" + id, "secDueT_" + id, it.dueAt, DEFAULT_DUE_TIME, "")}${dueDateFieldHtml_("Available from", "secOpen_" + id, "secOpenT_" + id, it.unlockAt, DEFAULT_OPEN_TIME, "")}</div>
+        <div class="sec-name"><label class="sec-include"><input type="checkbox" class="secInclude" data-akey="${esc(it.aKey)}" ${checked ? "checked" : ""}><span><strong>${esc(it.label)}</strong><small>${stateTxt}${it.released ? "" : " · Hidden from students, so it stays unpublished"}</small></span></label>${it.link ? `<div class="sec-actions"><button type="button" class="btn secPush" data-kind="${esc(it.kind)}" data-key="${esc(it.key)}" data-akey="${esc(it.aKey)}">↗ Push grades now</button><span class="sec-pushed" data-akey="${esc(it.aKey)}">${it.link.lastGradeSyncAt ? "Last grade push: " + esc(new Date(it.link.lastGradeSyncAt).toLocaleString([], { month: "numeric", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" })) : "Not pushed yet"}</span></div>` : ""}</div>
+        <div class="sec-dates">${dueDateFieldHtml_("Due", "secDue_" + id, "secDueT_" + id, it.dueAt, DEFAULT_DUE_TIME, "")}${dueDateFieldHtml_("Available from", "secOpen_" + id, "secOpenT_" + id, it.unlockAt, DEFAULT_OPEN_TIME, "")}${dueDateFieldHtml_("Lock after", "secLock_" + id, "secLockT_" + id, it.lockAt, DEFAULT_DUE_TIME, "")}</div>
         <div class="sec-picks"><label class="sec-field"><span>Module</span><select class="secItemModule" data-akey="${esc(it.aKey)}" data-orig="${esc(itemSel)}">${modOpts([["__section", "Section’s module — " + secName], ["__none", "(No module)"]], itemSel)}</select></label>${groupSel}</div>
       </div>`;
     }).join("");
     root.innerHTML = `<div class="modal"><div class="modalbox canvas-section-modalbox"><div class="modal-head"><div><span class="eyebrow">${esc(r.course.courseName || "Canvas")}</span><h3>${title}</h3></div><button class="btn modal-dismiss" id="closeSectionCanvas">Close</button></div>
-      <p class="toolbar-note">Save makes or updates every ticked assignment in Canvas, with these dates, in its module. Assignments open to students are published; hidden ones stay unpublished until you open them. Pick a date and the due time is 11:59 PM that day unless you change it.</p>
+      <p class="toolbar-note">Save makes or updates every ticked assignment in Canvas, with these dates, in its module. Assignments open to students are published; hidden ones stay unpublished until you open them. Pick a date and the due time is 11:59 PM that day unless you change it; "Lock after" closes the assignment in Canvas.</p>
       ${(r.deletedInCanvas || []).length ? `<p class="canvas-deleted-note" role="status"><strong>Deleted in Canvas:</strong> ${esc(r.deletedInCanvas.join(", "))}. Save makes ${r.deletedInCanvas.length === 1 ? "it" : "them"} again, with these dates, in the module chosen below.</p>` : ""}
       <div class="sec-module-box"><label class="sec-field"><span>Canvas module for ${esc(CANVAS_SECTION_LABELS[section])}</span><select id="secModule" data-orig="${esc(secSel)}">${modOpts([["__unit", unitText], ["__none", "(No module)"]], secSel)}</select></label><p class="toolbar-note">Every assignment below goes here unless you pick another module on its row. ${r.modulesError ? `<strong class="sec-error">Couldn't load the modules: ${esc(r.modulesError)}</strong>` : "The unit default is in Canvas Connection (the Canvas ✓ button)."}</p></div>
       ${(r.groups || []).length ? `<p class="toolbar-note">Assignment group: change one on its row and Save moves it in Canvas. Pushing grades never changes the group.</p>` : r.groupsError ? `<p class="toolbar-note">${esc(r.groupsError)}</p>` : ""}
       <div class="sec-rows">${rows}</div>
       <p id="secMsg" class="toolbar-note" role="status"></p>
-      <div class="canvas-assignment-actions"><button class="btn" id="cancelSectionCanvas">Cancel</button><button class="btn primary" id="saveSectionCanvas">Save to Canvas</button></div></div></div>`;
+      <div class="canvas-assignment-actions"><button class="btn" id="secCheckDates" title="Bring in any due, available or lock dates you changed in Canvas">Check Canvas for Date Changes</button><span class="sec-spacer"></span><button class="btn" id="cancelSectionCanvas">Cancel</button><button class="btn primary" id="saveSectionCanvas">Save to Canvas</button></div></div></div>`;
     const close = () => (root.innerHTML = "");
     document.getElementById("closeSectionCanvas").onclick = close;
     document.getElementById("cancelSectionCanvas").onclick = close;
@@ -1596,6 +1597,28 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     secModSel.onchange = () => {
       const v = secModSel.value, txt = v === "__unit" ? (r.unitModule && r.unitModule.moduleId ? moduleName_(r.unitModule, mods) : "(No module)") : v === "__none" ? "(No module)" : moduleName_({ moduleId: v }, mods);
       root.querySelectorAll(".secItemModule option[value='__section']").forEach((o) => (o.textContent = "Section’s module — " + txt));
+    };
+    root.querySelectorAll(".secPush").forEach((b) => (b.onclick = async () => {
+      const lbl = root.querySelector(`.sec-pushed[data-akey="${b.dataset.akey}"]`);
+      b.disabled = true; if (lbl) lbl.textContent = "Sending grades and feedback…";
+      try {
+        const res = await rpc("pushCanvasGrades", { classId: backend.activeClassId, kind: b.dataset.kind, key: b.dataset.key });
+        backend.dashboard.settings = res.settings; backend.canvasSettings = res.settings.canvas || {}; backend.dashboardCache[backend.activeClassId] = backend.dashboard;
+        if (lbl) lbl.textContent = `Pushed just now · ${res.sent} score${res.sent === 1 ? "" : "s"}` + (res.commentsSent ? ` · ${res.commentsSent} comment${res.commentsSent === 1 ? "" : "s"}` : "") + (res.excused ? ` · ${res.excused} excused` : "") + (res.unmatched && res.unmatched.length ? ` · unmatched: ${res.unmatched.join(", ")}` : "");
+      } catch (e) { if (lbl) lbl.textContent = "Could not push: " + (e.message || String(e)); }
+      b.disabled = false;
+    }));
+    const chkBtn = document.getElementById("secCheckDates");
+    if (chkBtn) chkBtn.onclick = async () => {
+      const msg = document.getElementById("secMsg");
+      chkBtn.disabled = true; msg.textContent = "Checking Canvas…";
+      try {
+        const res = await reconcileCanvasDates_(backend.activeClassId, { quiet: true });
+        const pulled = ((res && res.changes) || []).filter((x) => x.action === "pulled" && r.items.some((it) => it.aKey === x.key));
+        if (pulled.length) { await openSectionCanvas_(section, focusKey); const m2 = document.getElementById("secMsg"); if (m2) m2.textContent = `Brought in date changes from Canvas for ${pulled.length} assignment${pulled.length === 1 ? "" : "s"}.`; return; }
+        msg.textContent = (res && res.message) ? res.message : "Canvas matches what is here — nothing to change.";
+      } catch (e) { msg.textContent = e.message || String(e); }
+      chkBtn.disabled = false;
     };
     const f = focusKey && root.querySelector(`.sec-row.is-focus input[type=date]`);
     if (f) setTimeout(() => { try { f.closest(".sec-row").scrollIntoView({ block: "nearest" }); f.focus(); } catch (e) {} }, 40);
@@ -1608,12 +1631,15 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
         const id = secId_(it.aKey);
         const due = isoFromLocalInput_(joinDateTime_("secDue_" + id, "secDueT_" + id, DEFAULT_DUE_TIME));
         const open = isoFromLocalInput_(joinDateTime_("secOpen_" + id, "secOpenT_" + id, DEFAULT_OPEN_TIME));
+        const lock = isoFromLocalInput_(joinDateTime_("secLock_" + id, "secLockT_" + id, DEFAULT_DUE_TIME));
         const inc = root.querySelector(`.secInclude[data-akey="${it.aKey}"]`);
         if (inc && inc.checked) {
           payload.include.push(it.aKey);
           if (due && open && open > due && !clash) clash = `${it.label} opens after it is due. Change its “Available from” date or its due date.`;
+          if (lock && due && lock < due && !clash) clash = `${it.label} locks before it is due. Change its “Lock after” date or its due date.`;
+          if (lock && open && lock < open && !clash) clash = `${it.label} locks before it opens. Change its “Lock after” date.`;
         }
-        payload.schedules[it.aKey] = { dueAt: due, unlockAt: open };
+        payload.schedules[it.aKey] = { dueAt: due, unlockAt: open, lockAt: lock };
       });
       if (clash) { msg.textContent = clash; return; }
       if (secModSel.value !== secModSel.dataset.orig) payload.sectionModule = secModSel.value === "__unit" ? null : toModule(secModSel.value);
@@ -1651,16 +1677,21 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
       .hubSectionCanvasBtn.hub-mini-btn{font-size:12px;padding:6px 10px}
       .hub-section-msg{margin:4px 0 10px;font-size:12.5px;color:#28452f;background:#eef6ef;border:1px solid #c9dfcd;border-radius:6px;padding:7px 10px}
       .canvas-unit-module{margin-top:14px}.canvas-unit-module-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
-      .canvas-section-modalbox{width:min(1080px,calc(100vw - 24px))!important;max-width:none!important;max-height:calc(100vh - 32px);overflow:auto}
+      .canvas-section-modalbox{width:min(1240px,calc(100vw - 24px))!important;max-width:none!important;max-height:calc(100vh - 32px);overflow:auto}
       .sec-module-box{border:1px solid #d8cebc;background:#fffaf0;border-radius:8px;padding:10px 12px;margin:10px 0}
       .sec-field{display:flex;flex-direction:column;gap:4px;min-width:0}.sec-field>span{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
       .sec-field select{width:100%;max-width:100%;min-width:0;padding:7px 8px;border:1px solid #cfc5b2;border-radius:5px;background:#fff;font:inherit;font-size:13px}
       .sec-rows{display:flex;flex-direction:column;gap:8px;margin-top:8px}
-      .sec-row{display:grid;grid-template-columns:minmax(180px,1.1fr) minmax(0,1.6fr) minmax(170px,1fr);gap:10px 14px;align-items:start;border:1px solid #e1d8c7;border-radius:8px;padding:10px 12px;background:#fff}
+      .sec-name{display:flex;flex-direction:column;gap:8px;min-width:0}
+      .sec-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding-left:24px}
+      .sec-actions .secPush{font-size:12px;padding:5px 10px;background:#b9963b;border-color:#a78632;color:#18243f;font-weight:800}
+      .sec-pushed{font-size:12px;color:#5f5a50}
+      .sec-spacer{flex:1}
+      .sec-row{display:grid;grid-template-columns:minmax(190px,1fr) minmax(0,2.3fr) minmax(170px,.9fr);gap:10px 14px;align-items:start;border:1px solid #e1d8c7;border-radius:8px;padding:10px 12px;background:#fff}
       .sec-row.is-focus{box-shadow:0 0 0 2px #b9963b}.sec-row.is-off{opacity:.62}
       .sec-include{display:flex;gap:8px;align-items:flex-start;cursor:pointer}.sec-include input{margin-top:3px}
       .sec-include span{display:flex;flex-direction:column;gap:2px;min-width:0}.sec-include small{font-size:12px;color:var(--muted);line-height:1.35}
-      .sec-dates{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}.sec-dates .field{margin:0}.sec-dates .due-inputs{display:flex;gap:6px;flex-wrap:wrap}.sec-dates .due-inputs input{min-width:0;flex:1 1 120px}
+      .sec-dates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}.sec-dates .field{margin:0}.sec-dates .due-inputs{display:flex;gap:6px;flex-wrap:wrap}.sec-dates .due-inputs input{min-width:0;flex:1 1 120px}
       .sec-picks{display:flex;flex-direction:column;gap:8px;min-width:0}
       .sec-error{color:#8c1d17}
       @media(max-width:860px){.sec-row{grid-template-columns:1fr}.sec-dates{grid-template-columns:1fr}}
@@ -2054,7 +2085,11 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
         backend.dashboard = fresh;
         applyDashboardState_(fresh);
       }
-      if (state.view === "manage") render();
+      if (state.view === "manage") {
+        let a = document.activeElement;
+        if (a && a.classList && a.classList.contains("gbScoreInput")) backend.dashboardStale = true; // repaint after you leave the box
+        else render();
+      }
     } catch (e) {
       console.warn("Gradebook refresh skipped:", e);
     } finally { backend._dashboardRefreshing = false; }
@@ -2208,10 +2243,34 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     let history = r.mcRedoCount ? `<span class="mc-retry-note">${r.mcRedoCount} previous redo${r.mcRedoCount === 1 ? "" : "s"}</span>` : "";
     return `<div class="mc-retry-strip"><strong>Comprehension:</strong><span>${scoreText}</span>${retry}${history}</div>`;
   }
+  // v52: "Submitted Oct 28, 9:14 PM" on every marking screen, and "Late · 2 days"
+  // when that is after the due date set for the assignment (Due date & Canvas).
+  function subTimeHtml_(iso, aKey, verb) {
+    if (!iso) return "";
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    const fmt = { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
+    const dueRaw = (canvasSchedule_()[aKey] || {}).dueAt || ((canvasSettings_().assignments || {})[aKey] || {}).dueAt || "";
+    const due = dueRaw ? new Date(dueRaw) : null;
+    let tail = "";
+    if (due && !Number.isNaN(due.getTime())) {
+      const mins = (d.getTime() - due.getTime()) / 60000;
+      if (mins > 0) {
+        const n = mins < 60 ? Math.ceil(mins) : mins < 1440 ? Math.round(mins / 60) : Math.round(mins / 1440);
+        const unit = mins < 60 ? "min" : mins < 1440 ? "hr" : (n === 1 ? "day" : "days");
+        tail = `<span class="mini-chip sub-late" title="Due ${esc(due.toLocaleString([], fmt))}">Late · ${n} ${unit}</span>`;
+      } else tail = `<span class="mini-chip sub-ontime" title="Due ${esc(due.toLocaleString([], fmt))}">On time</span>`;
+    }
+    return `<span class="mini-chip sub-time" title="${esc((verb || "Submitted") + " " + d.toLocaleString())}">${esc(verb || "Submitted")} ${esc(d.toLocaleString([], fmt))}</span>${tail}`;
+  }
+  function discFirstPostAt_(r) {
+    let t = (r.posts || []).map((p) => new Date(p.createdAt || "").getTime()).filter((x) => !Number.isNaN(x));
+    return t.length ? new Date(Math.min.apply(null, t)).toISOString() : "";
+  }
   function batchStudentRowHtml_(storyId, r) {
     let a = authorshipBlock_(r.dokText, r.process, "story", storyId);
     return `<div class="item-grade-block batch-row" data-email="${esc(r.email)}" data-grade-rank="${batchSortRank_(r)}" data-student-name="${esc(r.name || "")}">
-      <h5>${esc(r.name)} ${batchStatusBadgeHtml_(r)} ${a.chip}</h5>
+      <h5>${esc(r.name)} ${batchStatusBadgeHtml_(r)} ${subTimeHtml_(r.submittedAt, "story:" + storyId)} ${a.chip}</h5>
       ${mcRetryStripHtml_(r)}
       ${a.box}
       ${a.note}
@@ -2375,7 +2434,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
   function stageBatchStudentRowHtml_(r) {
     let a = authorshipBlock_(stageBatchText_(r), stageBatchProcess_(r), "finalDraft", "finalDraft");
     return `<div class="item-grade-block batch-row" data-email="${esc(r.email)}" data-grade-rank="${stageBatchSortRank_(r)}" data-student-name="${esc(r.name || "")}">
-      <h5>${esc(r.name)} ${stageBatchStatusBadgeHtml_(r)} ${a.chip}</h5>
+      <h5>${esc(r.name)} ${stageBatchStatusBadgeHtml_(r)} ${subTimeHtml_(r.submittedAt, "stage:" + backend.batchStageKey)} ${a.chip}</h5>
       ${stageBatchEvidenceHtml_(r)}
       ${a.note}
       <div class="grade-row-dok${geminiPanelHasPicks_(r) ? " has-gemini-picks" : ""}">${stageBatchScoreRow(r, r.email)}<label class="exclude-toggle"><input type="checkbox" class="stageBatchExcludeToggle" data-email="${esc(r.email)}" ${r.excluded ? "checked" : ""}> Exclude from grade</label>${geminiTeacherBoxHtml_(r)}<textarea class="stageBatchComment" data-email="${esc(r.email)}" placeholder="Optional feedback comment for the student">${esc(r.comment || "")}</textarea></div>
@@ -2478,6 +2537,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
       list.forEach((r) => {
         if (!byEmail[r.email]) byEmail[r.email] = { email: r.email, name: r.name, submitted:r.submitted, finalText: r.finalText, process: r.process || {}, criteria: {} };
         byEmail[r.email].submitted = r.submitted;
+        if (r.submittedAt) byEmail[r.email].submittedAt = r.submittedAt;
         byEmail[r.email].name = r.name || byEmail[r.email].name;
         if (r.finalText) byEmail[r.email].finalText = r.finalText;
         // This was dropped entirely, so the Final Draft screen could never show
@@ -2574,7 +2634,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
   // compact band buttons (level name + points), the teacher score on one line,
   // the student's self-rating as one line under it, then Exclude, the comment
   // box and the Gemini suggestions. Handler classes are unchanged.
-  const SSL_BAND_NAMES = { 7: "Exceeds", 6: "Strong", 5: "Developing", 4: "Limited", 0: "Beginning" };
+  const SSL_BAND_NAMES = { 7: "Exceeds", 6: "Strong", 5: "Developing", 4: "Limited", 1: "Incomplete", 0: "Incomplete" };
   function sslBandName_(points) { return SSL_BAND_NAMES[points] || points + " pts"; }
   function critBatchMbButtons_(criterion, r, email) {
     let levels = STORY_RUBRIC[criterion].levels;
@@ -2622,7 +2682,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     let em = esc(student.email);
     let focused = backend.finalFocusEmail === student.email;
     return `<div class="item-grade-block batch-row final-row final-draft-batch-row ssl-mbfinal${focused ? " focus-mode" : ""}" data-email="${em}" data-grade-rank="${finalBatchSortRank_(student)}" data-student-name="${esc(student.name || "")}">
-      <h5 class="final-student-head"><span class="final-student-name">${esc(student.name)}</span><span class="final-summary">${finalMbSummaryHtml_(student)}</span>${auth.chip}</h5>
+      <h5 class="final-student-head"><span class="final-student-name">${esc(student.name)}</span><span class="final-summary">${finalMbSummaryHtml_(student)}</span>${subTimeHtml_(student.submittedAt, "finalDraft:finalDraft")}${auth.chip}</h5>
       <div class="focus-head"><span class="focus-left">${focused ? esc(finalLeftText_()) : ""}</span><button type="button" class="btn ffocusPrevBtn" title="Back to the student you saw before this one">← Back</button><button type="button" class="btn ffocusNextBtn" title="The next student who has submitted and is not marked yet">Next to mark →</button><button type="button" class="btn primary ffocusCloseBtn" title="Back to the list (Esc)">✕ Close focus</button></div>
       <div class="batch-work"><div class="focus-open-row"><button type="button" class="btn ffocusOpenBtn" data-email="${em}" title="Open this story full-screen beside the rubric">⤢ Focused grading</button></div><div class="response-box final-essay-text final-draft-response">${student.finalText ? `${raFinal.bar}<div ${raFinal.attrs}>${raFinal.body}</div>` : "<em>No final draft submitted yet.</em>"}</div>${auth.note}</div>
       ${student.finalText ? `<div class="ffb-bar" data-email="${em}">${ffbBarHtml_(student)}</div>` : ""}
@@ -3123,7 +3183,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     // the word count covers both, which is what the rubric asks about.
     let a = authorshipBlock_(discBatchText_(r), r.process || {}, "", "");
     return `<div class="item-grade-block batch-row" data-email="${esc(r.email)}" data-grade-rank="${discBatchSortRank_(r)}" data-student-name="${esc(r.name || "")}">
-      <h5>${esc(r.name)} ${discBatchStatusBadgeHtml_(r)} ${a.chip}</h5>
+      <h5>${esc(r.name)} ${discBatchStatusBadgeHtml_(r)} ${subTimeHtml_(discFirstPostAt_(r), "discussion:" + backend.batchDiscussion, "Posted")} ${a.chip}</h5>
       ${discussionEvidenceHtml(r)}
       ${a.note}
       <div class="grade-row-dok">${discBatchScoreRow(r, r.email)}<label class="exclude-toggle"><input type="checkbox" class="discBatchExcludeToggle" data-email="${esc(r.email)}" ${r.excluded ? "checked" : ""}> Exclude from grade</label><textarea class="discBatchComment" data-email="${esc(r.email)}" placeholder="Optional feedback comment for the student">${esc(r.comment || "")}</textarea></div>
@@ -3259,7 +3319,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     return rubricLevelRow(rub, r.excluded ? null : r.score, "activityBatchScoreBtn", `data-email="${esc(r.email)}"`) + teacherScoreInputHtml_("activityBatchManualScore", ACTIVITY_RUBRIC_MAX, r.score, `data-email="${esc(r.email)}"`) + offRubricNoteHtml_(rub, r.score);
   }
   function activityBatchStudentRowHtml_(r) {
-    return `<div class="item-grade-block batch-row activity-batch-row" data-email="${esc(r.email)}" data-grade-rank="${activityBatchSortRank_(r)}" data-student-name="${esc(r.name || "")}"><h5>${esc(r.name)} ${activityBatchStatusBadgeHtml_(r)} ${authorshipBlock_((r.evidence||[]).map((x)=>activityFreeText_(x.value)).filter(Boolean).join("\n\n"), r.process, "activity", backend.batchActivityKey).chip}</h5>${activityEvidenceHtml_(r)}<div class="grade-row-dok">${activityBatchScoreRow_(r)}<label class="exclude-toggle"><input type="checkbox" class="activityBatchExcludeToggle" data-email="${esc(r.email)}" ${r.excluded ? "checked" : ""}> Exclude from grade</label><textarea class="activityBatchComment" data-email="${esc(r.email)}" placeholder="Optional feedback comment for the student">${esc(r.comment || "")}</textarea></div></div>`;
+    return `<div class="item-grade-block batch-row activity-batch-row" data-email="${esc(r.email)}" data-grade-rank="${activityBatchSortRank_(r)}" data-student-name="${esc(r.name || "")}"><h5>${esc(r.name)} ${activityBatchStatusBadgeHtml_(r)} ${subTimeHtml_(r.submittedAt, "activity:" + backend.batchActivityKey)} ${authorshipBlock_((r.evidence||[]).map((x)=>activityFreeText_(x.value)).filter(Boolean).join("\n\n"), r.process, "activity", backend.batchActivityKey).chip}</h5>${activityEvidenceHtml_(r)}<div class="grade-row-dok">${activityBatchScoreRow_(r)}<label class="exclude-toggle"><input type="checkbox" class="activityBatchExcludeToggle" data-email="${esc(r.email)}" ${r.excluded ? "checked" : ""}> Exclude from grade</label><textarea class="activityBatchComment" data-email="${esc(r.email)}" placeholder="Optional feedback comment for the student">${esc(r.comment || "")}</textarea></div></div>`;
   }
   function updateActivityBatchRowUI_(email) {
     let r = getActivityBatchResponse_(email); if (!r) return;
@@ -3368,7 +3428,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     return rubricLevelRow(rub, r.excluded ? null : r.score, "annBatchScoreBtn", `data-email="${esc(r.email)}"`) + teacherScoreInputHtml_("annBatchManualScore", ANNOTATION_MAX, r.score, `data-email="${esc(r.email)}"`) + offRubricNoteHtml_(rub, r.score);
   }
   function annotationBatchStudentRowHtml_(r) {
-    return `<div class="item-grade-block batch-row annotation-batch-row" data-email="${esc(r.email)}" data-grade-rank="${annotationBatchSortRank_(r)}" data-student-name="${esc(r.name || "")}"><h5>${esc(r.name)} ${annotationBatchStatusBadgeHtml_(r)} ${annotationCountChipHtml_(r)}</h5>${annotationEvidenceHtml_(r)}<div class="grade-row-dok">${annotationBatchScoreRow_(r)}<label class="exclude-toggle"><input type="checkbox" class="annBatchExcludeToggle" data-email="${esc(r.email)}" ${r.excluded ? "checked" : ""}> Exclude from grade</label><textarea class="annBatchComment" data-email="${esc(r.email)}" placeholder="Optional feedback comment for the student">${esc(r.comment || "")}</textarea></div></div>`;
+    return `<div class="item-grade-block batch-row annotation-batch-row" data-email="${esc(r.email)}" data-grade-rank="${annotationBatchSortRank_(r)}" data-student-name="${esc(r.name || "")}"><h5>${esc(r.name)} ${annotationBatchStatusBadgeHtml_(r)} ${subTimeHtml_(r.submittedAt, "story:" + backend.batchStoryId)} ${annotationCountChipHtml_(r)}</h5>${annotationEvidenceHtml_(r)}<div class="grade-row-dok">${annotationBatchScoreRow_(r)}<label class="exclude-toggle"><input type="checkbox" class="annBatchExcludeToggle" data-email="${esc(r.email)}" ${r.excluded ? "checked" : ""}> Exclude from grade</label><textarea class="annBatchComment" data-email="${esc(r.email)}" placeholder="Optional feedback comment for the student">${esc(r.comment || "")}</textarea></div></div>`;
   }
   function updateAnnotationBatchRowUI_(email) {
     let r = getAnnotationBatchResponse_(email); if (!r) return;
@@ -3509,6 +3569,80 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     let has = hasOfficialScore_(raw);
     return `<td><button type="button" class="gradebook-cell gradebookJump is-excluded-cell" data-col="${esc(col)}" data-email="${esc(s.email)}" title="${esc(s.name)}'s ${esc(label)} is excluded from the grade${has ? " (score " + raw + "/" + max + " not counted)" : ""}. Open to change it.">excl.${has ? " " + raw : ""}</button></td>`;
   }
+  // v51: a single-score gradebook cell is a box you type the mark into (saved
+  // on Enter or when you leave the box, with the comment kept), plus ↗ to open
+  // the work. Cells made of several parts (a story, the Final Draft) still open
+  // the marking screen.
+  function gbEntryCellHtml_(s, itemType, itemKey, rec, max, label, openBtn) {
+    let has = !rec.excluded && hasOfficialScore_(rec.score);
+    let val = has ? String(rec.score) : "";
+    return `<td class="gb-entry-td"><span class="gb-entry${has ? "" : " is-empty"}"><input type="number" inputmode="decimal" class="gbScoreInput" min="0" max="${max}" step="0.5" value="${esc(val)}" data-orig="${esc(val)}" data-type="${esc(itemType)}" data-key="${esc(itemKey)}" data-email="${esc(s.email)}" data-name="${esc(s.name)}" data-max="${max}" aria-label="${esc(s.name)} · ${esc(label)} score out of ${max}" title="Type a score from 0 to ${max} and press Enter"><span class="gb-max">/${max}</span>${openBtn}</span></td>`;
+  }
+  function gbRecFor_(gs, itemType, itemKey) {
+    if (!gs) return null;
+    if (itemType === "activity") return gs.activities && gs.activities[itemKey];
+    if (itemType === "discussion") return gs.discussions && gs.discussions[itemKey];
+    if (itemType === "writingStage") return gs.writingStages && gs.writingStages[itemKey];
+    return null;
+  }
+  function gbSaveEntry_(input) {
+    let raw = String(input.value || "").trim();
+    if (raw === String(input.dataset.orig || "")) { input.closest(".gb-entry").classList.remove("is-bad"); return; }
+    let max = Number(input.dataset.max) || 7;
+    let score = raw === "" ? null : Number(raw);
+    let cell = input.closest(".gb-entry");
+    if (score !== null && (!Number.isFinite(score) || score < 0 || score > max)) {
+      cell.classList.add("is-bad");
+      input.title = "Use a number from 0 to " + max;
+      return;
+    }
+    if (score !== null) score = Math.round(score * 2) / 2;
+    cell.classList.remove("is-bad");
+    let stu = backend.dashboard && Array.isArray(backend.dashboard.students) ? backend.dashboard.students.find((x) => x.email === input.dataset.email) : null;
+    let rec = stu && gbRecFor_(stu.gradeSummary, input.dataset.type, input.dataset.key);
+    queueGradeMutation_({ classId: backend.activeClassId, studentEmail: input.dataset.email, studentName: input.dataset.name, itemType: input.dataset.type, itemKey: input.dataset.key, score: score, excluded: false, keepComment: true });
+    if (rec) { rec.score = score; rec.rawScore = score; }
+    input.value = score === null ? "" : String(score);
+    input.dataset.orig = input.value;
+    cell.classList.toggle("is-empty", score === null);
+    cell.classList.add("is-saved");
+    setTimeout(() => cell.classList.remove("is-saved"), 1200);
+    // Counts on the Grading Hub change; refresh them quietly (the gradebook
+    // itself is not repainted while you are typing in it).
+    delete backend.gradingHubCache[backend.activeClassId];
+  }
+  document.addEventListener("keydown", (e) => {
+    let t = e.target;
+    if (!t || !t.classList || !t.classList.contains("gbScoreInput")) return;
+    if (e.key === "Enter") { e.preventDefault(); gbSaveEntry_(t); gbMoveDown_(t); }
+    else if (e.key === "Escape") { t.value = t.dataset.orig || ""; t.blur(); }
+  });
+  document.addEventListener("focusout", (e) => {
+    let t = e.target;
+    if (t && t.classList && t.classList.contains("gbScoreInput")) {
+      gbSaveEntry_(t);
+      // A background refresh waits while you type in the gradebook; once you
+      // leave it for something other than another score box, catch up.
+      setTimeout(() => {
+        let a = document.activeElement;
+        if (backend.dashboardStale && !(a && a.classList && a.classList.contains("gbScoreInput"))) refreshStaleDashboard_();
+      }, 300);
+    }
+  });
+  // Enter moves to the same assignment for the next student, like a spreadsheet.
+  function gbMoveDown_(input) {
+    let td = input.closest("td"), tr = td && td.parentElement;
+    if (!tr) return;
+    let idx = Array.prototype.indexOf.call(tr.children, td);
+    let next = tr.nextElementSibling;
+    while (next) {
+      let cell = next.children[idx];
+      let box = cell && cell.querySelector(".gbScoreInput");
+      if (box) { box.focus(); box.select(); return; }
+      next = next.nextElementSibling;
+    }
+    input.blur();
+  }
   function gradebookCard(dash) {
     // Only show work the class has actually been assigned. Reading stories
     // follow release order; writing work follows the instructional sequence
@@ -3526,18 +3660,19 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
         let a = (gs.activities && gs.activities["pre:" + item.key]) || { score: null, excluded: false };
         let graded = !a.excluded && hasOfficialScore_(a.score);
         if (a.excluded) return excludedCellHtml_(s, item.label, "activity:pre:" + item.key, a.rawScore, ACTIVITY_RUBRIC_MAX);
-        return `<td><button type="button" class="gradebook-cell gradebookJump ${graded ? "" : "ungraded"}" data-col="activity:pre:${item.key}" data-email="${esc(s.email)}" title="Open ${esc(s.name)}'s ${esc(item.label)}">${graded ? a.score + "/" + ACTIVITY_RUBRIC_MAX : "—"}</button></td>`;
+        return gbEntryCellHtml_(s, "activity", "pre:" + item.key, a, ACTIVITY_RUBRIC_MAX, item.label, `<button type="button" class="gb-open gradebookJump" data-col="activity:pre:${item.key}" data-email="${esc(s.email)}" title="Open ${esc(s.name)}'s ${esc(item.label)}" aria-label="Open ${esc(s.name)}'s ${esc(item.label)}">↗</button>`);
       }
       if (item.type === "discussion") {
         let d = (gs.discussions && gs.discussions[item.key]) || { score: null, excluded: false };
         let graded = !d.excluded && hasOfficialScore_(d.score);
-        return `<td><button type="button" class="gradebook-cell discussionJump ${graded ? "" : "ungraded"}" data-col="discussion:${item.key}" data-discussion="${item.key}" title="Open the whole-class ${esc(item.label)} grading screen">${graded ? d.score + "/" + DISCUSSION_MAX : "—"}</button></td>`;
+        if (d.excluded) return `<td><button type="button" class="gradebook-cell discussionJump is-excluded-cell" data-col="discussion:${item.key}" data-discussion="${item.key}" title="Excluded · open the whole-class ${esc(item.label)} grading screen">ex</button></td>`;
+        return gbEntryCellHtml_(s, "discussion", item.key, d, DISCUSSION_MAX, item.label, `<button type="button" class="gb-open discussionJump" data-col="discussion:${item.key}" data-discussion="${item.key}" title="Open the whole-class ${esc(item.label)} grading screen" aria-label="Open the ${esc(item.label)} grading screen">↗</button>`);
       }
       if (item.type === "stage") {
         let st = (gs.writingStages && gs.writingStages[item.key]) || { score: null, excluded: false };
         let graded = !st.excluded && hasOfficialScore_(st.score);
         if (st.excluded) return excludedCellHtml_(s, item.label, "stage:" + item.key, st.rawScore, WRITING_STAGE_MAX);
-        return `<td><button type="button" class="gradebook-cell gradebookJump ${graded ? "" : "ungraded"}" data-col="stage:${item.key}" data-email="${esc(s.email)}" title="Open ${esc(s.name)}'s ${esc(item.label)}">${graded ? st.score + "/" + WRITING_STAGE_MAX : "—"}</button></td>`;
+        return gbEntryCellHtml_(s, "writingStage", item.key, st, WRITING_STAGE_MAX, item.label, `<button type="button" class="gb-open gradebookJump" data-col="stage:${item.key}" data-email="${esc(s.email)}" title="Open ${esc(s.name)}'s ${esc(item.label)}" aria-label="Open ${esc(s.name)}'s ${esc(item.label)}">↗</button>`);
       }
       let rt = gs.rubricTotal || { earned: 0, possible: 0, pending: false, hasAnyResult: false };
       let display = rt.possible ? `${rt.hasAnyResult ? rt.earned : "—"}/${rt.possible}` : "—";
@@ -3561,7 +3696,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     }).join("");
 
     let emptyNote = !assignedStories.length && !writingSeq.length ? `<p class="toolbar-note">No graded work is assigned yet. Release a story or Writing Workshop assignment in the Grading Hub and it will appear here.</p>` : "";
-    return `<div class="card teacher-gradebook-card"><div class="teacher-card-heading teacher-card-heading-row"><div class="teacher-heading-group"><span class="teacher-card-icon">▥</span><div><span class="eyebrow">Class record</span><h3>Gradebook</h3></div></div><div class="canvas-gradebook-actions"><button class="btn canvas-push-btn" id="pushCanvasGradebookBtn">Push to Canvas</button><span id="canvasGradebookStatus" class="toolbar-note"></span></div></div><p class="toolbar-note teacher-card-note">Only assigned work appears here. Writing Workshop runs left to right in the same sequence students complete it.</p>${emptyNote}${assignedStories.length || writingSeq.length ? `<div style="overflow:auto"><table class="gradebook-table"><thead>${groupHead}${detailHead}</thead><tbody>${rows}</tbody></table></div>` : ""}</div>`;
+    return `<div class="card teacher-gradebook-card"><div class="teacher-card-heading teacher-card-heading-row"><div class="teacher-heading-group"><span class="teacher-card-icon">▥</span><div><span class="eyebrow">Class record</span><h3>Gradebook</h3></div></div><div class="canvas-gradebook-actions"><button class="btn canvas-push-btn" id="pushCanvasGradebookBtn">Push to Canvas</button><span id="canvasGradebookStatus" class="toolbar-note"></span></div></div><p class="toolbar-note teacher-card-note">Only assigned work appears here. Writing Workshop runs left to right in the same sequence students complete it. Type a mark straight into a white box and press Enter (it saves and moves down); ↗ opens the work.</p>${emptyNote}${assignedStories.length || writingSeq.length ? `<div style="overflow:auto"><table class="gradebook-table"><thead>${groupHead}${detailHead}</thead><tbody>${rows}</tbody></table></div>` : ""}</div>`;
   }
   function downloadTextFile_(filename, content) {
     let blob = new Blob([content], { type: "text/csv;charset=utf-8" });
@@ -3844,7 +3979,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
   function nameFixCard_() {
     if (!backend.nameNeedsCompleting || backend.nameFixDismissed) return "";
     let guess = String(backend.rosterName || backend.user.name || "").trim();
-    return `<div class="card name-fix-card"><div class="name-fix-head"><span class="name-fix-mark">!</span><div><strong>Add your last name</strong><p>Your work is showing up on your teacher's roster as “${esc(guess)}”. Add your full name so your teacher knows whose work it is.</p></div></div><div class="name-field-row"><div class="field"><label>First name</label><input id="fixFirst" value="${esc(guess.indexOf(" ") > 0 ? guess.slice(0, guess.lastIndexOf(" ")) : guess)}" autocomplete="given-name"></div><div class="field"><label>Last name</label><input id="fixLast" value="" autocomplete="family-name"></div></div><div class="name-fix-actions"><button class="btn primary" id="saveMyNameBtn">Save my name</button><button class="btn" id="dismissNameFix">Not now</button></div><p id="nameFixMsg" class="toolbar-note"></p></div>`;
+    return `<div class="card name-fix-card"><div class="name-fix-head"><span class="name-fix-mark">!</span><div><strong>Add your last name</strong><p>Your work is showing up on your teacher's roster as “${esc(guess)}”. Add your full name so your teacher knows whose work it is.</p></div></div><div class="name-field-row"><div class="field"><label>First name</label><input id="fixFirst" value="${esc(guess.indexOf(" ") > 0 ? guess.slice(0, guess.lastIndexOf(" ")) : guess)}" autocomplete="given-name"></div><div class="field"><label>Last name</label><input id="fixLast" value="" autocomplete="family-name"></div></div><div class="name-fix-actions"><button class="btn primary" id="saveMyNameBtn">Save my name</button></div><p id="nameFixMsg" class="toolbar-note"></p></div>`;
   }
 
   function bindNameFix_() {
@@ -4480,10 +4615,10 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
   // the exact same click.
   function storyRubricQuickLabel_(key, points) {
     const labels = {
-      plot: {7:"Well-developed plot",6:"Clear plot",5:"Basic plot",4:"Weak / unclear plot",0:"No plot evidence"},
-      character: {7:"Complex, well-developed",6:"Developed character",5:"Basic development",4:"Limited development",0:"No character evidence"},
-      setting: {7:"Vivid, purposeful setting",6:"Clear setting",5:"Basic setting",4:"Limited / unclear setting",0:"No setting evidence"},
-      theme: {7:"Strong, integrated theme",6:"Theme is present",5:"Unclear / underdeveloped",0:"No theme evidence"},
+      plot: {7:"Well-developed plot",6:"Clear plot",5:"Basic plot",4:"Weak / unclear plot",1:"Incomplete",0:"No plot evidence"},
+      character: {7:"Complex, well-developed",6:"Developed character",5:"Basic development",4:"Limited development",1:"Incomplete",0:"No character evidence"},
+      setting: {7:"Vivid, purposeful setting",6:"Clear setting",5:"Basic setting",4:"Limited / unclear setting",1:"Incomplete",0:"No setting evidence"},
+      theme: {7:"Strong, integrated theme",6:"Theme is present",5:"Unclear / underdeveloped",4:"Barely evident",1:"Incomplete",0:"No theme evidence"},
     };
     return (labels[key] && labels[key][points]) || (points + " points");
   }
@@ -4507,7 +4642,7 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
     let st = (gs && gs.storyRubric && gs.storyRubric[key]) || { score: null, excluded: false, comment: "", pending: false };
     let selfEval = (s && s.writing && s.writing.finalSelfEval) || {};
     let selfComments = (s && s.writing && s.writing.finalSelfComments) || {};
-    let selfIdx = selfEval[key];
+    let selfIdx = storyRubricSelfIdx_(s && s.writing, key);
     let selfLevel = selfIdx !== undefined && selfIdx !== "" ? c.levels[selfIdx] : null;
     let pillText = st.excluded ? "excluded" : st.score === null ? "not yet graded" : st.pending ? st.score + "/" + STORY_RUBRIC_MAX + " -- pending" : st.score + "/" + STORY_RUBRIC_MAX;
     return `<div class="item-grade-block" data-crit="${key}">
@@ -5767,6 +5902,119 @@ body.role-admin .hub-lab-card .mini-chip.hub-badge-tomark{background:#fbe3e4!imp
   // the server didn't get; this just tries to send it right away too.
   window.addEventListener("pagehide", () => { try { flushStudentSaveSoon_(); } catch (e) {} });
   setInterval(() => { if (!document.hidden) refreshStudentWorkIfStale_(); }, 3 * 60 * 1000);
+
+  // ---- v51: on every marking screen, a search box for a student; on every
+  // teacher screen, a "↑ Dashboard" button once you have scrolled down. ----
+  backend.gradeSearch = backend.gradeSearch || "";
+  function gsNorm_(t) { return String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, ""); }
+  function gradeSearchApply_() {
+    let box = document.getElementById("gradeSearch");
+    if (!box) return;
+    let q = gsNorm_(backend.gradeSearch).trim();
+    let rows = Array.from(document.querySelectorAll("#app .batch-row[data-email]"));
+    let shown = 0;
+    rows.forEach((r) => {
+      let hay = gsNorm_((r.dataset.studentName || "") + " " + (r.dataset.email || "") + " " + ((r.querySelector("h5") || {}).textContent || ""));
+      let hit = !q || q.split(/\s+/).every((w) => hay.indexOf(w) !== -1);
+      r.classList.toggle("gs-hidden", !hit);
+      if (hit) shown++;
+    });
+    document.querySelectorAll("#app .batch-grade-group").forEach((g) => {
+      let any = g.querySelector(".batch-row[data-email]:not(.gs-hidden)");
+      g.classList.toggle("gs-group-dim", !!q && !any);
+    });
+    let n = document.getElementById("gradeSearchCount");
+    if (n) n.textContent = q ? (shown ? shown + " of " + rows.length + " students" : "No student matches") : (rows.length ? rows.length + " students" : "");
+  }
+  function gradeToolsInsert_() {
+    let back = document.getElementById("backToDashboard");
+    if (!back) return;
+    let head = back.closest(".sectionhead");
+    if (!head || document.getElementById("gradeSearch")) { gradeSearchApply_(); return; }
+    head.insertAdjacentHTML("afterend", `<div class="grade-search-bar" role="search"><label class="grade-search-label" for="gradeSearch">Find a student</label><input type="search" id="gradeSearch" autocomplete="off" placeholder="Type a name…" value="${esc(backend.gradeSearch)}"><span id="gradeSearchCount" class="grade-search-count" aria-live="polite"></span></div>`);
+    gradeSearchApply_();
+  }
+  document.addEventListener("input", (e) => {
+    if (e.target && e.target.id === "gradeSearch") { backend.gradeSearch = e.target.value; gradeSearchApply_(); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.target && e.target.id === "gradeSearch" && e.key === "Escape") { e.target.value = ""; backend.gradeSearch = ""; gradeSearchApply_(); }
+  });
+  let gsTimer = null;
+  try {
+    new MutationObserver(() => {
+      clearTimeout(gsTimer);
+      gsTimer = setTimeout(() => { if (document.getElementById("backToDashboard")) gradeToolsInsert_(); }, 60);
+    }).observe(document.getElementById("app"), { childList: true, subtree: true });
+  } catch (e) {}
+  function floatDashUpdate_() {
+    let b = document.getElementById("floatDashBtn");
+    if (!b) return;
+    let teacher = backend.enabled && backend.user && backend.user.role !== "student" && !backend.previewAsStudent;
+    let focus = !!document.querySelector(".batch-row.focus-mode");
+    let onDash = state.view === "manage";
+    b.textContent = onDash ? "↑ Top" : "↑ Dashboard";
+    b.title = onDash ? "Back to the top of the Teacher Dashboard" : "Back to the Teacher Dashboard";
+    b.hidden = !(teacher && !focus && (window.scrollY || document.documentElement.scrollTop || 0) > 500);
+  }
+  (function floatDashInit_() {
+    if (document.getElementById("floatDashBtn")) return;
+    let b = document.createElement("button");
+    b.type = "button"; b.id = "floatDashBtn"; b.className = "float-dash-btn"; b.hidden = true;
+    b.onclick = () => {
+      if (state.view !== "manage") {
+        let back = document.getElementById("backToDashboard");
+        if (back) back.click();
+        else { state.view = "manage"; render(); loadGradingHub(backend.activeClassId); }
+      }
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      setTimeout(floatDashUpdate_, 400);
+    };
+    document.body.appendChild(b);
+    window.addEventListener("scroll", floatDashUpdate_, { passive: true });
+  })();
+  {
+    const renderBeforeTools_ = render;
+    render = function () {
+      if (state.view === "manage") backend.gradeSearch = "";
+      let out = renderBeforeTools_.apply(this, arguments);
+      try { gradeToolsInsert_(); floatDashUpdate_(); } catch (e) { console.warn("grade tools", e); }
+      return out;
+    };
+  }
+  (function gradeToolsStyles_() {
+    if (document.getElementById("gradeToolsStyles")) return;
+    const st = document.createElement("style");
+    st.id = "gradeToolsStyles";
+    st.textContent = `
+      .grade-search-bar{position:sticky;top:0;z-index:40;display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0 12px;padding:9px 12px;background:#fffdf8;border:1px solid #ddd5c8;border-radius:10px;box-shadow:0 2px 8px rgba(40,30,20,.06)}
+      .grade-search-label{font-size:12px;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:#5f5a50}
+      #gradeSearch{flex:1 1 220px;max-width:420px;min-width:0;padding:8px 11px;border:1px solid #cfc6b8;border-radius:8px;font:inherit;font-size:15px;background:#fff;color:#111827}
+      .grade-search-count{font-size:12.5px;color:#5f5a50}
+      #app .batch-row.gs-hidden{display:none!important}
+      #app .batch-grade-group.gs-group-dim{opacity:.55}
+      .mini-chip.sub-time{background:#eef1f8!important;border-color:#c9d3ea!important;color:#23345f!important;text-transform:none;letter-spacing:0;font-weight:700}
+      .mini-chip.sub-late{background:#fdeceb!important;border-color:#e6b5b2!important;color:#8c1d17!important;text-transform:none;letter-spacing:0;font-weight:800}
+      .mini-chip.sub-ontime{background:#eafff2!important;border-color:#bfe8cf!important;color:#0d6b3d!important;text-transform:none;letter-spacing:0;font-weight:700}
+      .float-dash-btn{position:fixed;right:18px;bottom:18px;z-index:800;padding:10px 16px;border-radius:999px;border:1px solid #23345f;background:#23345f;color:#fff;font:inherit;font-size:14px;font-weight:800;box-shadow:0 6px 18px rgba(20,30,60,.28);cursor:pointer}
+      .float-dash-btn:hover{background:#18264a}
+      .float-dash-btn[hidden]{display:none}
+      .gb-entry-td{padding:3px 4px!important;white-space:nowrap}
+      .gb-entry{display:inline-flex;align-items:center;gap:2px;border:1px solid #d6cdbd;border-radius:7px;background:#fff;padding:1px 2px 1px 4px}
+      .gb-entry.is-empty{background:#fbf8f2}
+      .gb-entry.is-saved{border-color:#4f765d;box-shadow:0 0 0 2px #cfe6d5}
+      .gb-entry.is-bad{border-color:#b42318;box-shadow:0 0 0 2px #f6d0cc}
+      .gbScoreInput{width:3.2em;border:0;background:transparent;font:inherit;font-weight:800;font-size:14px;text-align:right;padding:4px 1px;color:#111827;-moz-appearance:textfield}
+      .gbScoreInput::-webkit-outer-spin-button,.gbScoreInput::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+      .gbScoreInput:focus{outline:none}
+      .gb-entry:focus-within{border-color:#23345f;box-shadow:0 0 0 2px #c9d3ea}
+      .gb-max{font-size:12px;color:#5f5a50;padding-right:2px}
+      .gb-open{border:0;background:none;color:#23345f;font-weight:800;cursor:pointer;padding:3px 4px;border-radius:5px;font-size:13px}
+      .gb-open:hover{background:#eef1f8}
+    `;
+    document.head.appendChild(st);
+  })();
+
 
 })();
 

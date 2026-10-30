@@ -1,0 +1,435 @@
+<!-- ======================================================================
+     Literature Circles — Step 1 writing checklists (Checklists)
+     Release 2026-09-27a. Rides along with BackendClient (see LC_INCLUDE_WITH
+     in Code.gs), so Index.html doesn't need a new include line.
+
+     One checklist per reading strategy, plus the Hybrid and the Reader's
+     Journal. It runs in the student's browser: instant, never "busy", and no
+     student writing leaves the app. It checks for the PIECES (page numbers,
+     an explanation, enough writing, an open question) — not for how deep the
+     thinking is. That stays with the teacher and the rubric.
+
+     TO CHANGE THE WORDING OR THE NUMBERS: edit LC_CHECKLISTS below. Each line
+     is one checklist item: `label` is what students read, `tip` shows under an
+     item that isn't met yet, and the number in each test (e.g. >= 30) is the
+     minimum. {n} in a label becomes the number of boxes for that strategy.
+     ====================================================================== -->
+<style id="lcCheckStyles">
+.focus-workspace.lc-ck-ws{max-width:1290px}
+.lc-ck-layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:22px;align-items:start}
+.lc-ck-main{min-width:0}
+.lc-ck-side{position:sticky;top:80px;max-height:calc(100vh - 96px);overflow:auto;background:#fff;border:1px solid #d8e7df;border-radius:22px;padding:18px 18px 16px;box-shadow:0 12px 32px rgba(23,55,43,.07);color:#17372b;font-family:Roboto,Arial,sans-serif}
+.lc-ck-side:focus{outline:3px solid #7fb99a;outline-offset:2px}
+.lc-ck-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.lc-ck-kicker{display:block;font-size:11.5px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#4f6b5f}
+.lc-ck-head h3{margin:2px 0 0;font-size:18px;line-height:1.25;color:#17372b}
+.lc-ck-score{flex:none;padding:4px 10px;border-radius:999px;background:#eef5f1;color:#17372b;font-size:13px;font-weight:800;white-space:nowrap}
+.lc-ck-score.is-done{background:#e2f4ea;color:#0b5e3a}
+.lc-ck-bar{height:6px;border-radius:999px;background:#e5eee9;margin:12px 0 4px;overflow:hidden}
+.lc-ck-bar span{display:block;height:100%;border-radius:999px;background:#2f7a55;transition:width .2s}
+.lc-ck-list{list-style:none;margin:10px 0 0;padding:0}
+.lc-ck-list li{display:grid;grid-template-columns:22px minmax(0,1fr);gap:9px;padding:9px 0;border-top:1px solid #edf3ef}
+.lc-ck-list li:first-child{border-top:0}
+.lc-ck-box{width:20px;height:20px;border-radius:6px;border:2px solid #9fb6aa;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:900;line-height:1;margin-top:1px;color:#fff}
+.lc-ck-list li.is-met .lc-ck-box{background:#2f7a55;border-color:#2f7a55}
+.lc-ck-list strong{display:block;font-size:14px;line-height:1.35;font-weight:700;color:#17372b}
+.lc-ck-list li.is-met strong{color:#35554a;font-weight:600}
+.lc-ck-list small{display:block;margin-top:2px;font-size:12.5px;color:#4f6b5f}
+.lc-ck-tip{margin:6px 0 0;padding:7px 9px;border-radius:9px;background:#fff8e8;border:1px solid #f0d89c;color:#6b4c12;font-size:12.5px;line-height:1.45}
+.lc-ck-deeper{margin-top:12px;padding:10px 12px;border-radius:12px;background:#edf7fb;border:1px solid #c9e2ee;color:#234f63;font-size:13px;line-height:1.5}
+.lc-ck-deeper strong{display:block;font-size:11.5px;letter-spacing:.06em;text-transform:uppercase;margin-bottom:2px;color:#234f63}
+.lc-ck-note{margin:10px 0 0;font-size:12px;line-height:1.45;color:#4f6b5f}
+.lc-ck-other{margin-top:10px;padding-top:10px;border-top:1px solid #edf3ef;font-size:13px;color:#35554a}
+.lc-ck-chips{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 2px}
+.lc-ck-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:999px;border:1px solid #d3e0d9;background:#fff;color:#4a6358;font-size:12px;font-weight:700;line-height:1.4}
+.lc-ck-chip.is-met{border-color:#bfe0cb;background:#eef8f2;color:#0b5e3a}
+.lc-ck-chip.is-words{border-style:dashed;font-weight:600}
+.lc-ck-confirm{margin-top:14px;padding:16px 18px;border-radius:18px;background:#fffaf0;border:1px solid #ead8a9;color:#5a4212}
+.lc-ck-confirm:focus{outline:3px solid #d8b35a;outline-offset:2px}
+.lc-ck-confirm h4{margin:0 0 6px;font-size:16px;color:#4a3408}
+.lc-ck-confirm ul{margin:6px 0 8px;padding-left:20px;font-size:14px;line-height:1.5}
+.lc-ck-confirm p{margin:6px 0 0;font-size:13px;line-height:1.5}
+.lc-ck-confirm-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+button.lc-ck-jump b{font-weight:800}
+.lc-sr{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
+@media(max-width:1180px){.lc-ck-layout{grid-template-columns:minmax(0,1fr)}.lc-ck-side{position:static;max-height:none}}
+</style>
+<script>
+window.__MB = window.__MB || {};
+window.__MB.Checklists = 'loading';
+(function () {
+  'use strict';
+  var W = window;
+  if (typeof W.STRATEGY_DEFS !== 'object') { W.__MB.Checklists = 'error: Index.html did not load first'; return; }
+  if (W.LC_CHECK) { W.__MB.Checklists = 'ok'; return; } // included twice — keep the first copy
+
+  // ------------------------------------------------------------------ reading helpers
+  var PAGE_RE = /\b(?:pp?|pgs?|pages?)\s*[.:#]*\s*(\d{1,4}(?:\s*(?:,|and|&|-|–|to)\s*\d{1,4})*)/gi;
+  var PAREN_RE = /\(\s*(\d{1,4})\s*\)/g;
+  // Words that usually mean the student is explaining, not just retelling.
+  var EXPLAIN_RE = /\b(because|since|so that|this (?:shows|means|tells|reveals|suggests|explains|helps|helped|made|makes|is important)|which (?:shows|means|tells|reveals|suggests|explains|helps|helped|made|makes)|that(?:'|’)?s why|help(?:s|ed)? (?:me|us|the reader|readers|(?:the|my|our) group|them|everyone)|notice|understand|realiz|(?:make|makes|made) (?:me|us) (?:think|see|feel|wonder|notice|realize)|now i\b|i (?:think|believe|learned|noticed|see|infer|can tell)|reveal|suggest|show(?:s|ed)? (?:that|how|why)|explain|matters? because|important because|significan|symboli)/i;
+
+  function str(s) { return s == null ? '' : String(s); }
+  function words(s) { return (str(s).match(/[A-Za-z0-9À-ɏ]+(?:['’][A-Za-z]+)?/g) || []).length; }
+  function pageNumbers(s) {
+    s = str(s); var out = {}, m;
+    PAGE_RE.lastIndex = 0; while ((m = PAGE_RE.exec(s))) m[1].split(/\D+/).forEach(function (n) { if (n) out[n] = 1; });
+    PAREN_RE.lastIndex = 0; while ((m = PAREN_RE.exec(s))) out[m[1]] = 1;
+    return Object.keys(out);
+  }
+  function hasPage(s) { return pageNumbers(s).length > 0; }
+  // For boxes labelled "(Pg #)" / "Page #": a bare number at the start or end also counts ("22 - …", "… 52").
+  function hasPageLoose(s) { s = str(s); return hasPage(s) || /^\s*#?\s*\d{1,4}\s*[-–—:.)]\s*\S/.test(s) || /(?:^|\s)#\s*\d{1,4}\b/.test(s) || /[-–—,(]\s*#?\s*\d{1,4}\s*\)?\s*$/.test(s); }
+  function explains(s) { return EXPLAIN_RE.test(str(s)); }
+  function explainedSentences(s) { return str(s).split(/[.!?\n]+/).filter(function (x) { return EXPLAIN_RE.test(x); }).length; }
+  function questionSentence(s) {
+    // "p. 135" and "Mr." aren't the end of a sentence
+    s = str(s).replace(/\b(pp?|pgs?|chs?|mrs?|ms|dr|st|vs|etc)\./gi, '$1'); var q = s.indexOf('?');
+    if (q >= 0) { var start = Math.max(s.lastIndexOf('.', q), s.lastIndexOf('!', q), s.lastIndexOf('\n', q)); return s.slice(start + 1, q + 1); }
+    var m = /\b(?:I wonder|I(?:'|’)?m confused|I am confused)/i.exec(s); if (!m) return '';
+    var a = Math.max(s.lastIndexOf('.', m.index), s.lastIndexOf('!', m.index), s.lastIndexOf('\n', m.index)) + 1;
+    var rest = s.slice(m.index), e = rest.search(/[.!?\n]/); return s.slice(a, e < 0 ? s.length : m.index + e);
+  }
+  function isQuestion(s) { return !!questionSentence(s); }
+  function openQuestion(s) {
+    var q = questionSentence(s); if (!q) return false;
+    if (/\b(?:why|how)\b/i.test(q)) return true;
+    var REF = /^(?:(?:on|in|at)\s+)?(?:pages?|pgs?|pp?|chapters?|chs?)\s*[.:#]*\s*\d+(?:\s*(?:,|and|&|-|–|to)\s*\d+)*\s*[)\],:;.\-–—]*\s*/i;
+    var t = q.replace(/^[\s"“'‘(\[]*/, ''); t = t.replace(REF, ''); t = t.replace(REF, '');
+    t = t.replace(/^[\s\d,:;()\-–—#.]*/, '').replace(/^(?:I wonder|I(?:'|’)?m confused about|I am confused about)\s*/i, '');
+    return /^(?:what|in what ways?|to what extent|should)\b/i.test(t);
+  }
+  function afterQuestionWords(s) { return Math.max(0, words(s) - words(questionSentence(s))); }
+  function hasLink(s) { return /(?:https?:\/\/|www\.)\S+|\b[\w-]+\.(?:com|org|edu|gov|net|io|us|uk|ca)\b/i.test(str(s)); }
+  var parser = typeof DOMParser === 'function' ? new DOMParser() : null;
+  function parseHtml(h) { return parser ? parser.parseFromString('<!doctype html><body>' + str(h) + '</body>', 'text/html').body : null; }
+  // DOMParser never runs scripts or loads images, so saved HTML is safe to read here.
+  function htmlText(h) {
+    h = str(h); if (h.indexOf('<') < 0 && h.indexOf('&') < 0) return h;
+    // Chrome's editor makes each line a <div> or <br>: keep those as line breaks so jotted lines stay separate thoughts.
+    h = h.replace(/<(br|\/?(?:div|p|li|h[1-6]))\b/gi, '\n<$1').replace(/</g, ' <');
+    var b = parseHtml(h); return b ? (b.textContent || '') : h.replace(/<[^>]*>/g, ' ');
+  }
+  function htmlTags(h) {
+    var b = parseHtml(h), seen = {}, out = [];
+    if (b) Array.prototype.forEach.call(b.querySelectorAll('mark[data-tag]'), function (m) { var t = m.getAttribute('data-tag'); if (t && !seen[t]) { seen[t] = 1; out.push(t); } });
+    return out;
+  }
+  function fieldCount(v, keys, labels, fn) {
+    var have = 0, missing = [];
+    keys.forEach(function (k, i) { if (fn(str(v[k]))) have++; else missing.push(labels[i]); });
+    return { have: have, need: keys.length, missing: missing };
+  }
+  function esc(s) { return str(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function label(key) { var d = W.STRATEGY_DEFS[key]; return d ? d.label : key; }
+
+  var KP = ['keyPoint1', 'keyPoint2', 'keyPoint3', 'keyPoint4', 'keyPoint5', 'keyPoint6', 'keyPoint7'];
+  var KP_L = ['#1', '#2', '#3', '#4', '#5', '#6', '#7'];
+  var MOVES = [
+    ['Questions', 'questioner', /\?|\bI wonder\b/i],
+    ['Connections', 'connector', /\bremind(?:s|ed)? me\b|\bconnect|\bsimilar to\b|\bjust like\b/i],
+    ['Predictions', 'predictor', /\bpredict|\bI bet\b|\bwill probably\b|\bgoing to happen\b/i],
+    ['Passages', 'literaryLuminary', /["“][^"”]{12,}["”]/],
+    ['Research', 'researcher', /\bresearch|\blooked (?:it )?up\b|\baccording to\b|https?:\/\//i],
+    ['Summary', 'summarizer', /\bsummar|\bin this section\b|\bso far\b/i],
+    ['Inferences', 'inferences', /\binfer|\bI can tell\b/i],
+    ['Character', 'illustrator', /\bcharacter|\bprotagonist\b/i],
+    ['Theme', 'theme', /\btheme|\bthe message\b/i],
+    ['Symbolism', 'symbolism', /\bsymbol/i]
+  ];
+  function journalMoves(text, tags) {
+    var t = {}; (tags || []).forEach(function (k) { t[k] = 1; });
+    return MOVES.filter(function (m) { return t[m[1]] || m[2].test(text); }).map(function (m) { return m[0]; });
+  }
+
+  // ------------------------------------------------------------------ THE CHECKLISTS (edit wording and numbers here)
+  // Boxed strategies (Connector, Questioner, …) use `each`: the test runs on every response box.
+  // The other strategies use `test` on the whole form.
+  var LC_CHECKLISTS = W.LC_CHECKLISTS = {
+    connector: {
+      noun: 'connection',
+      checks: [
+        { label: 'Write all {n} connections', each: function (r) { return words(r.connection) >= 12; }, tip: 'Each box needs a full connection, not just a few words.' },
+        { label: 'A page number on every connection', chip: 'Page #', each: function (r) { return hasPage(r.connection); }, tip: 'Say where it happens: “On page 42…” or “(p. 42)”.' },
+        { label: 'Say how each one helps you understand the book', chip: 'How it helps', each: function (r) { return explains(r.connection); }, tip: 'Go past “this reminds me of…”. Add: “This helps me understand ___ because ___.”' },
+        { label: 'Develop each one (30+ words)', chip: '30+ words', each: function (r) { return words(r.connection) >= 30; }, tip: 'Two or three sentences: the moment in the book, your connection, and what it shows you.' }
+      ],
+      deeper: 'A “thick” connection reflects on how it helps you understand the book better — the protagonist’s arc, the plot, the mood.'
+    },
+    questioner: {
+      noun: 'question',
+      checks: [
+        { label: 'Write all {n} questions', each: function (r) { return isQuestion(r.question) && words(r.question) >= 5; }, tip: 'Each box needs a real question (ending in “?”), or start with “I wonder…”.' },
+        { label: 'A page number with every question', chip: 'Page #', each: function (r) { return hasPage(r.question); }, tip: 'You must reference page numbers when writing your question.' },
+        { label: 'At least 3 open questions (Why…? How…? What if…?)', chip: 'Open question', need: 3, each: function (r) { return openQuestion(r.question); }, tip: 'Questions that start with Is, Does or Did can be answered yes or no. Try rewording with Why or How.' },
+        { label: 'After each question, say what it helps you understand', chip: 'Your thinking', each: function (r) { return afterQuestionWords(r.question) >= 10; }, tip: 'Add a sentence or two after the question: why it matters, and what the answer might reveal.' }
+      ],
+      deeper: '“Thick” questions, when answered, provide insight into how the story develops and what it means.'
+    },
+    literaryLuminary: {
+      noun: 'passage',
+      checks: [
+        { label: 'Choose all {n} passages', each: function (r) { return words(r.passage) >= 4; }, tip: 'Describe or record each passage you want the group to hear.' },
+        { label: 'A page number for every passage', chip: 'Page #', each: function (r) { return /\d/.test(str(r.pageNumber)) || hasPageLoose(r.passage); }, tip: 'Fill in the Page Number box so the group can find it.' },
+        { label: 'Explain why each passage matters (15+ words)', chip: 'Why it matters', each: function (r) { return words(r.whyMatters) >= 15 && explains(r.whyMatters); }, tip: 'Say what you want the group to notice when it’s read aloud, and what it helps them understand.' }
+      ],
+      deeper: 'The passages you choose should help your group better understand the book. Pick them because they reveal something important.'
+    },
+    predictor: {
+      noun: 'prediction',
+      checks: [
+        { label: 'Make all {n} predictions', each: function (r) { return words(r.prediction) >= 4; }, tip: 'Start with “I predict that…”.' },
+        { label: 'Back each prediction with 2+ page numbers', chip: '2+ pages', each: function (r) { return pageNumbers(r.reason).length >= 2; }, tip: 'Thick predictions have multiple pieces of evidence. Cite two moments: “On page 52… and on page 60…”.' },
+        { label: 'Fill in “What actually happened”', chip: 'What happened', each: function (r) { return words(r.whatHappened) >= 2; }, tip: 'If you haven’t read far enough to know, write “Not resolved yet”.' }
+      ],
+      deeper: 'A strong prediction is evidence-based. The reasoning matters more than whether you turn out to be right.'
+    },
+    inferences: {
+      noun: 'moment',
+      checks: [
+        { label: 'Summarize a moment for all {n} elements', each: function (r) { return words(r.summary) >= 8; }, tip: 'Watch for dialogue, actions, conflict, setting, inner thoughts and decisions as you read.' },
+        { label: 'A page number in every summary', chip: 'Page #', each: function (r) { return hasPageLoose(r.summary); }, tip: 'Add the page: “p. 22”.' },
+        { label: 'Write an inference for every moment', chip: 'Inference', each: function (r) { return words(r.inference) >= 8; }, tip: 'Finish “I infer that…” with what you can tell even though the author didn’t say it directly.' }
+      ],
+      deeper: 'An inference must be supported by evidence. Make the invisible thinking visible.'
+    },
+    summarizer: {
+      checks: [
+        { label: 'Write a 1–2 minute summary (75+ words)', test: function (v) { return words(v.summary) >= 75; }, detail: function (v) { return words(v.summary) + ' words'; }, tip: 'Give the gist: the key points, the main highlights, the essence of this week’s reading.' },
+        { label: 'Say which pages or chapters it covers', test: function (v) { return hasPage(v.summary) || /\b(?:ch|chapters?)\.?\s*\d+/i.test(str(v.summary)); }, tip: 'For example: “Chapters 4–6 (pages 40–72)…”.' },
+        { label: 'Say how it helped you understand the book', test: function (v) { return explains(v.summary); }, tip: 'End with a sentence like “This section helped me understand ___ because ___.”' },
+        { label: 'List all 7 key points or events', test: function (v) { return fieldCount(v, KP, KP_L, function (s) { return words(s) >= 3; }); }, tip: 'Only the details your group needs to understand what happened and why it matters.' },
+        { label: 'A page number on every key point', test: function (v) { return fieldCount(v, KP, KP_L, hasPageLoose); }, tip: 'Add the page to each one: “Maya finds the key (p. 52)”.' }
+      ],
+      deeper: 'Your group is counting on you for a quick statement that conveys the gist of the reading. Be selective and accurate.'
+    },
+    researcher: {
+      checks: [
+        { label: 'Name both research topics', test: function (v) { return fieldCount(v, ['topic1', 'topic2'], ['topic 1', 'topic 2'], function (s) { return words(s) >= 2; }); }, tip: 'Pick two things that struck you as puzzling or curious while reading.' },
+        { label: 'Write what you found for both (30+ words each)', test: function (v) { return fieldCount(v, ['findings1', 'findings2'], ['topic 1', 'topic 2'], function (s) { return words(s) >= 30; }); }, tip: 'Explain what you learned in your own words.' },
+        { label: 'Connect each finding to a page in the book', test: function (v) { return fieldCount(v, ['findings1', 'findings2'], ['topic 1', 'topic 2'], hasPage); }, tip: 'Name the page it connects to: “This explains the storm on page 88.”' },
+        { label: 'Add your source links', test: function (v) { return hasLink(v.sourceLinks); }, tip: 'Paste the web address of each source, one per line.' },
+        { label: 'Explain why the research helped you understand the book', test: function (v) { return words(v.reflection) >= 25 && explains(v.reflection); }, detail: function (v) { return words(v.reflection) + ' words'; }, tip: 'Write a reflection paragraph on why your research helped you understand the book better.' }
+      ],
+      deeper: 'This isn’t a formal research report. The idea is to find information that helps your group understand the book better.'
+    },
+    illustrator: {
+      checks: [
+        { label: 'Name the character you’re studying', test: function (v) { return words(v.character) >= 1; }, tip: 'Usually the protagonist.' },
+        { label: 'Describe all 3 scenes', test: function (v) { return fieldCount(v, ['scene1', 'scene2', 'scene3'], ['scene 1', 'scene 2', 'scene 3'], function (s) { return words(s) >= 6; }); }, tip: 'Choose scenes where the character says, does, or thinks something revealing.' },
+        { label: 'A page number for every scene', test: function (v) { return fieldCount(v, ['scene1', 'scene2', 'scene3'], ['scene 1', 'scene 2', 'scene 3'], hasPage); }, tip: 'Support your information with the page number where you learned it.' },
+        { label: 'Explain what each scene reveals (15+ words each)', test: function (v) { return fieldCount(v, ['reveals1', 'reveals2', 'reveals3'], ['scene 1', 'scene 2', 'scene 3'], function (s) { return words(s) >= 15; }); }, tip: 'Move from evidence to insight: “This scene shows… which reveals…”.' }
+      ],
+      deeper: 'Include specific internal and external information about the character — what they think, say and do — with the page where you learned it.'
+    },
+    hybrid: {
+      noun: 'moment',
+      checks: [
+        { label: 'Write all 3 moments (60+ words each)', eachMoment: function (m) { return words(m.text) >= 60; }, tip: 'Write a paragraph for each moment that shows your thinking, not just what happened.' },
+        { label: 'A page number in every moment', chip: 'Page #', eachMoment: function (m) { return hasPage(m.text); }, tip: 'Start with the page: “Page 45 — …”.' },
+        { label: 'Use 2+ of your strategies in each moment, underlined', chip: '2+ strategies', eachMoment: function (m, choices) { return m.tags.filter(function (t) { return !choices.length || choices.indexOf(t) >= 0; }).length >= 2; }, tip: 'Select the sentences that show each strategy, then tag them with the underline buttons.' },
+        { label: 'Use all 3 of your strategies across the moments', allMoments: true, tip: 'Make sure each of your three strategies shows up at least once.' },
+        { label: 'Say how each moment helps you understand the book', chip: 'How it helps', eachMoment: function (m) { return explains(m.text); }, tip: 'Show how one reading strategy leads to another and deepens your understanding.' }
+      ],
+      deeper: 'Reading strategies are not meant to stand alone: for good readers, one strategy leads to another. Show how your strategies work together to extract meaning from the book.'
+    },
+    journal: {
+      checks: [
+        { label: 'About a page of writing (250+ words)', test: function (j) { return words(j.text) >= 250; }, detail: function (j) { return words(j.text) + ' words'; }, tip: 'Your journal should be at least a full page. Keep jotting ideas, questions and reactions.' },
+        { label: 'Page numbers throughout (3 or more)', test: function (j) { return { have: Math.min(pageNumbers(j.text).length, 3), need: 3 }; }, detail: function (j) { var n = pageNumbers(j.text).length; return n + ' page number' + (n === 1 ? '' : 's'); }, tip: 'Add the page whenever you react to a specific part of the book.' },
+        { label: 'A mix of reading strategies (3 or more)', test: function (j) { return journalMoves(j.text, j.tags).length >= 3; }, detail: function (j) { var f = journalMoves(j.text, j.tags); return f.length ? 'Found: ' + f.join(', ') : 'None found yet'; }, tip: 'Use at least three reading strategies — questions, connections, predictions, passages, research… Underline them to show which is which.' },
+        { label: 'Questions to bring to your group (2 or more)', test: function (j) { return (str(j.text).match(/\?/g) || []).length + (str(j.text).match(/\bI wonder\b/gi) || []).length >= 2; }, tip: 'Your journal should guide your five-minute discussion. What will you ask the group?' },
+        { label: 'Explain your thinking, not just what happened', test: function (j) { return explainedSentences(j.text) >= 3; }, tip: 'After a moment, say why it matters or what it shows. It should read like a journal, not an essay.' }
+      ],
+      deeper: 'Keep asking: what did I notice, why does it matter, and what could I bring to my group?'
+    }
+  };
+
+  // ------------------------------------------------------------------ evaluate
+  function listCount(key) { var d = W.STRATEGY_DEFS[key] || {}; return d.repeat || (d.fixedRows ? d.fixedRows.length : 0); }
+  function itemLabel(key, i) { var d = W.STRATEGY_DEFS[key] || {}; return d.fixedRows ? d.fixedRows[i] : '#' + (i + 1); }
+  function finish(c, n, res, detail) {
+    var have = typeof res === 'object' ? res.have : (res ? 1 : 0), need = typeof res === 'object' ? res.need : 1;
+    return { label: c.label.replace('{n}', n), met: have >= need, have: have, need: need, missing: (typeof res === 'object' && res.missing) || [], detail: detail || '', tip: c.tip || '', chip: c.chip || '' };
+  }
+  function evalBoxed(key, v, list) {
+    var n = listCount(key), items = Array.isArray(v.items) ? v.items : (Array.isArray(v.rows) ? v.rows : []), per = [];
+    for (var i = 0; i < n; i++) per.push({ label: itemLabel(key, i), words: 0, empty: true, chips: [] });
+    var checks = list.checks.map(function (c) {
+      var have = 0, missing = [];
+      for (var i = 0; i < n; i++) {
+        var r = items[i] || {}, ok = !!c.each(r);
+        var all = (W.STRATEGY_DEFS[key].fields || []).map(function (f) { return str(r[f.key]); }).join(' ');
+        per[i].words = words(all); per[i].empty = !all.trim();
+        if (ok) have++; else if (!per[i].empty) missing.push(itemLabel(key, i));
+        if (c.chip) per[i].chips.push({ label: c.chip, met: ok });
+      }
+      return finish(c, n, { have: have, need: c.need || n, missing: missing });
+    });
+    return { checks: checks, per: per };
+  }
+  function evalHybrid(data, choices) {
+    var list = LC_CHECKLISTS.hybrid, raw = (data.hybridMoments || []).slice(0, 3);
+    while (raw.length < 3) raw.push('');
+    var moments = raw.map(function (h) { return { text: htmlText(h), tags: htmlTags(h) }; });
+    var per = moments.map(function (m, i) { return { label: 'Moment ' + (i + 1), words: words(m.text), empty: !m.text.trim(), chips: [] }; });
+    var checks = list.checks.map(function (c) {
+      if (c.allMoments) {
+        var used = {}; moments.forEach(function (m) { m.tags.forEach(function (t) { used[t] = 1; }); });
+        if (!choices.length) return finish(c, 3, { have: Math.min(Object.keys(used).length, 3), need: 3, missing: [] }); // older work saved no choices
+        var missing = choices.filter(function (k) { return !used[k]; }).map(label);
+        return finish(c, 3, { have: choices.length - missing.length, need: choices.length, missing: missing });
+      }
+      var have = 0, missing2 = [];
+      moments.forEach(function (m, i) { var ok = !!c.eachMoment(m, choices); if (ok) have++; else if (!per[i].empty) missing2.push('Moment ' + (i + 1)); if (c.chip) per[i].chips.push({ label: c.chip, met: ok }); });
+      return finish(c, 3, { have: have, need: 3, missing: missing2 });
+    });
+    return { checks: checks, per: per };
+  }
+  function evalWhole(list, v) {
+    return { checks: list.checks.map(function (c) { return finish(c, 0, c.test(v), c.detail ? c.detail(v) : ''); }), per: [] };
+  }
+  function group(key, title, out, list) {
+    var met = out.checks.filter(function (c) { return c.met; }).length;
+    return { key: key, title: title, checks: out.checks, per: out.per, met: met, total: out.checks.length, deeper: list.deeper || '' };
+  }
+  /** evaluate(prepType, choices, data) → { groups: [...], met, total } — the same call for a student's
+   *  live form and for saved work on the teacher's marking screen. */
+  function evaluate(prepType, choices, data) {
+    data = data || {}; choices = (choices || []).filter(Boolean); var groups = [];
+    if (prepType === 'journal') {
+      var jh = data.journalText || '';
+      groups.push(group('journal', 'Reader’s Journal', evalWhole(LC_CHECKLISTS.journal, { text: htmlText(jh), tags: htmlTags(jh) }), LC_CHECKLISTS.journal));
+    } else if (prepType === 'hybrid') {
+      groups.push(group('hybrid', 'Hybrid Reading', evalHybrid(data, choices), LC_CHECKLISTS.hybrid));
+    } else if (prepType) {
+      choices.forEach(function (k) {
+        var list = LC_CHECKLISTS[k]; if (!list) return;
+        var v = data[k] || {};
+        groups.push(group(k, label(k), list.checks[0].each ? evalBoxed(k, v, list) : evalWhole(list, v), list));
+      });
+    }
+    var met = 0, total = 0; groups.forEach(function (g) { met += g.met; total += g.total; });
+    return { groups: groups, met: met, total: total };
+  }
+  function unmetLines(res) {
+    var out = [];
+    res.groups.forEach(function (g) { g.checks.forEach(function (c) { if (!c.met) out.push({ group: g.title, label: c.label, detail: c.need > 1 ? c.have + ' of ' + c.need : '' }); }); });
+    return out;
+  }
+  /** One line for the teacher's marking screen. */
+  function teacherLine(work) {
+    if (!work || !work.prepType) return '';
+    var res = evaluate(work.prepType, work.choices, work.data); if (!res.total) return '';
+    var bits = [];
+    res.groups.forEach(function (g) { g.checks.forEach(function (c) { if (!c.met) bits.push((res.groups.length > 1 ? g.title + ': ' : '') + c.label.charAt(0).toLowerCase() + c.label.slice(1) + (c.missing.length ? ' (' + c.missing.join(', ') + ')' : c.detail ? ' (' + c.detail + ')' : c.need > 1 ? ' (' + c.have + ' of ' + c.need + ')' : '')); }); });
+    return { met: res.met, total: res.total, text: 'Checklist ' + res.met + ' of ' + res.total + ' met' + (bits.length ? ' · still open: ' + bits.slice(0, 3).join('; ') + (bits.length > 3 ? '; +' + (bits.length - 3) + ' more' : '') : ' · all the pieces are there') };
+  }
+  var CK = W.LC_CHECK = { evaluate: evaluate, teacherLine: teacherLine, unmet: unmetLines, lists: LC_CHECKLISTS, _: { words: words, pageNumbers: pageNumbers, hasPageLoose: hasPageLoose, explains: explains, openQuestion: openQuestion, isQuestion: isQuestion, afterQuestionWords: afterQuestionWords, hasLink: hasLink, htmlText: htmlText, htmlTags: htmlTags, journalMoves: journalMoves }, skip: {} };
+
+  // ------------------------------------------------------------------ student panel
+  function focusKey(wk, d) {
+    if (d.prepType === 'journal') return 'journal';
+    if (d.prepType === 'hybrid') return 'hybrid';
+    var fi = Math.min(W.prepFocusIndex(wk), Math.max(0, d.choices.length - 1)); return d.choices[fi];
+  }
+  function panelHtml(res, key) {
+    var g = res.groups.filter(function (x) { return x.key === key; })[0] || res.groups[0];
+    if (!g) return '';
+    var pct = g.total ? Math.round(g.met / g.total * 100) : 0, done = g.met === g.total;
+    // Only the first open item gets its tip, so the list reads as "here's your next step", not a wall of advice.
+    var firstOpen = -1; g.checks.some(function (c, i) { if (!c.met) { firstOpen = i; return true; } return false; });
+    var items = g.checks.map(function (c, i) {
+      var det = c.detail || (c.need > 1 ? c.have + ' of ' + c.need : '');
+      if (!c.met && c.missing.length) det += (det ? ' · ' : '') + 'still needed: ' + c.missing.join(', ');
+      return '<li class="' + (c.met ? 'is-met' : '') + '"><span class="lc-ck-box" aria-hidden="true">' + (c.met ? '✓' : '') + '</span><div><strong>' + esc(c.label) + '<span class="lc-sr"> — ' + (c.met ? 'done' : 'not yet') + '</span></strong>' + (det ? '<small>' + esc(det) + '</small>' : '') + (i === firstOpen && c.tip ? '<p class="lc-ck-tip"><b>Next step:</b> ' + esc(c.tip) + '</p>' : '') + '</div></li>';
+    }).join('');
+    var others = res.groups.filter(function (x) { return x !== g; }).map(function (x) { return '<b>' + esc(x.title) + '</b> · ' + x.met + ' of ' + x.total; }).join('<br>');
+    return '<div class="lc-ck-head"><div><span class="lc-ck-kicker">Checklist</span><h3>' + esc(g.title) + '</h3></div><span class="lc-ck-score' + (done ? ' is-done' : '') + '">' + (done ? '✓ ' : '') + g.met + ' of ' + g.total + '</span></div>' +
+      '<div class="lc-ck-bar" aria-hidden="true"><span style="width:' + pct + '%"></span></div><ul class="lc-ck-list">' + items + '</ul>' +
+      (g.deeper ? '<div class="lc-ck-deeper"><strong>Go deeper</strong>' + esc(g.deeper) + '</div>' : '') +
+      '<p class="lc-ck-note">The checklist looks for the pieces your teacher expects. It can’t judge how deep your thinking is; your teacher uses the rubric for that.</p>' +
+      (others ? '<div class="lc-ck-other">Also this week: ' + others + '</div>' : '');
+  }
+  function chipsHtml(p) {
+    if (!p) return '';
+    if (p.empty) return '<span class="lc-ck-chip">Not started</span>';
+    return p.chips.map(function (c) { return '<span class="lc-ck-chip' + (c.met ? ' is-met' : '') + '">' + (c.met ? '✓ ' : '○ ') + esc(c.label) + '</span>'; }).join('') + '<span class="lc-ck-chip is-words">' + p.words + ' word' + (p.words === 1 ? '' : 's') + '</span>';
+  }
+  function countText(res, key) { var g = res.groups.filter(function (x) { return x.key === key; })[0] || res.groups[0]; return g ? g.met + '/' + g.total : ''; }
+  function liveResult(wk) {
+    var d = W.prepDraftForWeek(wk); if (!d || !d.prepType) return null;
+    var g = W.collectCurrentPrepData(d); if (!g || g.error) return null;
+    return evaluate(g.prepType, g.choices, g.data);
+  }
+
+  // Wrap the Step 1 workspace: checklist beside the form, chips on each response, AI button → Checklist.
+  var _view = W.viewWeekStrategies;
+  W.viewWeekStrategies = function () {
+    var html = _view.apply(this, arguments);
+    try {
+      var wk = W.state.week, d = W.prepDraftForWeek(wk);
+      if (W.prepFlowStage(wk) !== 'workspace' || !d || !d.prepType) return html;
+      var open = '<div class="focus-workspace">', bar = '<div class="focus-action-bar">';
+      var a = html.indexOf(open), b = html.indexOf(bar);
+      if (a !== 0 || b < 0) return html;
+      var res = evaluate(d.prepType, d.choices, d.data), key = focusKey(wk, d), g = res.groups.filter(function (x) { return x.key === key; })[0];
+      if (!g) return html;
+      var main = html.slice(open.length, b), rest = html.slice(b), n = 0;
+      if (key === 'hybrid') {
+        var mi = W.hybridMomentIndex(wk);
+        main = main.replace(/(<h3 class="hybrid-moment-title">[^<]*<\/h3>)/, '$1<div class="lc-ck-chips" data-ck-item="' + mi + '">' + chipsHtml(g.per[mi]) + '</div>');
+      } else if (g.per.length) {
+        main = main.replace(/<div class="repeat-item"><strong>[^<]*<\/strong>/g, function (m) { var i = n++; return m + '<div class="lc-ck-chips" data-ck-item="' + i + '">' + chipsHtml(g.per[i]) + '</div>'; });
+      }
+      rest = rest.replace(/<button class="secondary" id="aiFeedbackBtn"[^>]*>[^<]*<\/button>/, '<button class="secondary lc-ck-jump" type="button" onclick="lcCheckJump()">Checklist <b data-ck-count>' + countText(res, key) + '</b></button>');
+      return '<div class="focus-workspace lc-ck-ws"><div class="lc-ck-layout"><div class="lc-ck-main">' + main + '</div><aside class="lc-ck-side" id="lcCheckPanel" role="region" aria-label="Checklist" tabindex="-1" data-ck-key="' + esc(key) + '">' + panelHtml(res, key) + '</aside></div>' + rest;
+    } catch (e) { if (W.reportClientError) W.reportClientError(e, 'checklist render'); return html; }
+  };
+
+  function recheck() {
+    var panel = document.getElementById('lcCheckPanel'); if (!panel) return;
+    var wk = W.state.week, res = liveResult(wk); if (!res) return;
+    var key = panel.getAttribute('data-ck-key'), g = res.groups.filter(function (x) { return x.key === key; })[0]; if (!g) return;
+    var keep = panel.scrollTop; panel.innerHTML = panelHtml(res, key); panel.scrollTop = keep;
+    Array.prototype.forEach.call(document.querySelectorAll('.focus-workspace [data-ck-item]'), function (el) { el.innerHTML = chipsHtml(g.per[Number(el.getAttribute('data-ck-item'))]); });
+    var cnt = document.querySelector('[data-ck-count]'); if (cnt) cnt.textContent = countText(res, key);
+    var card = document.querySelector('.lc-ck-confirm'); if (card && res.met === res.total) card.remove();
+  }
+  var timer = null;
+  function soon() { clearTimeout(timer); timer = setTimeout(function () { try { recheck(); } catch (e) {} }, 180); }
+  document.addEventListener('input', function (e) { if (e.target && e.target.closest && e.target.closest('.focus-workspace')) soon(); }, true);
+  document.addEventListener('click', function (e) { if (e.target && e.target.closest && e.target.closest('.focus-workspace .hl-pill')) setTimeout(soon, 30); }, true);
+
+  W.lcCheckJump = function () {
+    var p = document.getElementById('lcCheckPanel'); if (!p) return;
+    try { p.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { p.scrollIntoView(); }
+    try { p.focus({ preventScroll: true }); } catch (e2) {}
+  };
+  // Any leftover "AI Feedback" button (older screens) now opens the checklist instead.
+  W.doGetAIFeedback = function () { W.lcCheckJump(); };
+
+  // ------------------------------------------------------------------ Submit: warn, then allow
+  var _save = W.doSavePrep;
+  W.doSavePrep = function (wk) {
+    var self = this, args = arguments;
+    function go() { var c = document.querySelector('.lc-ck-confirm'); if (c) c.remove(); return _save.apply(self, args); }
+    if (CK.skip[wk]) { CK.skip[wk] = false; return go(); }
+    var res = null; try { res = liveResult(wk); } catch (e) { res = null; }
+    if (!res || !res.total || res.met === res.total) return go();
+    var lines = unmetLines(res), slot = document.getElementById('aiFeedbackResult');
+    if (!slot) return go();
+    var groups = res.groups.length > 1;
+    slot.innerHTML = '<div class="lc-ck-confirm" role="alertdialog" aria-labelledby="lcCkConfirmH" tabindex="-1"><h4 id="lcCkConfirmH">Before you submit: ' + lines.length + ' checklist item' + (lines.length === 1 ? ' is' : 's are') + ' still open</h4><ul>' +
+      lines.map(function (l) { return '<li>' + (groups ? '<b>' + esc(l.group) + ':</b> ' : '') + esc(l.label) + (l.detail ? ' <span>(' + esc(l.detail) + ')</span>' : '') + '</li>'; }).join('') +
+      '</ul><p>You can still submit now, and you can keep improving it after you submit. The checklist can miss things, so check it against your own work.</p><div class="lc-ck-confirm-actions"><button class="secondary" type="button" onclick="lcCheckKeepWorking()">Keep working</button><button type="button" id="lcCkSubmitAnyway" onclick="lcCheckSubmitAnyway(' + Number(wk) + ')">Submit anyway</button></div></div>';
+    var card = slot.firstChild;
+    try { card.scrollIntoView({ behavior: 'smooth', block: 'center' }); } catch (e3) { card.scrollIntoView(); }
+    try { card.focus({ preventScroll: true }); } catch (e4) {}
+  };
+  W.lcCheckKeepWorking = function () { var c = document.querySelector('.lc-ck-confirm'); if (c) c.remove(); W.lcCheckJump(); };
+  W.lcCheckSubmitAnyway = function (wk) { W.syncFocusedPrep(wk); CK.skip[wk] = true; W.doSavePrep(wk); };
+
+  W.__MB.Checklists = 'ok';
+})();
+</script>

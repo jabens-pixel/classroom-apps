@@ -481,7 +481,9 @@
     .auto-override-note{font-size:10px;color:#778a80;text-align:right;max-width:190px}
     @media(max-width:900px){.auto-stage-gradebox{align-items:flex-start}.auto-override-buttons{justify-content:flex-start}.auto-stage-gradebox .auto-current small,.auto-override-note{text-align:left}}
 
-  </style>
+  
+.lc-name-row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px 14px;margin:10px 0 6px}.lc-name-row label{display:flex;flex-direction:column;gap:4px;font-weight:700;min-width:0}.lc-name-row input{width:100%;box-sizing:border-box}.lc-name-card{max-width:620px}@media(max-width:560px){.lc-name-row{grid-template-columns:1fr}}
+</style>
 <style>
 /* 2026-09-26a: logo + wordmark (the title is simply "Literature Circles") */
 header h1.lc-brand{display:flex;align-items:center;gap:10px;margin:0;font-family:'Roboto Condensed',Roboto,Arial,sans-serif;font-weight:700;font-size:22px;letter-spacing:.2px;text-transform:none;color:#17372b}
@@ -2340,18 +2342,41 @@ function saveLcAccess(){var email=$('adminLcEmail').value,name=$('adminLcName').
 // join-code entry, or shared-device account switching.
 function viewLogin(){
   var savedEmail=loadEmailLocally(), detected=(platform.bootstrap&&platform.bootstrap.email)||'';
-  return '<div class="card"><h2>Welcome to Literature Circles</h2><p>Your reading, discussion, peer feedback, and reflection all live here.</p><label>Your email</label><input type="email" id="loginEmail" placeholder="you@school.org" value="'+esc(detected||savedEmail)+'"><label>Class join code <span class="muted">(only needed the first time)</span></label><input type="text" id="loginJoinCode" placeholder="ABC123" style="text-transform:uppercase"><div style="margin-top:16px"><button id="loginBtn" onclick="doLogin()">Enter Literature Circles</button></div></div>';
+  return '<div class="card"><h2>Welcome to Literature Circles</h2><p>Your reading, discussion, peer feedback, and reflection all live here.</p><label>Your email</label><input type="email" id="loginEmail" placeholder="you@school.org" value="'+esc(detected||savedEmail)+'"><label>Class join code <span class="muted">(only needed the first time)</span></label><input type="text" id="loginJoinCode" placeholder="ABC123" style="text-transform:uppercase"><div class="lc-name-row"><label>First name <span class="muted">(first time)</span><input type="text" id="loginFirst" autocomplete="given-name" maxlength="40"></label><label>Last name <span class="muted">(first time)</span><input type="text" id="loginLast" autocomplete="family-name" maxlength="40"></label></div><div style="margin-top:16px"><button id="loginBtn" onclick="doLogin()">Enter Literature Circles</button></div></div>';
 }
 function applyLoadedStudentState(s, opts){
   opts=opts||{};
+  // 2026-10-29a: a student who hasn't given their first and last name gives it before anything else.
+  if(s&&s.needsName){ showNamePage(s, opts); return; }
   state.email=s.email;state.group=s.group;state.weeklyWork=s.weeklyWork||{};state.weeklyDrafts=s.weeklyDrafts||{};state.teacherFeedback=s.teacherFeedback||{};state.discussionAway=s.discussionAway||{};state.peerAssessmentsGiven=s.peerAssessmentsGiven||[];state.pastBooks=s.pastBooks||[];state.reflections=s.reflections||{};state.selfAssessments=s.selfAssessments||{};state.peerFeedbackReceived=s.peerFeedbackReceived||{};state.resume=s.resume||null;
   saveEmailLocally(state.email);
   restoreStudentResume(opts.forceHome);
 }
 function doLogin(){
   var email=$('loginEmail').value.trim(), code=($('loginJoinCode')&&$('loginJoinCode').value.trim())||'';if(!email){showError('Please enter an email address.');return;}
+  var first=($('loginFirst')&&$('loginFirst').value.trim())||'', last=($('loginLast')&&$('loginLast').value.trim())||'';
+  if(code&&(!first||!last)){showError('Please type your first name and your last name, so your teacher knows whose work this is.');return;}
   function loadState(){callServer('getState',[email],function(s){applyLoadedStudentState(s,{forceHome:false});},null,{button:$('loginBtn')});}
-  if(code){platformRpc('joinLiteratureClass',[{email:email,joinCode:code}],function(r){platform.activeClassId=r.classInfo.classId;loadPlatformBootstrap(loadState);},null,$('loginBtn'));}else loadState();
+  if(code){platformRpc('joinLiteratureClass',[{email:email,joinCode:code,firstName:first,lastName:last}],function(r){platform.activeClassId=r.classInfo.classId;loadPlatformBootstrap(loadState);},null,$('loginBtn'));}else loadState();
+}
+// 2026-10-29a: first and last name, asked once of every student (prefilled with what the roster has).
+function showNamePage(s, opts){
+  state.view='namePrompt';
+  var sug=(s&&s.nameSuggest)||{};
+  var app=$('app'); if(!app) return;
+  app.innerHTML='<div class="card lc-name-card"><h2>What is your name?</h2><p>Type your real first and last name — this is how your teacher will find your work. You only need to do this once.</p>'+
+    '<div class="lc-name-row"><label>First name<input type="text" id="nameFirst" autocomplete="given-name" maxlength="40" value="'+esc(sug.first||'')+'"></label>'+
+    '<label>Last name<input type="text" id="nameLast" autocomplete="family-name" maxlength="40" value="'+esc(sug.last||'')+'"></label></div>'+
+    '<p class="muted">Signed in as '+esc((s&&s.email)||'')+'</p><button class="btn" id="nameSaveBtn">Save my name</button><p id="nameMsg" class="muted" role="status"></p></div>';
+  var save=function(){
+    var f=$('nameFirst').value.trim(), l=$('nameLast').value.trim(), msg=$('nameMsg');
+    if(!f||!l){msg.textContent='Please type both your first name and your last name.';return;}
+    msg.textContent='Saving…';
+    callServer('setMyLiteratureName',[{email:s.email,firstName:f,lastName:l}],function(){ s.needsName=false; applyLoadedStudentState(s,opts); },function(e){ msg.textContent=(e&&e.message)||String(e); },{button:$('nameSaveBtn')});
+  };
+  $('nameSaveBtn').onclick=save;
+  ['nameFirst','nameLast'].forEach(function(id){ $(id).onkeydown=function(e){ if(e.key==='Enter') save(); }; });
+  setTimeout(function(){ var f=$(sug.first?'nameLast':'nameFirst'); if(f&&!sug.last) f.focus(); },30);
 }
 function autoEnterReturningStudent(){
   if(state.email || state.view!=='login') return;
@@ -2922,7 +2947,7 @@ function lcCompletionBanner(points,title,copy){return '<div class="completion-gr
 function openLcStandards(){
   var old=$('lcStandardsBackdrop');if(old)old.remove();
   var groups=Object.keys(LC_COMMON_CORE_9_10).map(function(group){return '<section class="standards-group-lc"><h3>'+esc(group)+'</h3>'+LC_COMMON_CORE_9_10[group].map(function(it){return '<div class="standard-item-lc"><strong>'+esc(it[0])+'</strong><br>'+esc(it[1])+'</div>';}).join('')+'</section>';}).join('');
-  var div=document.createElement('div');div.id='lcStandardsBackdrop';div.className='modal-backdrop';div.innerHTML='<div class="standards-modal"><div class="standards-modal-head"><div><div class="week-kicker">Grades 9–10 ELA</div><h2>Common Core Standards for Literature Circles</h2><p class="muted">These are the standards most directly addressed by weekly reading, preparation, collaborative discussion, peer feedback, and reflection.</p></div><button class="secondary" onclick="closeLcStandards()">Close</button></div><div class="standards-modal-body"><div class="standards-grid-lc">'+groups+'</div><p style="margin:20px 0 0"><a href="https://www.thecorestandards.org/ELA-Literacy/" target="_blank" rel="noopener" style="color:#176944;font-weight:800">Open the official Common Core ELA standards ↗</a></p></div></div>';
+  var div=document.createElement('div');div.id='lcStandardsBackdrop';div.className='modal-backdrop';div.innerHTML='<div class="standards-modal"><div class="standards-modal-head"><div><div class="week-kicker">Grades 9–10 ELA</div><h2>Common Core Standards for Literature Circles</h2><p class="muted">These are the standards most directly addressed by weekly reading, preparation, collaborative discussion, peer feedback, and reflection.</p></div><button class="secondary" onclick="closeLcStandards()">Close</button></div><div class="standards-modal-body"><div class="standards-grid-lc">'+groups+'</div><p style="margin:20px 0 0"><a href="https:&#47;&#47;www.thecorestandards.org/ELA-Literacy/" target="_blank" rel="noopener" style="color:#176944;font-weight:800">Open the official Common Core ELA standards ↗</a></p></div></div>';
   div.addEventListener('click',function(e){if(e.target===div)closeLcStandards();});document.body.appendChild(div);
 }
 function closeLcStandards(){var x=$('lcStandardsBackdrop');if(x)x.remove();}
@@ -3130,7 +3155,7 @@ function openLcCanvasSetup(){
 }
 function renderLcCanvasSetup(status,courses,loadError){
   var current=lcCanvasSettingsClient(),connected=status&&status.connected&&status.valid;
-  var conn='<div class="lc-canvas-panel"><h3>Teacher Connection</h3>'+(connected?'<p class="lc-canvas-status-good">✓ Connected as '+esc((status.profile&&status.profile.name)||'Canvas teacher')+'</p><p class="lc-canvas-secret">Your access token stays in your private Apps Script user properties. It is not stored in the Literature Circles spreadsheet.</p><button class="secondary" onclick="disconnectLcCanvas()">Disconnect token</button>':'<label>Canvas URL</label><input id="lcCanvasBaseUrl" type="text" value="'+esc((status&&status.baseUrl)||'')+'" placeholder="https://your-school.instructure.com"><label>Access token</label><input id="lcCanvasToken" type="password" placeholder="Paste your Canvas access token"><p class="lc-canvas-secret">The token is tested with Canvas, then stored privately for your signed-in teacher account.</p><button id="lcSaveCanvasConnection" onclick="saveLcCanvasConnection(this)">Connect Canvas</button>'+(status&&status.message?'<p class="lc-canvas-status-warn">'+esc(status.message)+'</p>':'')+'</div>');
+  var conn='<div class="lc-canvas-panel"><h3>Teacher Connection</h3>'+(connected?'<p class="lc-canvas-status-good">✓ Connected as '+esc((status.profile&&status.profile.name)||'Canvas teacher')+'</p><p class="lc-canvas-secret">Your access token stays in your private Apps Script user properties. It is not stored in the Literature Circles spreadsheet.</p><button class="secondary" onclick="disconnectLcCanvas()">Disconnect token</button>':'<label>Canvas URL</label><input id="lcCanvasBaseUrl" type="text" value="'+esc((status&&status.baseUrl)||'')+'" placeholder="https:&#47;&#47;your-school.instructure.com"><label>Access token</label><input id="lcCanvasToken" type="password" placeholder="Paste your Canvas access token"><p class="lc-canvas-secret">The token is tested with Canvas, then stored privately for your signed-in teacher account.</p><button id="lcSaveCanvasConnection" onclick="saveLcCanvasConnection(this)">Connect Canvas</button>'+(status&&status.message?'<p class="lc-canvas-status-warn">'+esc(status.message)+'</p>':'')+'</div>');
   var opts='<option value="">Choose a Canvas course</option>'+(courses||[]).map(function(c){return'<option value="'+esc(c.id)+'" '+(String(current.courseId||'')===String(c.id)?'selected':'')+'>'+esc(c.name+(c.term?' · '+c.term:''))+'</option>';}).join('');
   var link='<div class="lc-canvas-panel"><h3>Link This Class</h3>'+(connected?'<label>Canvas course</label><select id="lcCanvasCourseSelect" onchange="loadLcCanvasGroups(this.value)">'+opts+'</select><label>Assignment group</label><select id="lcCanvasGroupSelect"><option value="">Canvas default group</option></select><div class="lc-canvas-actions"><button id="lcLinkCanvasClass" onclick="linkLcCanvasClass(this)">'+(current.courseId?'Update Class Link':'Link Class')+'</button>'+(current.courseId?'<button class="secondary" onclick="unlinkLcCanvasClass()">Unlink Class</button>':'')+'</div>'+(current.courseId?'<p class="lc-canvas-status-good">Currently linked: '+esc(current.courseName||current.courseId)+(current.assignmentGroupName?' · '+esc(current.assignmentGroupName):'')+'</p>':''):'<p class="muted">Connect your Canvas teacher token first, then choose the Canvas course for this Literature Circles class.</p>')+(loadError?'<p class="lc-canvas-status-warn">'+esc(loadError)+'</p>':'')+'</div>';
   lcCanvasModal('<div class="lc-canvas-modal-head"><div><div class="week-kicker">Canvas</div><h2>Connect Literature Circles</h2><p class="muted">Link this class once, then create Week 1–4 assignments directly from the Gradebook.</p></div><button class="secondary" onclick="closeLcCanvasModal()">Close</button></div><div class="lc-canvas-modal-body"><div class="lc-canvas-grid">'+conn+link+'</div><p id="lcCanvasSetupMsg" class="lc-canvas-msg"></p></div>');

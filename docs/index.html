@@ -57,6 +57,15 @@
   .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
   .app { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 12px; padding: 22px; }
   .app-head { display: flex; gap: 14px; align-items: center; margin-bottom: 12px; }
+  .art { position: relative; margin: -22px -22px 18px; aspect-ratio: 2 / 1; border-radius: 8px 8px 0 0; overflow: hidden;
+    background: #1b1814 center / cover no-repeat; display: flex; align-items: flex-end; }
+  .art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,.86) 0%, rgba(10,8,6,.45) 38%, rgba(10,8,6,0) 70%); }
+  .art.plain { background: radial-gradient(120% 90% at 85% 10%, rgba(255,255,255,.16), transparent 60%), var(--accent); }
+  .art.plain::after { background: linear-gradient(to top, rgba(10,8,6,.45), rgba(10,8,6,0) 65%); }
+  .art-initials { position: absolute; right: 18px; top: 6px; font: 700 96px/1 Literata, Georgia, serif; color: rgba(255,255,255,.18); letter-spacing: .02em; }
+  .art-title { position: relative; z-index: 1; padding: 0 22px 16px; color: #fff; }
+  .art-title h3 { font-size: 24px; text-shadow: 0 1px 12px rgba(0,0,0,.5); }
+  .art-title .meta { color: rgba(255,255,255,.86); margin: 2px 0 0; }
   .tile { flex: none; width: 48px; height: 48px; border-radius: 10px; display: grid; place-items: center; background: var(--accent); color: #fff; font: 700 18px/1 Literata, Georgia, serif; letter-spacing: .02em; }
   .app h3 { font-size: 22px; }
   .meta { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
@@ -124,9 +133,9 @@
       <p class="section-note">You’ll need a Google Workspace for Education account, so students sign in with their school Google account. Canvas and AI feedback are optional.</p>
       <div class="grid">
       <article class="app" style="--accent:#8c2f39">
-        <div class="app-head">
-          <div class="tile" aria-hidden="true">MC</div>
-          <div>
+        <div class="art" style="background-image:url('img/macbeth-curriculum.webp')">
+          
+          <div class="art-title">
             <h3>Macbeth Curriculum</h3>
             <p class="meta">Grades 9–12</p>
           </div>
@@ -141,40 +150,16 @@
           <ol>
             <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
             <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen. If it says <em>“Google hasn’t verified this app”</em>, that’s expected for your own copy: click <strong>Advanced ▸ Go to Macbeth Curriculum</strong>, then <strong>Allow</strong>.</li>
+            <li>Approve Google’s permission screen. It will say <em>“Google hasn’t verified this app”</em>: that’s expected for your own copy, and only you see it, once. Click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
             <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
           </ol>
-          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/macbeth-curriculum/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI feedback are optional.</p>
+          <p class="small"><a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/macbeth-curriculum/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
         </details>
       </article>
       <article class="app" style="--accent:#1f5f74">
-        <div class="app-head">
-          <div class="tile" aria-hidden="true">GG</div>
-          <div>
-            <h3>The Great Gatsby</h3>
-            <p class="meta">Grades 11–12</p>
-          </div>
-        </div>
-        <p class="blurb">A Great Gatsby unit with the full novel (public domain in the US since 2021), activities, grading and Canvas.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1lQVNOhQgdyiHyqW1W91u3ZFOQ5DjvPyH35fJbIwJLyQ/copy" target="_blank" rel="noopener">Make a copy</a>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/great-gatsby" target="_blank" rel="noopener">View code</a>
-        </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen. If it says <em>“Google hasn’t verified this app”</em>, that’s expected for your own copy: click <strong>Advanced ▸ Go to The Great Gatsby</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/great-gatsby/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI feedback are optional.</p>
-        </details>
-      </article>
-      <article class="app" style="--accent:#6a4c93">
-        <div class="app-head">
-          <div class="tile" aria-hidden="true">ME</div>
-          <div>
+        <div class="art plain">
+          <span class="art-initials" aria-hidden="true">ME</span>
+          <div class="art-title">
             <h3>Memoir</h3>
             <p class="meta">Grades 9–12</p>
           </div>
@@ -189,40 +174,16 @@
           <ol>
             <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
             <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen. If it says <em>“Google hasn’t verified this app”</em>, that’s expected for your own copy: click <strong>Advanced ▸ Go to Memoir</strong>, then <strong>Allow</strong>.</li>
+            <li>Approve Google’s permission screen. It will say <em>“Google hasn’t verified this app”</em>: that’s expected for your own copy, and only you see it, once. Click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
             <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
           </ol>
-          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/memoir/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI feedback are optional.</p>
+          <p class="small"><a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/memoir/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
         </details>
       </article>
-      <article class="app" style="--accent:#2e6b4f">
-        <div class="app-head">
-          <div class="tile" aria-hidden="true">NS</div>
-          <div>
-            <h3>Novel Study</h3>
-            <p class="meta">Grades 6–12</p>
-          </div>
-        </div>
-        <p class="blurb">A simple novel study built around books students read in Sora (or any copy they have).</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1P-UddWYQyj-VCAFTFGRotiNcO_CEgZnCvrQ8JnmvhY0/copy" target="_blank" rel="noopener">Make a copy</a>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/novel-study" target="_blank" rel="noopener">View code</a>
-        </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen. If it says <em>“Google hasn’t verified this app”</em>, that’s expected for your own copy: click <strong>Advanced ▸ Go to Novel Study</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/novel-study/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI feedback are optional.</p>
-        </details>
-      </article>
-      <article class="app" style="--accent:#b5651d">
-        <div class="app-head">
-          <div class="tile" aria-hidden="true">PS</div>
-          <div>
+      <article class="app" style="--accent:#6a4c93">
+        <div class="art" style="background-image:url('img/podcast-studio.webp')">
+          
+          <div class="art-title">
             <h3>Podcast Studio</h3>
             <p class="meta">Grades 9–12</p>
           </div>
@@ -237,16 +198,16 @@
           <ol>
             <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
             <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen. If it says <em>“Google hasn’t verified this app”</em>, that’s expected for your own copy: click <strong>Advanced ▸ Go to Podcast Studio</strong>, then <strong>Allow</strong>.</li>
+            <li>Approve Google’s permission screen. It will say <em>“Google hasn’t verified this app”</em>: that’s expected for your own copy, and only you see it, once. Click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
             <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
           </ol>
-          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/podcast-studio/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI feedback are optional.</p>
+          <p class="small"><a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/podcast-studio/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
         </details>
       </article>
-      <article class="app" style="--accent:#3d5a80">
-        <div class="app-head">
-          <div class="tile" aria-hidden="true">BR</div>
-          <div>
+      <article class="app" style="--accent:#2e6b4f">
+        <div class="art plain">
+          <span class="art-initials" aria-hidden="true">BR</span>
+          <div class="art-title">
             <h3>Bell Ringers</h3>
             <p class="meta">Grades 9–12</p>
           </div>
@@ -261,16 +222,16 @@
           <ol>
             <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
             <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen. If it says <em>“Google hasn’t verified this app”</em>, that’s expected for your own copy: click <strong>Advanced ▸ Go to Bell Ringers</strong>, then <strong>Allow</strong>.</li>
+            <li>Approve Google’s permission screen. It will say <em>“Google hasn’t verified this app”</em>: that’s expected for your own copy, and only you see it, once. Click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
             <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
           </ol>
-          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/bell-ringers/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI feedback are optional.</p>
+          <p class="small"><a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/bell-ringers/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
         </details>
       </article>
-      <article class="app" style="--accent:#7a5c2e">
-        <div class="app-head">
-          <div class="tile" aria-hidden="true">LC</div>
-          <div>
+      <article class="app" style="--accent:#b5651d">
+        <div class="art" style="background-image:url('img/lit-circles.webp')">
+          
+          <div class="art-title">
             <h3>Lit Circles</h3>
             <p class="meta">Grades 9–12</p>
           </div>
@@ -285,16 +246,40 @@
           <ol>
             <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
             <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen. If it says <em>“Google hasn’t verified this app”</em>, that’s expected for your own copy: click <strong>Advanced ▸ Go to Lit Circles</strong>, then <strong>Allow</strong>.</li>
+            <li>Approve Google’s permission screen. It will say <em>“Google hasn’t verified this app”</em>: that’s expected for your own copy, and only you see it, once. Click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
             <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
           </ol>
-          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI feedback are optional.</p>
+          <p class="small"><a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
         </details>
       </article>
-      <article class="app" style="--accent:#5b6c2f">
-        <div class="app-head">
-          <div class="tile" aria-hidden="true">RW</div>
-          <div>
+      <article class="app" style="--accent:#3d5a80">
+        <div class="art" style="background-image:url('img/lit-circles-hunger-games.webp')">
+          
+          <div class="art-title">
+            <h3>Hunger Games Lit Circles</h3>
+            <p class="meta">Grades 9</p>
+          </div>
+        </div>
+        <p class="blurb">A four-week literature circle unit on The Hunger Games (Suzanne Collins): two assigned reading strategies a week, built-in reading quizzes, discussion, peer and self assessment, grading and Canvas. Students need their own copy of the book.</p>
+        <div class="actions">
+          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1OA1mHfE8VGhnNCJ32zScy0zA1e_iPfd9gNGQSC2OQ8I/copy" target="_blank" rel="noopener">Make a copy</a>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles-hunger-games" target="_blank" rel="noopener">View code</a>
+        </div>
+        <details>
+          <summary>Set it up</summary>
+          <ol>
+            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
+            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
+            <li>Approve Google’s permission screen. It will say <em>“Google hasn’t verified this app”</em>: that’s expected for your own copy, and only you see it, once. Click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
+            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
+          </ol>
+          <p class="small"><a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles-hunger-games/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
+        </details>
+      </article>
+      <article class="app" style="--accent:#7a5c2e">
+        <div class="art plain">
+          <span class="art-initials" aria-hidden="true">RW</span>
+          <div class="art-title">
             <h3>Root Word Study</h3>
             <p class="meta">Grades 9–12</p>
           </div>
@@ -309,16 +294,16 @@
           <ol>
             <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
             <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen. If it says <em>“Google hasn’t verified this app”</em>, that’s expected for your own copy: click <strong>Advanced ▸ Go to Root Word Study</strong>, then <strong>Allow</strong>.</li>
+            <li>Approve Google’s permission screen. It will say <em>“Google hasn’t verified this app”</em>: that’s expected for your own copy, and only you see it, once. Click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
             <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
           </ol>
-          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/root-word-study/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI feedback are optional.</p>
+          <p class="small"><a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/root-word-study/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
         </details>
       </article>
-      <article class="app" style="--accent:#a23b5a">
-        <div class="app-head">
-          <div class="tile" aria-hidden="true">SS</div>
-          <div>
+      <article class="app" style="--accent:#5b6c2f">
+        <div class="art" style="background-image:url('img/short-story-lab.webp')">
+          
+          <div class="art-title">
             <h3>Short Story Lab</h3>
             <p class="meta">Grades 9–10</p>
           </div>
@@ -333,10 +318,10 @@
           <ol>
             <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
             <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen. If it says <em>“Google hasn’t verified this app”</em>, that’s expected for your own copy: click <strong>Advanced ▸ Go to Short Story Lab</strong>, then <strong>Allow</strong>.</li>
+            <li>Approve Google’s permission screen. It will say <em>“Google hasn’t verified this app”</em>: that’s expected for your own copy, and only you see it, once. Click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
             <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
           </ol>
-          <p class="small"><a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/short-story-lab/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI feedback are optional.</p>
+          <p class="small"><a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/short-story-lab/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
         </details>
       </article>
       </div>

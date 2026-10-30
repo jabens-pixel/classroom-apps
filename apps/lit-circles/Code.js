@@ -45,7 +45,7 @@ var GEMINI_MODEL = 'gemini-3.7-flash';
 // Bump on every release: here, LCH_RELEASE at the top of BackendClient.html (it sets the badge and
 // LC_CLIENT_VERSION, so Index.html only needs re-pasting when Index itself changes) and
 // FILE_FINGERPRINTS.release at the bottom of this file.
-var LC_APP_VERSION = '2026-10-27b';
+var LC_APP_VERSION = '2026-10-29b';
 var LC_LIVE_VERSION_PROP = 'LC_LIVE_APP_VERSION';
 
 var SHEET_NAMES = { GROUPS: 'Groups', WORK: 'WeeklyWork', DRAFTS: 'WeeklyDrafts', PEER: 'PeerAssessments', HISTORY: 'BookHistory', REFLECT: 'Reflections', RESUME: 'StudentResume', SELF: 'DiscussionSelfAssessments', STEP: 'StepDrafts', BACKUP: 'WorkBackups', WSTATS: 'WritingStats', JIMG: 'JournalImages', AWAY: 'DiscussionAway' };
@@ -60,7 +60,7 @@ var LC_SHEET_HEADERS = {
   BookHistory: ['Email', 'OldGroupId', 'OldBookTitle', 'ArchivedAt'],
   Reflections: ['GroupId', 'Email', 'Week', 'Type', 'Answers', 'Goal', 'SubmittedAt', 'AnswersFp', 'Answers2', 'Answers3', 'Answers4', 'Answers5'],
   DiscussionSelfAssessments: ['GroupId', 'Email', 'Week', 'Participation', 'Leadership', 'ActiveEngagement', 'SubmittedAt'],
-  StudentResume: ['Email', 'View', 'Week', 'FlowStage', 'FocusIndex', 'HybridMoment', 'UpdatedAt'],
+  StudentResume: ['Email', 'View', 'Week', 'FlowStage', 'FocusIndex', 'HybridMoment', 'UpdatedAt', 'MarkStyle'],
   // Half-finished Step 2 plans and Step 4 reflections (Kind = 'plan' | 'reflection'). Blanked in
   // place when the real Plan / Reflection save succeeds.
   StepDrafts: ['Email', 'Week', 'Kind', 'UpdatedAt', 'DataJson', 'DataJson2', 'DataJson3', 'DataJson4', 'DataJson5', 'GroupId'],
@@ -90,7 +90,7 @@ function doGet(e) {
  *  the 400 KB Index.html. WritingStats (per-box writing stats) and WritingFocus (focus mode for Step 1
  *  writing) ride along too. Checklists (the Step 1 writing checklists) and SaveGuard (keeps student
  *  writing safe: stale tabs, unsaved text, Steps 2 and 4 drafts) ride along with BackendClient. */
-var LC_INCLUDE_WITH = {"BackendClient": ["Checklists","SaveGuard","StrategyArt","WritingStats","WritingFocus","ReadingQuiz","DiscussionDeck","JournalPictures","DiscussionAway","CommentBank","WeekDueDates","Bullets"]};
+var LC_INCLUDE_WITH = {"BackendClient": ["Checklists","SaveGuard","StrategyArt","WritingStats","WritingFocus","ReadingQuiz","DiscussionDeck","JournalPictures","DiscussionAway","CommentBank","WeekDueDates","Bullets","MarkStyle"]};
 
 /** Splices another HTML file into Index. A missing file becomes a visible warning, not a blank page. */
 function include_(name) {
@@ -610,8 +610,22 @@ function getStudentResume_(email) {
     flowStage: String(r.FlowStage || 'pathway'),
     focusIndex: Number(r.FocusIndex || 0),
     hybridMoment: Number(r.HybridMoment || 0),
-    updatedAt: lcIsoValue_(r.UpdatedAt)
+    updatedAt: lcIsoValue_(r.UpdatedAt),
+    markStyle: String(r.MarkStyle || '') === 'fill' ? 'fill' : String(r.MarkStyle || '') === 'underline' ? 'underline' : ''
   };
+}
+
+/** 2026-10-29b: how this student wants their strategy marks shown — 'underline' (default) or
+ *  'fill' (highlighter). Only the look on their own screens; the writing itself doesn't change. */
+function saveStudentMarkStyle(email, style) {
+  email = lcActingEmail_(email);
+  var sess = lcCurrentEmail_();
+  if (sess && sess !== email && !lcIsDemoEmail_(email)) return { ok: true, skipped: true }; // a teacher viewing doesn't change the student's setting
+  var v = String(style) === 'fill' ? 'fill' : 'underline';
+  return lcWithUserLock_(function () {
+    lcUpsertByKeys_(resumeSheet_(), 'Email', { Email: email }, { MarkStyle: v });
+    return { ok: true, markStyle: v };
+  });
 }
 
 function saveStudentResume(email, resumeObj) {
@@ -713,6 +727,9 @@ function getState(email) {
       loadedAt: new Date(Date.now() - 1500).toISOString(),
       stepDrafts: {}
     };
+    // 2026-10-29a: the page asks a student for their first and last name until they give it
+    // (only for the student themself, never when a teacher opens their pages).
+    if (normEmail_(lcCurrentEmail_()) === email && lcNeedsName_(email)) { result.needsName = true; result.nameSuggest = lcNameSuggestion_(email); }
     if (group) {
       var gid = String(group.groupId);
       function mine(sh, header) { return lcReadRows_(sh, lcFindRowNumbers_(sh, header, email)).filter(function (r) { return String(r.GroupId) === gid; }); }
@@ -1663,7 +1680,8 @@ var LC_PLATFORM_SHEETS = { USERS: 'LC_Users', CLASSES: 'LC_Classes', ENROLL: 'LC
 var LC_PLATFORM_HEADERS = {
   LC_Users: ['Email', 'Name', 'Role', 'Status', 'UpdatedAt'],
   LC_Classes: ['ClassId', 'TeacherEmail', 'ClassName', 'Period', 'JoinCode', 'SettingsJson', 'Active', 'CreatedAt', 'UpdatedAt'],
-  LC_Enrollment: ['ClassId', 'StudentEmail', 'StudentName', 'Active', 'JoinedAt'],
+  // NameSetAt (2026-10-29a): when the student typed their own first and last name.
+  LC_Enrollment: ['ClassId', 'StudentEmail', 'StudentName', 'Active', 'JoinedAt', 'NameSetAt'],
   // MarkedFp: fingerprint of the work at the moment it was scored (for "redone after grading").
   // CanvasCommentFp: which version of the comment was last posted to Canvas.
   LC_Grades: ['ClassId', 'StudentEmail', 'ItemKey', 'Score', 'MaxPoints', 'RubricJson', 'Feedback', 'Excluded', 'UpdatedAt', 'UpdatedBy', 'MarkedFp', 'CanvasCommentFp', 'CanvasPostedScore']
@@ -1856,6 +1874,49 @@ function lcEnrollmentsForStudent_(email) {
   return Object.keys(ids).filter(function (k) { return ids[k]; });
 }
 
+// ---- 2026-10-29a: every student gives their first and last name ------------
+// A student who joined with only an email (or whom the teacher added by email)
+// is asked once for their first and last name; it replaces the name in every
+// class they are in. NameSetAt marks rows the student has named themselves.
+function lcCleanNamePart_(v, what) {
+  var s = String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+  if (!s) throw new Error('Please type your ' + what + '.');
+  if (s.length > 40) throw new Error('Your ' + what + ' is too long (40 letters at most).');
+  if (!/[A-Za-z\u00C0-\u024F\u0100-\u017F\u02BB\u0370-\u1FFF]/.test(s) || /[<>@=]/.test(s)) throw new Error('Please type your real ' + what + '.');
+  return s;
+}
+function lcNeedsName_(email) {
+  var e = normEmail_(email); if (!e) return false;
+  var rows = lcSheetObjects_(LC_PLATFORM_SHEETS.ENROLL).filter(function (x) { return normEmail_(x.StudentEmail) === e && lcTruth_(x.Active); });
+  if (!rows.length) return false;
+  return !rows.some(function (x) { return x.NameSetAt !== '' && x.NameSetAt != null; });
+}
+function lcNameSuggestion_(email) {
+  var e = normEmail_(email), name = '';
+  lcSheetObjects_(LC_PLATFORM_SHEETS.ENROLL).forEach(function (x) { if (normEmail_(x.StudentEmail) === e && String(x.StudentName || '').trim()) name = String(x.StudentName).replace(/^'/, '').trim(); });
+  var parts = (name || lcNameFromEmail_(e)).split(/\s+/);
+  return { first: parts[0] || '', last: parts.length > 1 ? parts.slice(1).join(' ') : '' };
+}
+function setMyLiteratureName(payload) {
+  payload = payload || {};
+  lcEnsurePlatform_();
+  var email = lcActingEmail_(payload.email || lcCurrentEmail_(), true);
+  var name = lcCleanNamePart_(payload.firstName, 'first name') + ' ' + lcCleanNamePart_(payload.lastName, 'last name');
+  var updated = 0;
+  withLock_(function () {
+    var sh = lcPlatformSheet_(LC_PLATFORM_SHEETS.ENROLL);
+    lcReadRows_(sh, lcFindRowNumbers_(sh, 'StudentEmail', email)).forEach(function (r) {
+      if (normEmail_(r.StudentEmail) !== email) return;
+      var o = {}; Object.keys(r).forEach(function (k) { if (k !== '_row') o[k] = r[k]; });
+      o.StudentName = lcText_(name); o.NameSetAt = new Date();
+      lcWriteObjectRow_(sh, r._row, o); updated++;
+    });
+    LC_X_.enroll = null;
+  });
+  if (!updated) throw new Error('You are not in a class yet. Ask your teacher for the class code.');
+  return { ok: true, name: name, updated: updated };
+}
+
 function getLiteratureBootstrap() {
   lcEnsurePlatform_();
   var email = lcCurrentEmail_();
@@ -1875,7 +1936,8 @@ function getLiteratureBootstrap() {
       return pc;
     });
   }
-  return { ok: true, email: email, name: (u && u.Name) || lcNameFromEmail_(email), role: role, classes: classes, rubrics: LC_RUBRICS, appVersion: lcLiveAppVersion_(), serverBuild: LC_APP_VERSION, lastClassId: (role === 'teacher' || role === 'admin') ? lcTeacherLastClass_(email) : '', defaultClassId: (role === 'teacher' || role === 'admin') ? lcBusiestClass_(classes) : '' };
+  var needsName = role === 'student' && !!email && lcNeedsName_(email);
+  return { ok: true, email: email, name: (u && u.Name) || lcNameFromEmail_(email), role: role, classes: classes, needsName: needsName, nameSuggest: needsName ? lcNameSuggestion_(email) : null, rubrics: LC_RUBRICS, appVersion: lcLiveAppVersion_(), serverBuild: LC_APP_VERSION, lastClassId: (role === 'teacher' || role === 'admin') ? lcTeacherLastClass_(email) : '', defaultClassId: (role === 'teacher' || role === 'admin') ? lcBusiestClass_(classes) : '' };
 }
 
 // 2026-10-18f: the teacher dashboard opens on the class the teacher had open last (on any device),
@@ -1971,7 +2033,9 @@ function joinLiteratureClass(payload) {
   var classId = String(c.ClassId);
   withLock_(function () {
     LC_X_.enroll = null;
-    if (!lcIsEnrolled_(classId, email)) lcAppendObject_(lcPlatformSheet_(LC_PLATFORM_SHEETS.ENROLL), { ClassId: classId, StudentEmail: email, StudentName: String(payload.name || lcNameFromEmail_(email)), Active: true, JoinedAt: new Date() });
+    // 2026-10-29a: a student joining gives a first and last name (lcCleanNamePart_ checks both).
+    var typed = (payload.firstName || payload.lastName) ? lcCleanNamePart_(payload.firstName, 'first name') + ' ' + lcCleanNamePart_(payload.lastName, 'last name') : '';
+    if (!lcIsEnrolled_(classId, email)) lcAppendObject_(lcPlatformSheet_(LC_PLATFORM_SHEETS.ENROLL), { ClassId: classId, StudentEmail: email, StudentName: lcText_(typed || String(payload.name || lcNameFromEmail_(email))), Active: true, JoinedAt: new Date(), NameSetAt: typed ? new Date() : '' });
     LC_X_.enroll = null;
   });
   var pc = lcPublicClass_(c);
@@ -3543,17 +3607,17 @@ function teacherRestoreLiteratureArchive(payload){
 // Regenerate FILE_FINGERPRINTS with Node every release.
 // ============================================================================
 var FILE_FINGERPRINTS = {
-  "release": "2026-10-27b",
+  "release": "2026-10-29b",
   "files": {
     "Index": {
-      "chars": 412123,
-      "md5": "f8ba948471c50f53241c3bbdd139b1c3",
-      "md5ws": "33da7c4131765f878a13edf556931f66"
+      "chars": 414880,
+      "md5": "aa13731f01dcfaed1db22ffd8c988dae",
+      "md5ws": "cb7795775dcdd4dd40614748f3beea4b"
     },
     "BackendClient": {
       "chars": 282230,
-      "md5": "64543c7e9b6e28ec62f28cd977cf3683",
-      "md5ws": "c547d73e004170b8ff4e7dcb1c55a971"
+      "md5": "958fcf95c95082739839df66b1f1c135",
+      "md5ws": "bbf150b0aba1836904e294598302369f"
     },
     "Checklists": {
       "chars": 37708,
@@ -3614,6 +3678,11 @@ var FILE_FINGERPRINTS = {
       "chars": 8020,
       "md5": "d8aee7ba288c6f9ababc9a9e564a1ef7",
       "md5ws": "b63ac98c4d757eca759e72092e0b3d78"
+    },
+    "MarkStyle": {
+      "chars": 10860,
+      "md5": "0706167565478718870781d769673d50",
+      "md5ws": "d7487e82fe6723edd480fc42386d0e5f"
     },
     "LibraryTheme": {
       "chars": 232280,

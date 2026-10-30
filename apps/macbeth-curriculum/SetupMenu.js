@@ -8,6 +8,8 @@
  *   1. makes this Sheet the app's backend and makes the teacher the admin (automatic),
  *   2. shows 5 short steps to publish the app as a web app (Google only lets the owner do this), and
  *   3. saves the student link the teacher pastes back, so it can be found again.
+ * Until a copy is set up, opening the Sheet shows a note (bottom right) that explains Google's
+ * "hasn't verified this app" screen before the teacher meets it (2026-10-29).
  * Running it again is safe: the setup keeps the existing data.
  */
 var CAS_APP = {"title":"Macbeth Curriculum","setup":"setupMacbethBackend","dbProp":"MACBETH_DB_ID"};
@@ -19,6 +21,16 @@ function onOpen() {
     .addItem('Set up my app', 'classroomAppSetup')
     .addItem('Show my student link', 'classroomAppShowLink')
     .addToUi();
+  // Until this copy is set up: warn about Google's "hasn't verified this app" screen before it appears.
+  // (Runs as a simple trigger: no permission needed, and it must never stop the menu from showing.)
+  try {
+    if (PropertiesService.getScriptProperties().getProperty(CAS_PROP_FOR) !== ScriptApp.getScriptId()) {
+      SpreadsheetApp.getActiveSpreadsheet().toast(
+        // Keep it this short: Sheets cuts a longer note off at the bottom of the window (checked 2026-10-29).
+        'Google will warn it “hasn’t verified this app.” That’s normal for your copy: Advanced ▸ Go to … (unsafe) ▸ Allow.',
+        'Next: Classroom App ▸ Set up my app', -1);
+    }
+  } catch (e) {}
 }
 
 /** Menu: Classroom App ▸ Set up my app */

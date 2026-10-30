@@ -1,0 +1,138 @@
+<!-- HungerGames: this copy's one book and fixed weekly strategies (English 1, Grade 9).
+     Rides along LAST after BackendClient (LC_INCLUDE_WITH in Code.js), so it wraps the
+     functions the other files set up ("later definitions win").
+     - Step 1 has no pathway choice: no Reader's Journal, no Hybrid. Every student does the
+       same two strategies that week (HG_PLAN in Code.js; the page gets it as state.plan).
+     - The group setup page only asks for teammates; the book and the four reading sections
+       are fixed. "Start a New Book" is gone.
+     Nothing here saves or grades anything; the server enforces the same plan on every save. -->
+<style>
+.hg-plan-shell{max-width:1120px;margin:0 auto}
+.hg-plan-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:18px 0}
+.hg-plan-card{background:#fff;color:#17201b;border:2px solid #17201b;padding:18px 20px 20px}
+.hg-plan-card .strategy-picture{height:96px;display:flex;align-items:center;justify-content:center;background:#eeeee8;margin-bottom:12px}
+.hg-plan-card .hg-num{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#3d4a43;margin-bottom:4px}
+.hg-plan-card h4{margin:0 0 6px;font-size:22px;color:#17201b}
+.hg-plan-card p{margin:0 0 10px;color:#33413a;font-size:15px;line-height:1.5}
+.hg-plan-card ol{margin:0;padding-left:20px;color:#26332c;font-size:14.5px;line-height:1.5}
+.hg-plan-card li{margin:4px 0}
+.prep-section-title .hg-fixed-note,.hg-fixed-note{display:inline-block;margin-top:10px;font-size:14px;font-weight:700;background:#eef3d6!important;color:#26330c!important;padding:6px 10px}
+.hg-setup .hg-fixed{background:#f4f4ef;border:1px solid #d8d8cf;padding:12px 14px;margin:6px 0 14px;color:#17201b}
+.hg-setup .hg-fixed strong{display:block;font-size:18px}
+.hg-setup .hg-sched{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:6px 0 14px}
+.hg-setup .hg-sched div{background:#f4f4ef;border:1px solid #d8d8cf;padding:8px 10px;font-size:14px;color:#17201b}
+.hg-setup .hg-sched b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#4a564f}
+.week-focus-reading .hg-week-strats{display:block;margin-top:6px;font-size:13px;font-weight:600;color:#3d4a43;line-height:1.35}
+@media (max-width:760px){.hg-plan-cards{grid-template-columns:1fr}.hg-setup .hg-sched{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+<script>
+(function () {
+  'use strict';
+  var W = window;
+  // Same as HG_PLAN in Code.js; the server's copy (state.plan) wins whenever it has arrived.
+  var FALLBACK = { book: 'The Hunger Games', author: 'Suzanne Collins', reading: ['Ch. 1–6', 'Ch. 7–13', 'Ch. 14–20', 'Ch. 21–27'],
+    strategies: { 1: ['summarizer', 'researcher'], 2: ['predictor', 'illustrator'], 3: ['connector', 'questioner'], 4: ['literaryLuminary', 'inferences'] } };
+  function plan() { var p = W.state && W.state.plan; return (p && p.strategies && p.reading) ? p : FALLBACK; }
+  function stratsFor(wk) { var s = plan().strategies[String(wk)] || plan().strategies[wk] || FALLBACK.strategies[wk] || []; return s.filter(function (k) { return !!(W.STRATEGY_DEFS && W.STRATEGY_DEFS[k]); }); }
+  function names(wk) { return stratsFor(wk).map(function (k) { return W.STRATEGY_DEFS[k].label; }); }
+  function readingFor(wk) { return plan().reading[wk - 1] || ''; }
+  function esc(s) { return W.esc ? W.esc(s) : String(s == null ? '' : s); }
+  W.HG = { plan: plan, strategiesFor: stratsFor, namesFor: names, readingFor: readingFor };
+  var _apply = W.applyLoadedStudentState;
+  if (typeof _apply === 'function') W.applyLoadedStudentState = function (s) { if (s && s.plan) W.state.plan = s.plan; return _apply.apply(this, arguments); };
+
+  // ---- Step 1 is always this week's two strategies --------------------------------------
+  var _draft = W.prepDraftForWeek;
+  W.prepDraftForWeek = function (wk) {
+    var d = _draft.apply(this, arguments);
+    // keep the two strategies saved work was written for (if the plan changed later); else the plan's
+    var keep = d.prepType === 'strategies' && Array.isArray(d.choices) && d.choices.length === 2 && d.choices.every(function (k) { return !!(W.STRATEGY_DEFS && W.STRATEGY_DEFS[k]); });
+    d.prepType = 'strategies';
+    if (!keep) d.choices = stratsFor(wk);
+    d.data = d.data || {};
+    return d;
+  };
+  // No pathway screen: 'pathway' (and the journal's 'rubric' step) become the strategies page.
+  var _stage = W.prepFlowStage;
+  W.prepFlowStage = function (wk) { var s = _stage.apply(this, arguments); return (s === 'pathway' || s === 'rubric') ? 'picker' : s; };
+  W.choosePrepPathway = function (wk) { W.setPrepFlowStage(wk, 'picker'); W.saveStudentResumeClient(); W.render(); };
+  W.returnToPathway = function (wk) { W.returnToPicker(wk); };
+  W.pickFocusedStrategy = function () {};
+
+  // The page before the workspace: this week's two strategies, then the rubric, then Start.
+  W.renderStrategyPicker = function (wk) {
+    var keys = W.prepDraftForWeek(wk).choices, started = !!((W.state.weeklyDrafts && W.state.weeklyDrafts[wk] && W.state.weeklyDrafts[wk].prepType) || (W.state.weeklyWork[wk] && W.state.weeklyWork[wk].prepType));
+    var cards = keys.map(function (k, i) {
+      var def = W.STRATEGY_DEFS[k], v = (W.STRATEGY_VISUALS || {})[k] || { icon: '📖', tag: '' }, guide = (W.STRATEGY_GUIDES || {})[k] || { steps: [def.blurb || ''] };
+      return '<div class="hg-plan-card"><div class="strategy-picture">' + v.icon + '</div><span class="hg-num">Strategy ' + (i + 1) + ' of ' + keys.length + '</span><h4>' + esc(def.label) + '</h4><p>' + esc(v.tag) + '</p><ol>' + guide.steps.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ol></div>';
+    }).join('');
+    return '<div class="hg-plan-shell"><a class="backlink" onclick="openWeekHub(' + wk + ')">← Back to Week ' + wk + '</a>' +
+      '<div class="prep-section-title"><h3>Week ' + wk + ' · ' + esc(readingFor(wk)) + ' · Your two reading strategies</h3><p>Everyone in the class uses the same two strategies this week: <b>' + esc(names(wk).join(' and ')) + '</b>. You will work through them one at a time.</p><span class="hg-fixed-note">Assigned by your teacher for this week</span></div>' +
+      '<div class="hg-plan-cards">' + cards + '</div>' +
+      (W.lcStudentRubricHtml ? W.lcStudentRubricHtml('strategies') : '') +
+      '<div class="start-work-row"><button onclick="startFocusedWork(' + wk + ')">' + (started ? 'Continue My Weekly Work →' : 'I Understand the Rubric · Start My Weekly Work →') + '</button></div></div>';
+  };
+
+  // Words on the Step 1 pages that offered a choice.
+  var _vws = W.viewWeekStrategies;
+  W.viewWeekStrategies = function () {
+    var html = _vws.apply(this, arguments);
+    var wk = W.state.week;
+    return String(html)
+      .split('← Change strategies').join('← This week’s strategies')
+      .split('← Change pathway').join('← This week’s strategies')
+      .split('Pick two strategies that fit what you noticed in this week’s reading.').join('Everyone does ' + esc(names(wk).join(' and ')) + ' this week.');
+  };
+
+  // Week page: Step 1's description names this week's strategies.
+  var STEP1_OLD = 'Complete this week’s two reading strategies. This is your main reading response for the week.';
+  var _vw = W.viewWeek;
+  W.viewWeek = function () {
+    var html = _vw.apply(this, arguments), wk = W.state.week;
+    return String(html).split(STEP1_OLD).join('Complete this week’s two reading strategies: <b>' + esc(names(wk).join(' + ')) + '</b>. This is your main reading response for the week.');
+  };
+
+  // Home page: no "Start a New Book"; "Edit Book / Group Setup" only edits the group; each week
+  // card names its two strategies under the reading.
+  var _dash = W.viewDashboard;
+  W.viewDashboard = function () {
+    var html = String(_dash.apply(this, arguments));
+    html = html.split('<div style="margin-top:18px"><button class="secondary" onclick="startNewBookFlow()">Start a New Book</button></div>').join('');
+    html = html.split('>Edit Book / Group Setup<').join('>Edit My Group<');
+    html = html.split('<div class="eyebrow">Lit Circles</div>').join('<div class="eyebrow">Lit Circles · ' + esc(plan().author || '') + '</div>');
+    [1, 2, 3, 4].forEach(function (wk) {
+      var r = '<div class="week-focus-reading">Weekly reading<strong>' + esc(readingFor(wk)) + '</strong>';
+      var at = html.indexOf(r, html.indexOf('week-focus-card week-' + wk + ' '));
+      if (at >= 0) html = html.slice(0, at + r.length) + '<span class="hg-week-strats">Strategies: ' + esc(names(wk).join(' + ')) + '</span>' + html.slice(at + r.length);
+    });
+    return html;
+  };
+  W.startNewBookFlow = function () { W.showInfo('Everyone in this class reads ' + plan().book + ', so there is no new book to start.'); };
+
+  // Group setup: only teammates. The book and the four sections are the same for everyone.
+  W.viewSetup = function () {
+    var g = W.state.group, me = String(W.state.email || '').toLowerCase();
+    var others = g ? g.memberEmails.filter(function (m) { return m.toLowerCase() !== me; }) : [];
+    var boxes = '<div class="email-box-label">Your email</div><input type="email" value="' + esc(W.state.email) + '" disabled style="opacity:0.7;">';
+    for (var i = 0; i < 4; i++) boxes += '<div class="email-box-label" style="margin-top:10px;">Teammate ' + (i + 1) + ' email' + (i === 0 ? '' : ' (optional)') + '</div><input type="email" id="teammate' + i + '" placeholder="teammate@school.org" value="' + esc(others[i] || '') + '">';
+    var sched = plan().reading.map(function (r, i) { return '<div><b>Week ' + (i + 1) + '</b>' + esc(r) + '<br><small>' + esc(names(i + 1).join(' + ')) + '</small></div>'; }).join('');
+    return '<div class="card hg-setup"><h2>' + (g ? 'Edit Your Group' : 'Set Up Your Group') + '</h2><p class="muted">Do this together as a group during your first meeting. Everyone in your group adds the same teammates.</p>' +
+      '<label>Book</label><div class="hg-fixed"><strong>' + esc(plan().book) + '</strong>' + esc(plan().author || '') + ' · the whole class reads this book</div>' +
+      '<label>Reading schedule</label><div class="hg-sched">' + sched + '</div>' +
+      '<label>Group members</label>' + boxes +
+      '<div style="margin-top:18px;"><button id="setupSaveBtn" onclick="doSaveSetup()">' + (g ? 'Save Group' : 'Save &amp; Continue to Week 1') + '</button>' + (g ? ' <button class="secondary" onclick="goHome()">Cancel</button>' : '') + '</div></div>';
+  };
+  W.doSaveSetup = function () {
+    var teammates = [0, 1, 2, 3].map(function (i) { var el = document.getElementById('teammate' + i); return el ? el.value.trim() : ''; }).filter(Boolean);
+    var members = [W.state.email].concat(teammates).join(',');
+    W.callServer('saveGroupSetup', [W.state.email, plan().book, members, plan().reading.slice()], function (s) {
+      var st = W.state;
+      st.group = s.group; st.weeklyWork = s.weeklyWork; st.weeklyDrafts = s.weeklyDrafts || {}; st.teacherFeedback = s.teacherFeedback || {}; st.discussionAway = s.discussionAway || {}; st.peerAssessmentsGiven = s.peerAssessmentsGiven; st.pastBooks = s.pastBooks || []; st.reflections = s.reflections || {}; st.selfAssessments = s.selfAssessments || {}; st.peerFeedbackReceived = s.peerFeedbackReceived || {};
+      if (s.plan) st.plan = s.plan;
+      st.week = 1; st.view = 'week'; W.render();
+    }, null, { button: document.getElementById('setupSaveBtn') });
+  };
+
+  (W.__MB = W.__MB || {}).HungerGames = 'ok';
+})();
+</script>

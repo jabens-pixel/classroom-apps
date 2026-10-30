@@ -63,6 +63,7 @@ state.writing.process = state.writing.process && typeof state.writing.process ==
 state.writing.finalText = state.writing.finalText || "";
 state.writing.finalReflection = state.writing.finalReflection || "";
 state.writing.finalSelfEval = state.writing.finalSelfEval || {};
+if (typeof migrateFinalSelfEval_ === "function") migrateFinalSelfEval_(state.writing);
 state.writing.finalSelfComments = state.writing.finalSelfComments || {};
 state.writing.aiFeedback = state.writing.aiFeedback || null;
 state.submissions = state.submissions && typeof state.submissions === "object" ? state.submissions : {};
@@ -1463,7 +1464,7 @@ function gradedActivityAssigned_(itemKey) {
 function resourceCard(r, gradedItemKey) {
   let [type, title, target] = r;
   if (gradedItemKey && !gradedActivityAssigned_(gradedItemKey)) return "";
-  let isUrl = new RegExp("^https?://", "i").test(target || "");
+  let isUrl = new RegExp("^https?:/{2}", "i").test(target || "");
   // A graded assignment's only way in used to be a pale button that looked
   // exactly like "View Rubric" and "Back" -- students said they couldn't tell
   // an assignment existed. It's now the primary action on the card.
@@ -2293,6 +2294,7 @@ function bind() {
     (x) =>
       (x.onclick = () => {
         state.writing.finalSelfEval[x.dataset.crit] = x.dataset.band;
+        state.writing.finalSelfEvalV = 2;
         save();
         render();
       }),

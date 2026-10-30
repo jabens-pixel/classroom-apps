@@ -1094,7 +1094,7 @@ const STORY_RUBRIC = {
       { points: 6, text: "The story has a discernible plot with a beginning, middle, and end. It generally engages the reader, though some parts may be less developed or less engaging." },
       { points: 5, text: "The story has a basic plot, but it may lack coherence or fail to engage the reader consistently." },
       { points: 4, text: "The story lacks a clear plot or fails to engage the reader effectively." },
-      { points: 0, text: "No evidence of a plot is present in the story." },
+      { points: 1, text: "No evidence of a plot is present in the story." },
     ],
   },
   character: {
@@ -1104,7 +1104,7 @@ const STORY_RUBRIC = {
       { points: 6, text: "The characters are reasonably developed, with some distinct personalities, motivations, and growth. Most of their actions and dialogue contribute to the overall narrative." },
       { points: 5, text: "The characters may lack depth or development, and their actions and dialogue may not consistently contribute to the overall narrative." },
       { points: 4, text: "The characters are underdeveloped and their actions and dialogue do not contribute significantly to the overall narrative." },
-      { points: 0, text: "No evidence of character development is present in the story." },
+      { points: 1, text: "No evidence of character development is present in the story." },
     ],
   },
   setting: {
@@ -1114,7 +1114,7 @@ const STORY_RUBRIC = {
       { points: 6, text: "The story establishes a setting that is generally clear and contributes to the overall narrative. Some additional details could enhance the reader's understanding." },
       { points: 5, text: "The setting is mentioned but lacks detail or does not significantly contribute to the overall narrative." },
       { points: 4, text: "The setting is unclear or irrelevant to the overall narrative." },
-      { points: 0, text: "No evidence of setting is present in the story." },
+      { points: 1, text: "No evidence of setting is present in the story." },
     ],
   },
   theme: {
@@ -1123,11 +1123,27 @@ const STORY_RUBRIC = {
       { points: 7, text: "The story effectively conveys a theme that resonates with the reader. The theme is well-developed and integrated into the narrative, providing insight or a deeper understanding of the human experience." },
       { points: 6, text: "The theme is present but may lack coherence or integration into the narrative, providing limited insight or understanding." },
       { points: 5, text: "The theme is unclear or poorly developed, and does not contribute significantly to the reader's understanding." },
-      { points: 0, text: "No evidence of a theme is present in the story." },
+      { points: 4, text: "The theme is barely evident and is not developed through the narrative, offering little insight or understanding." },
+      { points: 1, text: "No evidence of a theme is present in the story." },
     ],
   },
 };
 const STORY_RUBRIC_ORDER = ["plot", "character", "setting", "theme"];
+// v49: every criterion is 7 / 6 / 5 / 4 / 1 (1 = Incomplete); Theme gained its
+// 4. A Theme self-assessment saved before that stored index 3 for the lowest
+// level, which is now index 4 -- storyRubricSelfIdx_ reads old copies right.
+function storyRubricSelfIdx_(writing, key) {
+  const w = writing || {}, v = (w.finalSelfEval || {})[key];
+  if (v === undefined || v === null || v === "") return v;
+  if (key === "theme" && !w.finalSelfEvalV && String(v) === "3") return "4";
+  return v;
+}
+function migrateFinalSelfEval_(writing) {
+  if (!writing || writing.finalSelfEvalV) return;
+  const fixed = storyRubricSelfIdx_(writing, "theme");
+  if (writing.finalSelfEval && fixed !== undefined && fixed !== null && fixed !== "") writing.finalSelfEval.theme = fixed;
+  writing.finalSelfEvalV = 2;
+}
 const STORY_RUBRIC_MAX = 7; // per-criterion max; 4 criteria = 28 total
 
 // Writing Workshop stage grades. Prewriting is intentionally NOT a single

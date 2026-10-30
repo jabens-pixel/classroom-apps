@@ -5,7 +5,7 @@ const SHORTSTORY_DB_PROP = 'SHORTSTORY_DB_ID';
 // version returned by getBootstrap()/getAppVersion(). Bump this one value for
 // each classroom release; stale tabs safely reload with a cache-busting URL
 // and then show the one-time "App updated" confirmation.
-const SHORTSTORY_APP_VERSION = '2026.10.26.49';
+const SHORTSTORY_APP_VERSION = '2026.10.29.52';
 // Bumped on every build that ships. A student's browser remembers the value
 // it booted with and the server returns the current one on every save, so a
 // tab left open across a redeploy can notice and offer to reload -- it is
@@ -14,7 +14,7 @@ const SHORTSTORY_APP_VERSION = '2026.10.26.49';
 // WHOEVER EDITS THIS PROJECT NEXT: bump this string whenever you change ANY
 // file. It is the only thing that tells an open tab it is out of date. Nothing
 // breaks if you forget -- students simply are not prompted.
-const APP_BUILD = '2026-10-26-final-marking-like-macbeth-v49';
+const APP_BUILD = '2026-10-29-name-required-v52';
 
 const SHEETS = {
   USERS: ['email','name','role','status','createdAt','updatedAt'],
@@ -96,16 +96,26 @@ const STORY_LABELS = {
 // client-side STORY_RUBRIC just enough to validate a teacher's score
 // server-side: the valid point values for each criterion, in order
 // strongest-first (last value is that criterion's floor). A criterion's
-// "possible" points are always STORY_RUBRIC_MAX (7), even for Theme, which
-// only has 4 rating levels in the source rubric instead of 5.
+// "possible" points are always STORY_RUBRIC_MAX (7). v49: every criterion is
+// 7/6/5/4/1 (1 = Incomplete); Theme gained a 4. See finalSelfIdx_ for Theme
+// self-assessments saved before that.
 const STORY_RUBRIC_CRITERIA = ['plot','character','setting','theme'];
 const STORY_RUBRIC_POINTS = {
-  plot: [7,6,5,4,0],
-  character: [7,6,5,4,0],
-  setting: [7,6,5,4,0],
-  theme: [7,6,5,0]
+  plot: [7,6,5,4,1],
+  character: [7,6,5,4,1],
+  setting: [7,6,5,4,1],
+  theme: [7,6,5,4,1]
 };
 const STORY_RUBRIC_MAX = 7;
+// A Theme self-assessment saved before v49 stored index 3 for its lowest level,
+// which is now index 4 (Theme gained a 4). Same rule as storyRubricSelfIdx_ in StoryData.
+function finalSelfIdx_(sw, key) {
+  sw = sw || {};
+  const v = (sw.finalSelfEval || {})[key];
+  if (v === undefined || v === null || v === '') return v;
+  if (key === 'theme' && !sw.finalSelfEvalV && String(v) === '3') return '4';
+  return v;
+}
 
 // Writing Workshop stage grades (Prewriting / Drafting / Revision) -- a
 // single holistic 1-7 score + comment per stage, teacher-entered, the same
@@ -540,12 +550,35 @@ function stampSubmissionSignatures_(existing, incoming) {
     if (old && old.sig && old.submittedAt === rec.submittedAt) { rec.sig = old.sig; if (old.serverAt) rec.serverAt = old.serverAt; }
     else if (old && old.submittedAt === rec.submittedAt) { rec.sig = submissionFp_(incoming, k); }
     else { rec.sig = submissionFp_(incoming, k); rec.serverAt = new Date().toISOString(); }
+    if (SUBMISSION_TEXT_FIELD[k]) {
+      // v50: the story text as turned in. A record from before v50 gets it the
+      // first time it is saved again (the page has cleared it if the text changed).
+      if (old && old.textSig && old.submittedAt === rec.submittedAt) rec.textSig = old.textSig;
+      else rec.textSig = submissionTextFp_(incoming, k);
+    }
   });
 }
 // Is the version on screen the one the student turned in?
+// v50: the Final Draft and Revision count as submitted while the STORY TEXT is
+// the one turned in. Their full fingerprint also covers the self-assessment,
+// reflection and revision checklist, which students fill in after pressing
+// Submit; that used to make a submitted story show as "not submitted" to the
+// teacher while the student's page still said Submitted. The page clears these
+// submissions when the story text changes, and so does the text check here.
+const SUBMISSION_TEXT_FIELD = {'finalDraft:finalDraft':'finalText', 'stage:revision':'revisionText'};
+function submissionTextFp_(st, subKey) {
+  const f = SUBMISSION_TEXT_FIELD[subKey];
+  return f ? contentFp_(String((((st || {}).writing) || {})[f] || '')) : '';
+}
 function submittedCurrent_(st, subKey) {
   const rec = ((st || {}).submissions || {})[subKey];
   if (!rec || !rec.submittedAt) return false;
+  if (SUBMISSION_TEXT_FIELD[subKey]) {
+    // Submitted before v50 (no text fingerprint): the page already clears the
+    // submission whenever the story text is edited.
+    if (!rec.textSig) return true;
+    return rec.textSig === submissionTextFp_(st, subKey);
+  }
   if (!rec.sig) return true; // pre-v11 record: the app already clears it on any edit
   return rec.sig === submissionFp_(st, subKey);
 }
@@ -801,6 +834,14 @@ function getClassDashboard(payload) {
 // individually handled -- a self-assessment-derived pending score does NOT
 // count as handled here, since the whole point of this dashboard is to
 // surface what the teacher has not reviewed yet.
+// v52: when the version that counts was turned in (server time when there is
+// one; older records have only the browser's), for "Submitted … · Late".
+function submittedAtFor_(st, kind, key) {
+  const subKey = String(kind || '') + ':' + String(key || '');
+  if (!submittedCurrent_(st, subKey)) return '';
+  const rec = ((st || {}).submissions || {})[subKey] || {};
+  return String(rec.serverAt || rec.submittedAt || '');
+}
 function explicitSubmission_(st, kind, key) {
   const all = (st && st.submissions && typeof st.submissions === 'object') ? st.submissions : {};
   const rec = all[String(kind || '') + ':' + String(key || '')];
@@ -1065,7 +1106,7 @@ function getActivityResponses(payload) {
     const row = items.find(g => norm_(g.studentEmail) === norm_(stu.studentEmail));
     const excluded = !!(row && truthy_(row.excluded));
     const score = row && row.score !== '' && row.score !== null && row.score !== undefined ? Number(row.score) : null;
-    return {...reviewInfo_(st, row, 'activity', itemKey),email:stu.studentEmail,name:stu.studentName,process:activityProcessFor_(st, itemKey),evidence:ev.responses,submitted:ev.submitted && explicitSubmission_(st, 'activity', itemKey),score:score,excluded:excluded,comment:row?(row.comment||''):'',updatedAt:work?work.updatedAt:''};
+    return {...reviewInfo_(st, row, 'activity', itemKey),email:stu.studentEmail,name:stu.studentName,process:activityProcessFor_(st, itemKey),evidence:ev.responses,submittedAt:submittedAtFor_(st, 'activity', itemKey),submitted:ev.submitted && explicitSubmission_(st, 'activity', itemKey),score:score,excluded:excluded,comment:row?(row.comment||''):'',updatedAt:work?work.updatedAt:''};
   })};
 }
 
@@ -1094,7 +1135,8 @@ function setGradeItem(payload) {
   const itemType = VALID_ITEM_TYPES.indexOf(payload.itemType) === -1 ? '' : payload.itemType;
   const itemKey = String(payload.itemKey || '');
   const excluded = !!payload.excluded;
-  const comment = String(payload.comment || '').trim();
+  // v51: keepComment = a mark typed straight into the gradebook; leave the comment alone.
+  const comment = payload.keepComment === true ? undefined : String(payload.comment || '').trim();
   let score = (payload.score === null || payload.score === undefined || payload.score === '') ? null : Number(payload.score);
   const klass = getClass_(classId);
   if (!klass) throw new Error('Class not found.');
@@ -1334,6 +1376,7 @@ function getStoryResponses(payload) {
         dokText: dokText,
         ...reviewInfo_(st, item, 'dok', storyId),
         submitted: !!dokText && explicitSubmission_(st, 'story', storyId),
+        submittedAt: dokText ? submittedAtFor_(st, 'story', storyId) : '',
         process: writingProcessFor_(st, 'dok:' + storyId),
         updatedAt: work ? work.updatedAt : '',
         score: score,
@@ -1382,6 +1425,7 @@ function getAnnotationResponses(payload) {
         count: ev.count,
         complete: ev.complete,
         submitted: ev.started && explicitSubmission_(st, 'annotation', storyId),
+        submittedAt: ev.started ? submittedAtFor_(st, 'annotation', storyId) : '',
         process: writingProcessFor_(st, 'annotation:' + storyId),
         updatedAt: work ? work.updatedAt : '',
         score: score,
@@ -1481,6 +1525,7 @@ function getWritingStageResponses(payload) {
         evidence: evidence,
         ...reviewInfo_(st, item, 'writingStage', stageKey),
         submitted: stageKey === 'prewriting' ? true : explicitSubmission_(st, 'stage', stageKey),
+        submittedAt: stageKey === 'prewriting' ? '' : submittedAtFor_(st, 'stage', stageKey),
         updatedAt: work ? work.updatedAt : '',
         score: score,
         excluded: item ? truthy_(item.excluded) : false,
@@ -1521,7 +1566,7 @@ function getFinalDraftResponses(payload) {
       const excluded = item ? truthy_(item.excluded) : false;
       let pending = false;
       if (!excluded && score === null) {
-        const selfIdx = (sw.finalSelfEval || {})[criterion];
+        const selfIdx = finalSelfIdx_(sw, criterion);
         const points = STORY_RUBRIC_POINTS[criterion];
         if (selfIdx !== undefined && selfIdx !== '' && points && points[Number(selfIdx)] !== undefined) {
           score = points[Number(selfIdx)];
@@ -1534,12 +1579,13 @@ function getFinalDraftResponses(payload) {
         finalText: String(sw.finalText || ''),
         ...reviewInfo_(st, item, 'storyRubric', criterion),
         submitted: !!String(sw.finalText || '').trim() && explicitSubmission_(st, 'finalDraft', 'finalDraft'),
+        submittedAt: String(sw.finalText || '').trim() ? submittedAtFor_(st, 'finalDraft', 'finalDraft') : '',
         draftText: String(sw.draftText || ''),
         revisionText: String(sw.revisionText || ''),
         revisionBase: String(sw.revisionBase || sw.draftText || ''),
         process: sw.process || {},
         aiFeedback: sw.aiFeedback || null,
-        selfEvalIdx: (sw.finalSelfEval || {})[criterion],
+        selfEvalIdx: finalSelfIdx_(sw, criterion),
         selfComment: (sw.finalSelfComments || {})[criterion] || '',
         updatedAt: work ? work.updatedAt : '',
         score: score,
@@ -1713,7 +1759,7 @@ function gradeSummaryForStudent_(classId, email, state, itemsOverride, settingsO
     const teacherScore=row&&row.score!==''&&row.score!==null&&row.score!==undefined?Number(row.score):null;
     let displayScore=teacherScore, isPending=false;
     if (!rExcluded && classIncludes && displayScore===null) {
-      const selfIdx=selfEval[key], points=STORY_RUBRIC_POINTS[key];
+      const selfIdx=finalSelfIdx_(state.writing, key), points=STORY_RUBRIC_POINTS[key];
       if (selfIdx!==undefined&&selfIdx!==''&&points&&points[Number(selfIdx)]!==undefined){displayScore=points[Number(selfIdx)];isPending=true;}
     }
     if (finalAssigned && classIncludes && !rExcluded) {
@@ -2321,7 +2367,7 @@ function getCanvasSectionSetup(payload) {
     const ca = l && l.assignmentId ? inCanvas[String(l.assignmentId)] : null;
     return {kind:p[0], key:p[1], aKey:aKey, label:canvasDisplayLabel_(p[0], p[1]), released:assignmentIsReleased_(p[0], p[1], ctx.settings),
       dueAt:s.dueAt || (l && l.dueAt) || '', unlockAt:s.unlockAt || '', lockAt:s.lockAt || '',
-      link:l && l.assignmentId ? {htmlUrl:l.htmlUrl || '', moduleName:l.moduleName || '', moduleId:l.moduleId || ''} : null,
+      link:l && l.assignmentId ? {htmlUrl:l.htmlUrl || '', moduleName:l.moduleName || '', moduleId:l.moduleId || '', lastGradeSyncAt:l.lastGradeSyncAt || ''} : null,
       itemModule:Object.prototype.hasOwnProperty.call(c.itemModules, aKey) ? canvasModuleObj_(c.itemModules[aKey]) : null,
       groupId:String((ca && ca.assignment_group_id) || (l && l.assignmentGroupId) || ''),
       deleted:!!(c.deleted || {})[aKey]};
@@ -2331,7 +2377,7 @@ function getCanvasSectionSetup(payload) {
     modules:modules, modulesError:modulesError, groups:groups, groupsError:groupsError, items:items, deletedInCanvas:gone,
     classGroupId:String(c.assignmentGroupId || '')};
 }
-// payload: {classId, section, include:[aKey], schedules:{aKey:{dueAt,unlockAt}},
+// payload: {classId, section, include:[aKey], schedules:{aKey:{dueAt,unlockAt,lockAt}},
 //   sectionModule: undefined (unchanged) | null (follow the unit default) | {moduleId,moduleName},
 //   itemModules:{aKey: null (follow the section) | {moduleId,moduleName}}, itemGroups:{aKey: groupId}}
 function syncCanvasSection(payload) {
@@ -2375,7 +2421,7 @@ function syncCanvasSection(payload) {
       const r = syncCanvasAssignment({classId:classId, kind:p[0], key:p[1], useChosenModule:true,
         dueAt:s.dueAt !== undefined ? String(s.dueAt || '') : (old.dueAt || ''),
         unlockAt:s.unlockAt !== undefined ? String(s.unlockAt || '') : (old.unlockAt || ''),
-        lockAt:old.lockAt || '', assignmentGroupId:String(itemGroups[aKey] || '')});
+        lockAt:s.lockAt !== undefined ? String(s.lockAt || '') : (old.lockAt || ''), assignmentGroupId:String(itemGroups[aKey] || '')});
       done.push(label);
       if (r.remade) remade.push(label); else if (r.adopted) adopted.push(label); else if (!had) created.push(label);
     } catch (e) {
@@ -4502,6 +4548,8 @@ function upsertGradeItem_(classId,email,name,itemType,itemKey,score,excluded,com
   const now = new Date().toISOString();
   const vals = {classId:classId, studentEmail:email, studentName:name, itemType:itemType, itemKey:itemKey,
     score:score===null?'':score, excluded:excluded, comment:comment, gradedBy:gradedBy, gradedAt:now, markedText:markedText || ''};
+  // v51: comment undefined = keep the comment already there (a mark typed into the gradebook).
+  if (comment === undefined) delete vals.comment;
   const keys = ['classId','studentEmail','itemType','itemKey'];
   const findAll = function(){
     const last = sh.getLastRow();
@@ -4673,14 +4721,14 @@ function checkFiles(){
 var FILE_FINGERPRINTS = {
   "files": {
     "AppLogic": {
-      "chars": 199641,
-      "md5": "657b5387c9ed53637110051ea988addd",
-      "md5ws": "20c11fc8337f2b2dd811f40886c18d0d"
+      "chars": 199772,
+      "md5": "e8cd30ceda4fa26a44435da65ec28045",
+      "md5ws": "3387556eec1798075b493d004a2ad932"
     },
     "BackendClient": {
-      "chars": 531631,
-      "md5": "dd3f280ba9577808ce2e1e806eab6437",
-      "md5ws": "eafa7a24b4fe7d4f11956ed30df90ef5"
+      "chars": 549585,
+      "md5": "6d1f5eb099139a07a07c5d97e66aa82b",
+      "md5ws": "13760712fdb7fbce3d0185e25c3e8ac3"
     },
     "Images": {
       "chars": 1029379,
@@ -4693,9 +4741,9 @@ var FILE_FINGERPRINTS = {
       "md5ws": "5752a10ec0e09c873b387e2a327acc77"
     },
     "StoryData": {
-      "chars": 111783,
-      "md5": "b0169773885b4c0dadb0b2d561a83f1b",
-      "md5ws": "3efaf41aa21f7a8201aafeff2f9e7784"
+      "chars": 112721,
+      "md5": "bf55fb79fc8de2c02a676c94baf91693",
+      "md5ws": "cfd49d76cd7496073ff1e2cc4c8f37a5"
     },
     "WritingWorkshop": {
       "chars": 42467,

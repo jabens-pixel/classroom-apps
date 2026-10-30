@@ -1,0 +1,163 @@
+<!-- ======================================================================
+     Literature Circles — Away on Discussion Day (2026-10-22b)
+     Rides along after BackendClient (LC_INCLUDE_WITH in Code.js).
+
+     Step 3 (peer assessment): next to each groupmate not rated yet there is a
+     "Not here today" button. A groupmate marked away doesn't need a rating, so
+     the student can go on to the self-rating and the reflection (Undo puts the
+     groupmate back). The student who was away:
+       * sees "You were marked away" on Step 3 instead of the rating cards, and
+         can say "I was there — let me rate my group" (rating anyone also lifts it);
+       * is EXCUSED from the Step 3 peer grade (server: lcEvalStage_), and has no
+         self-rating to do;
+       * gets reflection questions that don't depend on group feedback
+         (LC_AWAY_REFLECTION_QUESTIONS, Weeks 1–3; Week 4's growth questions
+         look across all four weeks, so they stay).
+     The teacher can mark or lift "away" on the Step 3 marking screen.
+     Saved in the DiscussionAway tab (setDiscussionAway / setLiteratureDiscussionAway).
+     ====================================================================== -->
+<style id="lcAwayStyles">
+.lc-away-btn{width:auto!important;margin:8px 0 0 8px!important}
+.teammate-card.lc-away-card{background:#F4F4EF}
+.lc-away-card p{margin:8px 0 0}
+.lc-away-me{margin:12px 0}
+.lc-away-me .row{display:flex;flex-wrap:wrap;gap:10px;margin-top:12px}
+.lc-away-me .row button{width:auto;margin:0}
+</style>
+<script>
+window.__MB = window.__MB || {};
+window.__MB.DiscussionAway = 'loading';
+(function () {
+  'use strict';
+  var W = window;
+  if (W.LC_AWAY) { W.__MB.DiscussionAway = 'ok'; return; }
+  if (typeof W.render !== 'function' || typeof W.callServer !== 'function' || typeof W.uniquePeerGivenCount !== 'function') { W.__MB.DiscussionAway = 'error: Index.html did not load first'; return; }
+  var A = W.LC_AWAY = {};
+
+  // Reflection questions for a week the student missed Discussion Day (Weeks 1–3).
+  // Edit the sentences in quotes to change them; keep the keys.
+  var AWAY_QUESTIONS = W.LC_AWAY_REFLECTION_QUESTIONS = [
+    { key: 'awayBringIdea', text: 'You missed Discussion Day this week. What is the one idea from your Lit Circle submission or discussion plan that you most wanted to share with your group? Explain why it matters, and include a page number.' },
+    { key: 'awayGroupQuestion', text: 'Choose one question from your discussion plan. How do you think your group would have answered it, and how would you have responded? Use evidence from the reading.' },
+    { key: 'awaySelfCheck', text: 'Look back at your preparation for this week. What did you do well, and what would make you a stronger discussion leader next time?' }
+  ];
+
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function low(s) { return String(s || '').trim().toLowerCase(); }
+  function me() { return low(W.state && W.state.email); }
+  function awayMap(wk) { var m = (W.state && W.state.discussionAway) || {}; return m[wk] || m[String(wk)] || {}; }
+  function isAway(email, wk) { return !!awayMap(wk)[low(email)]; }
+  function ratedAnyone(wk) { return ((W.state && W.state.peerAssessmentsGiven) || []).some(function (p) { return Number(p.week) === Number(wk); }); }
+  /** Marked away for this week's Discussion Day (and hasn't rated anyone — that means they were there). */
+  function iAmAway(wk) { return isAway(me(), wk) && !ratedAnyone(wk); }
+  A.iAmAway = W.lcIAmAway = iAmAway;
+  function mates() { return (W.getGroupmatesLocal() || []).map(low).filter(Boolean); }
+
+  // A student who was away has no self-rating to do: a stand-in (never saved, skipped in the PDF)
+  // lets every "self-rating done?" check move them on to Step 4.
+  function syncStandIns() {
+    var st = W.state; if (!st || !st.email) return;
+    st.selfAssessments = st.selfAssessments || {};
+    [1, 2, 3, 4].forEach(function (wk) {
+      var cur = st.selfAssessments[wk];
+      if (iAmAway(wk)) { if (!cur) st.selfAssessments[wk] = { away: true, participation: '', leadership: '', activeEngagement: '' }; }
+      else if (cur && cur.away) delete st.selfAssessments[wk];
+    });
+  }
+  var _render = W.render;
+  W.render = function () { try { syncStandIns(); } catch (e) {} return _render.apply(this, arguments); };
+
+  // Groupmates marked away count as done for the "rate every groupmate" rule; away = all done.
+  W.uniquePeerGivenCount = function (wk) {
+    var ms = mates(); if (iAmAway(wk)) return ms.length;
+    var seen = {};
+    ((W.state && W.state.peerAssessmentsGiven) || []).forEach(function (p) { if (Number(p.week) === Number(wk)) seen[low(p.assessedEmail)] = true; });
+    var n = 0; ms.forEach(function (m) { if (seen[m] || isAway(m, wk)) n++; });
+    // ratings given to someone no longer in the group still count, as before
+    Object.keys(seen).forEach(function (e) { if (ms.indexOf(e) < 0) n++; });
+    return n;
+  };
+
+  // ------------------------------------------------------------------ Step 3: the rating cards
+  var _section = W.renderPeerAssessmentSection;
+  W.renderPeerAssessmentSection = function (wk) {
+    var ms = W.getGroupmatesLocal() || [];
+    if (!ms.length) return _section.apply(this, arguments);
+    return ms.map(function (mate) {
+      var m = low(mate), already = (W.state.peerAssessmentsGiven || []).some(function (p) { return Number(p.week) === Number(wk) && low(p.assessedEmail) === m; });
+      if (!already && isAway(m, wk)) {
+        return '<div class="teammate-card lc-away-card"><strong>' + esc(mate) + '</strong> <span class="badge pending">Away today</span>' +
+          '<p class="muted">Not here for Discussion Day, so no rating is needed.</p>' +
+          '<button class="secondary lc-away-btn" style="margin-left:0!important" onclick="lcSetAway(' + Number(wk) + ',\'' + esc(m) + '\',false)">Undo — they were here</button></div>';
+      }
+      return '<div class="teammate-card">' +
+        '<strong>' + esc(mate) + '</strong> ' + (already ? '<span class="badge done">Submitted</span>' : '<span class="badge pending">Not yet</span>') +
+        '<div id="peerFormArea_' + W.safeId(mate) + '">' +
+        (already ? '<p class="muted" style="margin-top:8px;">You can submit again if you\'d like to update your feedback.</p>' : '') +
+        '<button class="secondary" style="margin-top:8px;" onclick="openPeerForm(' + wk + ',\'' + mate + '\')">' + (already ? 'Submit again' : 'Give feedback') + '</button>' +
+        (already ? '' : '<button class="secondary lc-away-btn" onclick="lcSetAway(' + Number(wk) + ',\'' + esc(m) + '\',true)" title="They missed Discussion Day: you won’t need to rate them, and they’re excused from this step">Not here today</button>') +
+        '</div></div>';
+    }).join('');
+  };
+  function busyOff(btns) { btns.forEach(function (b) { b.disabled = false; }); }
+  W.lcSetAway = function (wk, mate, on) {
+    if (on && !W.confirm('Mark ' + mate + ' as away for Discussion Day?\n\nYou won’t need to rate them, and they’ll be excused from this step. You can undo this.')) return;
+    var btns = Array.prototype.slice.call(document.querySelectorAll('.lc-away-btn')); btns.forEach(function (b) { b.disabled = true; });
+    W.callServer('setDiscussionAway', [W.state.email, wk, mate, !!on], function (r) {
+      if (!r || !r.ok) { busyOff(btns); return; }
+      W.state.discussionAway = W.state.discussionAway || {}; W.state.discussionAway[wk] = r.away || {};
+      if (typeof W.saveStudentResumeClient === 'function') { try { W.saveStudentResumeClient(); } catch (e) {} }
+      W.render(true);
+    }, function () { busyOff(btns); }, {});
+  };
+  W.lcIWasThere = function (wk) {
+    W.callServer('setDiscussionAway', [W.state.email, wk, W.state.email, false], function (r) {
+      if (!r || !r.ok) return;
+      W.state.discussionAway = W.state.discussionAway || {}; W.state.discussionAway[wk] = r.away || {};
+      W.render(true);
+    }, null, {});
+  };
+
+  // Step 3 for the student who was away
+  var _peer = W.viewWeekPeer;
+  W.viewWeekPeer = function () {
+    var wk = Number(W.state.week);
+    if (!iAmAway(wk)) return _peer.apply(this, arguments);
+    return '<a class="backlink" onclick="backToWeekHub()">← Back to Week ' + wk + '</a><div class="card"><div class="week-kicker">Step 3 · Week ' + wk + '</div><h2 style="margin:4px 0 4px">Discussion Day + Peer Assessment</h2>' +
+      '<div class="msg info lc-away-me"><strong>You were marked away for this week’s Discussion Day.</strong> You don’t need to rate your group or yourself this week, and this step won’t count against you. ' +
+      (wk < 4 ? 'Your Step 4 reflection has questions for students who missed the discussion.' : 'Your Step 4 reflection looks across all four weeks.') +
+      '<div class="row"><button onclick="openWeekSection(\'reflection\')">Go to Step 4 →</button><button class="secondary" onclick="lcIWasThere(' + wk + ')">I was there — let me rate my group</button></div></div></div>';
+  };
+
+  // ------------------------------------------------------------------ Step 4: questions for a missed discussion
+  function savedAnswers(wk) { var r = W.state && W.state.reflections && W.state.reflections[wk]; return (r && r.answers) || null; }
+  function useAwayQuestions(wk) {
+    if (Number(wk) >= 4) return false;
+    var a = savedAnswers(wk);
+    if (a && AWAY_QUESTIONS.some(function (q) { return a[q.key] !== undefined; })) return true; // already answered the away questions
+    if (!iAmAway(wk)) return false;
+    // a reflection already written to the usual questions keeps them
+    if (a && (W.REFLECTION_QUESTIONS || []).some(function (q) { return String(a[q.key] || '').trim(); })) return false;
+    return true;
+  }
+  A.useAwayQuestions = useAwayQuestions;
+  var _qs = W.reflectionQuestionsForWeek;
+  W.reflectionQuestionsForWeek = function (wk) {
+    var base = _qs.apply(this, arguments);
+    if (!useAwayQuestions(wk)) return base;
+    return AWAY_QUESTIONS.concat(base.filter(function (q) { return q.key === 'essentialQuestionReflection'; }));
+  };
+  var _refl = W.viewWeekReflection;
+  W.viewWeekReflection = function () {
+    var html = _refl.apply(this, arguments), wk = Number(W.state.week);
+    if (!iAmAway(wk)) return html;
+    var note = '<div class="msg info" style="margin-bottom:16px"><strong>You were away on Discussion Day.</strong> You’re excused from the peer step. ' +
+      (useAwayQuestions(wk) ? 'These questions ask about your own reading and preparation instead of feedback from your group.' : 'Use what you remember and your feedback from other weeks as evidence.') + '</div>';
+    html = html.replace(/<div class="msg success" style="margin-bottom:16px"><strong>Step 3 is complete\.<\/strong>[\s\S]*?<\/div>/, note);
+    html = html.replace(/<div class="msg info">No peer comments have arrived yet\.[\s\S]*?<\/div>/, '');
+    return html;
+  };
+
+  W.__MB.DiscussionAway = 'ok';
+})();
+</script>

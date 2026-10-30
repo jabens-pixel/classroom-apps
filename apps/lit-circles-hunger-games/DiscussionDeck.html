@@ -1,0 +1,472 @@
+<!-- ======================================================================
+     Literature Circles — Discussion Deck (release 2026-10-19a)
+     Rides along with BackendClient (LC_INCLUDE_WITH in Code.gs), so Index.html didn't change.
+     One deck per group per week: a title slide, then for every member a "Reading strategies" slide
+     (their submitted Step 1) and a "Discussion plan" slide (their Step 2). Their own slides change
+     only in Step 1 / Step 2. Anyone in the group can add to any slide ("Group adds"); each addition
+     is saved on its own with the writer's name, so nobody overwrites anyone. Not graded.
+     - Students: a "Discussion Deck" card on the week page (state.view = 'week_deck').
+     - Teacher: ⋯ on the Step 2 or Step 3 tile → "Discussion decks…" (LC_DECK.openTeacher).
+     Server: Deck.js.
+     ====================================================================== -->
+<style id="lcDeckStyles">
+.journey-step-grid.has-deck{grid-template-columns:repeat(2,minmax(0,1fr))!important}
+.journey-step.lc-deck-step{grid-column:1 / -1;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:6px 22px}
+.journey-step.lc-deck-step .step-no{grid-row:1 / span 2;font-size:20px!important}
+.journey-step.lc-deck-step h3{margin:0!important}
+.journey-step.lc-deck-step p{margin:0!important;grid-column:2}
+.journey-step.lc-deck-step .step-status{position:static!important;grid-column:3;grid-row:1;justify-self:end}
+.journey-step.lc-deck-step .step-action{grid-column:3;grid-row:2;justify-self:end;white-space:nowrap}
+@media(max-width:640px){.journey-step-grid.has-deck{grid-template-columns:1fr!important}}
+@media(max-width:820px){.journey-step.lc-deck-step{grid-template-columns:auto 1fr}.journey-step.lc-deck-step .step-status,.journey-step.lc-deck-step .step-action{grid-column:1 / -1;grid-row:auto;justify-self:start}.journey-step.lc-deck-step p{grid-column:1 / -1}}
+
+.lc-deck{max-width:1240px;margin:0 auto;color:var(--rr-ink,#111);font-family:var(--rr-body,Roboto,Arial,sans-serif)}
+#lcDeck.lc-deck{background:#F4F4F0;padding:18px 22px 26px;border:1px solid var(--rr-rule,#E3E3DF)}
+#lcDeck.lc-deck .backlink{display:inline-block;margin-bottom:6px}
+.lc-deck .lc-deck-compose .row button,.lc-deck .lc-deck-nav button,.lc-deck .lc-deck-actions button{width:auto!important;flex:0 0 auto;min-width:96px}
+.lc-deck *{box-sizing:border-box}
+.lc-deck-head{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap;margin:6px 0 16px}
+.lc-deck-head h2{margin:2px 0 4px;font:700 32px/1.1 var(--rr-display,'Roboto Condensed',Arial,sans-serif)}
+.lc-deck-head p{margin:0;color:var(--rr-muted,#454545);font-size:15px}
+.lc-deck-kicker{font:800 12px var(--rr-body,Roboto,Arial,sans-serif);text-transform:uppercase;letter-spacing:.09em;color:var(--rr-muted,#454545)}
+.lc-deck-actions{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.lc-deck-body{display:grid;grid-template-columns:220px minmax(0,1fr);gap:18px;align-items:start}
+.lc-deck-rail{position:sticky;top:12px;display:grid;gap:6px;max-height:calc(100vh - 40px);overflow:auto;padding-right:2px}
+.lc-deck .lc-deck-thumb{clip-path:none!important;display:block;width:100%;margin:0;padding:9px 11px;text-align:left;background:var(--rr-paper,#fff)!important;color:var(--rr-ink,#111)!important;border:2px solid var(--rr-rule,#E3E3DF)!important;border-radius:0!important;box-shadow:none!important;font:600 13px/1.3 var(--rr-body,Roboto,Arial,sans-serif)!important;text-transform:none!important;letter-spacing:0!important;cursor:pointer}
+.lc-deck .lc-deck-thumb small{display:block;color:var(--rr-muted,#454545);font-weight:500;font-size:11.5px;margin-top:2px}
+.lc-deck .lc-deck-thumb:hover{border-color:var(--rr-ink,#111)!important}
+.lc-deck .lc-deck-thumb.is-on{border-color:var(--rr-ink,#111)!important;background:var(--rr-lime,#E9FE5F)!important}
+.lc-deck .lc-deck-thumb .n{float:right;font-size:11px;font-weight:800;background:var(--rr-ink,#111);color:#fff;padding:1px 6px;margin-left:6px}
+.lc-deck-rail-name{margin:10px 0 2px;font:800 11.5px var(--rr-body,Roboto,Arial,sans-serif);text-transform:uppercase;letter-spacing:.07em;color:var(--rr-muted,#454545)}
+.lc-deck-stage{min-width:0}
+.lc-deck-slide{position:relative;background:var(--rr-paper,#fff);border:2px solid var(--rr-ink,#111);min-height:460px;padding:30px 34px 26px;overflow:auto}
+.lc-deck-slide h3{margin:0 0 4px;font:700 30px/1.15 var(--rr-display,'Roboto Condensed',Arial,sans-serif)}
+.lc-deck-slide .sub{margin:0 0 18px;color:var(--rr-muted,#454545);font-size:15px}
+.lc-deck-badge{display:inline-block;padding:3px 9px;margin:0 6px 6px 0;background:var(--rr-chip,#EEEEEA);font:700 12.5px var(--rr-body,Roboto,Arial,sans-serif)}
+.lc-deck-badge.is-me{background:var(--rr-lime,#E9FE5F)}
+.lc-deck-title{display:grid;align-content:center;min-height:400px}
+.lc-deck-title .book{font:700 52px/1.05 var(--rr-display,'Roboto Condensed',Arial,sans-serif);margin:6px 0 10px}
+.lc-deck-title .reading{font-size:20px;margin:0 0 22px}
+.lc-deck-title .how{margin-top:22px;padding:14px 16px;background:var(--rr-chip,#EEEEEA);font-size:15px;line-height:1.55;max-width:760px}
+.lc-deck-strats{display:grid;gap:14px}
+.lc-deck-strat{display:grid;grid-template-columns:96px minmax(0,1fr);gap:16px;padding:14px 16px;border:1px solid var(--rr-rule,#E3E3DF)}
+.lc-deck-strat .art{width:96px;height:58px}
+.lc-deck-strat .art .lc-art{height:58px}
+.lc-deck-strat h4{margin:0 0 8px;font:700 21px var(--rr-display,'Roboto Condensed',Arial,sans-serif)}
+.lc-deck-field{margin:0 0 9px;font-size:15.5px;line-height:1.55}
+.lc-deck-field b{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--rr-muted,#454545);margin-bottom:1px}
+.lc-deck-item{margin:0 0 10px;padding-left:10px;border-left:3px solid var(--rr-rule,#E3E3DF)}
+.lc-deck-rich{font-size:16px;line-height:1.6}
+.lc-deck-rich p{margin:0 0 10px}
+.lc-deck-plan{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.lc-deck-plan .box{padding:12px 14px;border:1px solid var(--rr-rule,#E3E3DF)}
+.lc-deck-plan .box.wide{grid-column:1 / -1}
+.lc-deck-plan .box.focus{background:var(--rr-lime,#E9FE5F);border-color:var(--rr-ink,#111)}
+.lc-deck-plan .box b{display:block;font-size:11.5px;text-transform:uppercase;letter-spacing:.06em;color:var(--rr-muted,#454545);margin-bottom:3px}
+.lc-deck-plan .box.focus b{color:var(--rr-ink,#111)}
+.lc-deck-plan .box div{font-size:16px;line-height:1.5;white-space:pre-wrap}
+.lc-deck-plan .box.focus div{font:700 21px/1.3 var(--rr-display,'Roboto Condensed',Arial,sans-serif)}
+.lc-deck-timeline{grid-column:1 / -1;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.lc-deck-timeline .box{border-top:4px solid var(--rr-ink,#111)}
+.lc-deck-empty{padding:30px 10px;text-align:center;color:var(--rr-muted,#454545);font-size:16px}
+.lc-deck-empty b{display:block;color:var(--rr-ink,#111);font-size:18px;margin-bottom:6px}
+.lc-deck-own{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin:16px 0 0;padding:10px 12px;background:var(--rr-chip,#EEEEEA);font-size:14px}
+.lc-deck-nav{display:flex;justify-content:space-between;align-items:center;gap:10px;margin:10px 0 0}
+.lc-deck-nav .count{font:800 13px var(--rr-body,Roboto,Arial,sans-serif);letter-spacing:.06em;color:var(--rr-muted,#454545)}
+.lc-deck-adds{margin-top:16px;padding:16px 18px;border:2px solid var(--rr-rule,#E3E3DF);background:var(--rr-paper,#fff)}
+.lc-deck-adds h4{margin:0 0 2px;font:700 20px var(--rr-display,'Roboto Condensed',Arial,sans-serif)}
+.lc-deck-adds .hint{margin:0 0 12px;color:var(--rr-muted,#454545);font-size:14px}
+.lc-deck-notes{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:8px}
+.lc-deck-note{padding:10px 12px;background:var(--rr-chip,#EEEEEA);font-size:15px;line-height:1.5}
+.lc-deck-note.is-mine{background:#F6FFD0;box-shadow:inset 3px 0 0 var(--rr-ink,#111)}
+.lc-deck-note .who{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--rr-muted,#454545);margin-bottom:3px}
+.lc-deck-note .who b{color:var(--rr-ink,#111)}
+.lc-deck-note .txt{white-space:pre-wrap;word-wrap:break-word}
+.lc-deck .lc-deck-link{clip-path:none!important;background:none!important;border:0!important;box-shadow:none!important;padding:0 2px!important;margin:0 0 0 8px!important;color:var(--rr-ink,#111)!important;text-decoration:underline;font:600 12.5px var(--rr-body,Roboto,Arial,sans-serif)!important;text-transform:none!important;letter-spacing:0!important;cursor:pointer;min-height:0!important}
+.lc-deck-compose textarea{width:100%;min-height:74px;font-size:15px;line-height:1.5;padding:10px 12px}
+.lc-deck-compose .row{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:8px;flex-wrap:wrap}
+.lc-deck-compose .left{font-size:12.5px;color:var(--rr-muted,#454545)}
+.lc-deck-msg{margin:8px 0 0;padding:9px 12px;font-size:14px;background:#FBEAE8;color:#B0281F}
+.lc-deck-msg.is-ok{background:#E6F2EA;color:#1D6B47}
+.lc-deck-wait{display:flex;align-items:center;gap:10px;color:var(--rr-muted,#454545);padding:30px 0}
+/* present mode: just the slide (and its additions) on a full screen */
+.lc-deck-stage:fullscreen{background:var(--rr-paper,#fff);padding:22px 28px;overflow:auto}
+.lc-deck-stage:fullscreen .lc-deck-slide{min-height:calc(100vh - 230px);font-size:118%}
+.lc-deck-stage:fullscreen .lc-deck-slide h3{font-size:40px}
+.lc-deck-stage.is-pseudo-fs{position:fixed;inset:0;z-index:10000;background:var(--rr-paper,#fff);padding:22px 28px;overflow:auto}
+/* teacher overlay */
+.lc-deck-overlay{position:fixed;inset:0;z-index:9000;background:rgba(17,17,17,.55);display:flex;align-items:stretch;justify-content:center;padding:18px}
+.lc-deck-overlay>.lc-deck-sheet{background:#F7F7F4;width:min(1320px,100%);overflow:auto;padding:18px 22px 28px}
+.lc-deck-pick{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.lc-deck .lc-deck-pick{flex-wrap:nowrap}
+.lc-deck .lc-deck-pick label{display:inline!important;margin:0!important;white-space:nowrap}
+.lc-deck .lc-deck-pick select{width:auto!important;min-width:260px;max-width:min(620px,60vw);padding:8px 10px;font-size:15px;margin:0!important}
+@media(max-width:700px){.lc-deck .lc-deck-pick{flex-wrap:wrap}.lc-deck .lc-deck-pick select{max-width:100%;min-width:0;width:100%!important}}
+@media(max-width:900px){.lc-deck-body{grid-template-columns:1fr}.lc-deck-rail{position:static;max-height:none;grid-template-columns:repeat(auto-fill,minmax(150px,1fr))}.lc-deck-rail-name{grid-column:1 / -1}.lc-deck-plan{grid-template-columns:1fr}.lc-deck-timeline{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.lc-deck-slide{padding:20px 16px;min-height:0}.lc-deck-strat{grid-template-columns:1fr}.lc-deck-strat .art{display:none}.lc-deck-title .book{font-size:36px}.lc-deck-timeline{grid-template-columns:1fr}.lc-deck-overlay{padding:0}}
+</style>
+<script>
+window.__MB = window.__MB || {};
+window.__MB.DiscussionDeck = 'loading';
+(function () {
+  'use strict';
+  var W = window;
+  if (typeof W.render !== 'function' || typeof W.viewWeek !== 'function') { W.__MB.DiscussionDeck = 'error: Index.html did not load first'; return; }
+  function esc(s) { return (s == null ? '' : String(s)).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function $(id) { return document.getElementById(id); }
+  function txt(v) { return String(v == null ? '' : v).trim(); }
+  function lines(v) { return esc(txt(v)).replace(/\n/g, '<br>'); }
+  function rpc(name, arg) {
+    return new Promise(function (resolve, reject) {
+      try { W.google.script.run.withSuccessHandler(resolve).withFailureHandler(reject)[name](arg); } catch (e) { reject(e); }
+    });
+  }
+  function errMsg(e) { return e && e.message ? String(e.message).replace(/^Exception:\s*/, '') : String(e || 'Something went wrong.'); }
+  function store(k, v) { try { if (v == null || v === '') W.localStorage.removeItem(k); else W.localStorage.setItem(k, v); } catch (e) {} }
+  function stored(k) { try { return W.localStorage.getItem(k) || ''; } catch (e) { return ''; } }
+  function ago(iso) {
+    var t = Date.parse(iso || ''); if (!t) return '';
+    var s = Math.max(0, (Date.now() - t) / 1000);
+    if (s < 60) return 'just now'; if (s < 3600) return Math.round(s / 60) + ' min ago'; if (s < 86400) return Math.round(s / 3600) + ' h ago';
+    try { return new Date(t).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }); } catch (e) { return ''; }
+  }
+
+  // Student HTML (Journal / Hybrid) is rich text: only plain formatting and the strategy highlight
+  // colours survive; everything else becomes text. Parsed with DOMParser, so nothing in it runs.
+  var SAFE = { P: 1, BR: 1, B: 1, STRONG: 1, I: 1, EM: 1, U: 1, UL: 1, OL: 1, LI: 1, SPAN: 1, MARK: 1, DIV: 1, BLOCKQUOTE: 1, H3: 1, H4: 1 };
+  function safe(html) {
+    var doc; try { doc = new DOMParser().parseFromString('<div>' + String(html || '') + '</div>', 'text/html'); } catch (e) { return esc(html); }
+    function walk(node) {
+      var out = '';
+      node.childNodes.forEach(function (n) {
+        if (n.nodeType === 3) { out += esc(n.nodeValue); return; }
+        if (n.nodeType !== 1) return;
+        var tag = n.tagName;
+        if (/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|TEMPLATE)$/.test(tag)) return;
+        var inner = walk(n);
+        if (!SAFE[tag]) { out += inner; return; }
+        if (tag === 'BR') { out += '<br>'; return; }
+        var t = tag.toLowerCase(), cls = String(n.getAttribute('class') || '').split(/\s+/).filter(function (c) { return /^hl-[A-Za-z]+$/.test(c); }).join(' ');
+        out += '<' + t + (cls ? ' class="' + cls + '"' : '') + '>' + inner + '</' + t + '>';
+      });
+      return out;
+    }
+    return walk(doc.body.firstChild || doc.body);
+  }
+
+  var PATHWAY = { strategies: 'Two reading strategies', hybrid: 'Hybrid', journal: 'Journal entry' };
+  var PLAN = { focus: 'What the group should think about', evidence: 'Book evidence to point to (pages)', question1: 'Opening question', question2: 'Follow-up question', open: '0:00–1:00 · Open', explore: '1:00–3:00 · Explore', deepen: '3:00–4:00 · Deepen', close: '4:00–5:00 · Close', backup: 'Backup move' };
+
+  var D = W.LC_DECK = { drafts: {}, mode: 'student', data: null, at: 0, slide: 'title', busy: false, err: '', msg: '', editing: '', posting: false, wk: 0, classId: '', groupId: '', groups: null, timer: 0 };
+
+  // ---------- slides
+  function slides() {
+    var d = D.data, out = [{ key: 'title', title: 'Our group', sub: 'Week ' + d.week }];
+    d.members.forEach(function (m) {
+      var first = String(m.name || '').split(/\s+/)[0] || m.name;
+      out.push({ key: m.email + '|s', member: m, kind: 's', title: (m.me ? 'You' : first) + ' · Strategies', sub: m.step1 && !m.step1.unreadable ? (PATHWAY[m.step1.prepType] || 'Step 1') : 'Not turned in yet' });
+      out.push({ key: m.email + '|p', member: m, kind: 'p', title: (m.me ? 'You' : first) + ' · Plan', sub: m.plan ? '5-minute plan' : 'Not saved yet' });
+    });
+    return out;
+  }
+  function notesFor(key) { return (D.data.notes || []).filter(function (n) { return n.slide === key; }); }
+  function slideIndex(list) { for (var i = 0; i < list.length; i++) if (list[i].key === D.slide) return i; return 0; }
+
+  function titleSlide() {
+    var d = D.data;
+    return '<div class="lc-deck-title"><div class="lc-deck-kicker">Discussion Deck · Week ' + d.week + '</div><div class="book">' + esc(d.bookTitle || 'Our book') + '</div>' +
+      '<p class="reading">' + (d.reading ? 'This week’s reading: <b>' + esc(d.reading) + '</b>' : 'This week’s reading isn’t set yet.') + '</p>' +
+      '<div>' + d.members.map(function (m) { return '<span class="lc-deck-badge' + (m.me ? ' is-me' : '') + '">' + esc(m.name) + (m.me ? ' (you)' : '') + '</span>'; }).join('') + '</div>' +
+      '<div class="how"><b>How to use this deck.</b> Everyone has two slides: their <b>reading strategies</b> (Step 1) and their <b>5-minute discussion plan</b> (Step 2). Your own slides update when you change Step 1 or Step 2. Under every slide is <b>Group adds</b>: add a quote, a question, a connection or an idea there, so the group’s thinking is all in one place.</div></div>';
+  }
+  function fieldsHtml(def, v) {
+    var out = '';
+    if (Array.isArray(v.items)) {
+      v.items.forEach(function (it, i) {
+        var bits = def.fields.map(function (f) { var t = txt(it && it[f.key]); return t ? '<div class="lc-deck-field">' + (def.fields.length > 1 ? '<b>' + esc(f.label) + '</b>' : '') + lines(t) + '</div>' : ''; }).join('');
+        if (bits) out += '<div class="lc-deck-item"><div class="lc-deck-field"><b>' + (def.fixedRows && def.fixedRows[i] ? esc(def.fixedRows[i]) : '#' + (i + 1)) + '</b></div>' + bits + '</div>';
+      });
+    } else {
+      def.fields.forEach(function (f) { var t = txt(v[f.key]); if (t) out += '<div class="lc-deck-field"><b>' + esc(f.label) + '</b>' + lines(t) + '</div>'; });
+      if (Array.isArray(v.rows)) v.rows.forEach(function (row) {
+        var bits = def.fields.map(function (f) { var t = txt(row && row[f.key]); return t ? '<div class="lc-deck-field"><b>' + esc(f.label) + '</b>' + lines(t) + '</div>' : ''; }).join('');
+        if (bits) out += '<div class="lc-deck-item">' + bits + '</div>';
+      });
+    }
+    if (v.imageUrl && /^https:\/\//i.test(String(v.imageUrl))) out += '<div class="lc-deck-field"><b>Image</b><a href="' + esc(v.imageUrl) + '" target="_blank" rel="noopener">Open the picture ↗</a></div>';
+    if (txt(v.helped)) out += '<div class="lc-deck-field"><b>How this helped</b>' + lines(v.helped) + '</div>';
+    return out;
+  }
+  function art(k) { var v = W.STRATEGY_VISUALS && W.STRATEGY_VISUALS[k]; return v && v.icon ? String(v.icon) : ''; }
+  function strategiesSlide(m) {
+    var who = m.me ? 'Your reading strategies' : esc(m.name) + '’s reading strategies';
+    var s = m.step1, D2 = W.STRATEGY_DEFS || {};
+    var head = '<h3>' + who + '</h3>';
+    if (!s) return head + emptyHtml(m, 'Step 1 isn’t turned in yet.', m.me ? 'Turn in Step 1 and it shows up here for your group.' : 'It shows up here as soon as ' + esc(String(m.name).split(/\s+/)[0]) + ' turns it in.', 'strategies');
+    if (s.unreadable) return head + emptyHtml(m, 'This Step 1 couldn’t be read.', 'Open Step 1 and turn it in again.', 'strategies');
+    var data = s.data || {}, html = '';
+    var chosen = (s.choices || []).map(function (k) { return D2[k] ? D2[k].label : k; });
+    html += '<p class="sub">' + esc(PATHWAY[s.prepType] || 'Step 1') + (chosen.length && s.prepType !== 'journal' ? ' · ' + esc(chosen.join(' + ')) : '') + '</p>';
+    if (s.prepType === 'journal') {
+      html += txt(data.journalText) ? '<div class="lc-deck-rich">' + safe(data.journalText) + '</div>' : '<p class="lc-deck-empty">(empty journal)</p>';
+    } else if (s.prepType === 'hybrid') {
+      html += '<div class="lc-deck-strats">' + (data.hybridMoments || []).map(function (mo, i) {
+        var tags = ((data.hybridTags || [])[i] || []).map(function (k) { return '<span class="lc-deck-badge">' + esc(D2[k] ? D2[k].label : k) + '</span>'; }).join('');
+        return '<div class="lc-deck-strat" style="grid-template-columns:1fr"><div><h4>Moment ' + (i + 1) + '</h4>' + (tags ? '<div>' + tags + '</div>' : '') + '<div class="lc-deck-rich">' + (txt(mo) ? safe(mo) : '<p>(left blank)</p>') + '</div></div></div>';
+      }).join('') + '</div>';
+    } else {
+      html += '<div class="lc-deck-strats">' + (s.choices || []).map(function (k) {
+        var def = D2[k], v = data[k] || {};
+        if (!def) return '';
+        var inner = fieldsHtml(def, v);
+        return '<div class="lc-deck-strat"><div class="art">' + art(k) + '</div><div><h4>' + esc(def.label) + '</h4>' + (inner || '<p class="lc-deck-field">(left blank)</p>') + '</div></div>';
+      }).join('') + '</div>';
+    }
+    return head + html + ownHtml(m, 'strategies');
+  }
+  function planSlide(m) {
+    var who = m.me ? 'Your 5-minute discussion plan' : esc(m.name) + '’s 5-minute discussion plan';
+    var p = m.plan, head = '<h3>' + who + '</h3>';
+    if (!p) return head + emptyHtml(m, 'No discussion plan saved yet.', m.me ? 'Save your plan in Step 2 and it shows up here.' : 'It shows up here once ' + esc(String(m.name).split(/\s+/)[0]) + ' saves Step 2.', 'plan');
+    function box(k, cls) { var v = txt(p[k]); return '<div class="box ' + (cls || '') + '"><b>' + esc(PLAN[k]) + '</b><div>' + (v ? esc(v) : '—') + '</div></div>'; }
+    return head + '<p class="sub">Leads the group for at least five minutes.</p><div class="lc-deck-plan">' + box('focus', 'focus wide') + box('evidence', 'wide') + box('question1') + box('question2') +
+      '<div class="lc-deck-timeline">' + box('open') + box('explore') + box('deepen') + box('close') + '</div>' + (txt(p.backup) ? box('backup', 'wide') : '') + '</div>' + ownHtml(m, 'plan');
+  }
+  function emptyHtml(m, title, line, section) {
+    return '<div class="lc-deck-empty"><b>' + title + '</b>' + line + (m.me && D.mode === 'student' ? '<div style="margin-top:14px"><button type="button" data-dk="go" data-section="' + section + '">Open ' + (section === 'plan' ? 'Step 2' : 'Step 1') + ' →</button></div>' : '') + '</div>';
+  }
+  function ownHtml(m, section) {
+    if (!m.me || D.mode !== 'student') return '';
+    return '<div class="lc-deck-own">This is your slide. To change it, edit ' + (section === 'plan' ? 'Step 2 (your plan)' : 'Step 1 (your submission)') + ' — the deck shows what you saved.<button type="button" class="lc-deck-link" data-dk="go" data-section="' + section + '">Open ' + (section === 'plan' ? 'Step 2' : 'Step 1') + '</button></div>';
+  }
+
+  // ---------- group adds
+  function draftKey(slide) { return 'lc_deck_draft|' + (D.data && D.data.me) + '|' + (D.data && D.data.week) + '|' + slide; }
+  function notesHtml(key) {
+    var list = notesFor(key), d = D.data;
+    var items = list.map(function (n) {
+      var tools = '';
+      if (n.mine && D.editing !== n.id) tools = '<button type="button" class="lc-deck-link" data-dk="edit" data-id="' + esc(n.id) + '">Edit</button><button type="button" class="lc-deck-link" data-dk="remove" data-id="' + esc(n.id) + '">Remove</button>';
+      if (D.mode === 'teacher') tools = '<button type="button" class="lc-deck-link" data-dk="remove" data-id="' + esc(n.id) + '">Remove</button>';
+      var body = D.editing === n.id
+        ? '<div class="lc-deck-compose"><textarea id="lcDeckEdit" maxlength="' + (d.noteMax || 600) + '">' + esc(n.text) + '</textarea><div class="row"><span class="left"></span><span><button type="button" data-dk="edit-cancel" class="lc-deck-link">Cancel</button> <button type="button" data-dk="edit-save" data-id="' + esc(n.id) + '"' + (D.posting ? ' disabled' : '') + '>Save</button></span></div></div>'
+        : '<div class="txt">' + esc(n.text) + '</div>';
+      return '<li class="lc-deck-note' + (n.mine ? ' is-mine' : '') + '"><div class="who"><span><b>' + esc(n.mine ? 'You' : n.name) + '</b> · ' + esc(ago(n.at)) + (n.editedAt ? ' · edited' : '') + '</span><span>' + tools + '</span></div>' + body + '</li>';
+    }).join('');
+    return items ? '<ul class="lc-deck-notes">' + items + '</ul>' : '<p class="hint" style="margin:0 0 10px">Nothing added here yet.</p>';
+  }
+  function addsHtml(key) {
+    var d = D.data, max = d.noteMax || 600;
+    var compose = D.mode === 'student' && d.canAdd
+      ? '<div class="lc-deck-compose"><label for="lcDeckNew" style="font-weight:700;font-size:14px">Add to this slide</label><textarea id="lcDeckNew" maxlength="' + max + '" placeholder="A quote (with the page), a question for the group, a connection, something you noticed…">' + esc(D.drafts[key] != null ? D.drafts[key] : stored(draftKey(key))) + '</textarea><div class="row"><span class="left" id="lcDeckCount"></span><button type="button" data-dk="add"' + (D.posting ? ' disabled' : '') + '>' + (D.posting ? 'Adding…' : 'Add') + '</button></div></div>'
+      : '';
+    return '<section class="lc-deck-adds"><h4>Group adds</h4><p class="hint">' + (D.mode === 'teacher' ? 'What the group added to this slide. You can remove an addition; it stays in the DeckNotes tab, marked removed.' : 'Anyone in your group can add here. Your additions show your name; you can edit or remove your own.') + '</p><div id="lcDeckNotes">' + notesHtml(key) + '</div>' + compose +
+      (D.msg ? '<div class="lc-deck-msg' + (D.msgOk ? ' is-ok' : '') + '">' + esc(D.msg) + '</div>' : '') + '</section>';
+  }
+
+  // ---------- painting
+  function railHtml(list) {
+    var html = '', lastMember = '';
+    list.forEach(function (s, i) {
+      if (s.member && s.member.email !== lastMember) { lastMember = s.member.email; html += '<div class="lc-deck-rail-name">' + esc(s.member.name) + (s.member.me ? ' (you)' : '') + '</div>'; }
+      var n = notesFor(s.key).length;
+      html += '<button type="button" class="lc-deck-thumb' + (s.key === D.slide ? ' is-on' : '') + '" data-dk="slide" data-key="' + esc(s.key) + '">' + (n ? '<span class="n" title="' + n + ' added">+' + n + '</span>' : '') + (i + 1) + '. ' + esc(s.kind ? (s.kind === 's' ? 'Strategies' : 'Plan') : s.title) + '<small>' + esc(s.sub) + '</small></button>';
+    });
+    return '<nav class="lc-deck-rail" aria-label="Slides">' + html + '</nav>';
+  }
+  function slideHtml(s) {
+    if (s.key === 'title') return titleSlide();
+    return s.kind === 's' ? strategiesSlide(s.member) : planSlide(s.member);
+  }
+  function headHtml() {
+    var d = D.data;
+    var back = D.mode === 'student' ? '<a class="backlink" onclick="backToWeekHub()">← Back to Week ' + d.week + '</a>' : '';
+    return back + '<div class="lc-deck-head"><div><div class="lc-deck-kicker">Discussion Deck · Week ' + d.week + '</div><h2>' + esc(d.bookTitle || 'Your book') + '</h2><p>' + (d.reading ? esc(d.reading) + ' · ' : '') + d.members.length + ' in the group · not graded</p></div>' +
+      '<div class="lc-deck-actions"><button type="button" data-dk="refresh"' + (D.busy ? ' disabled' : '') + '>' + (D.busy ? 'Loading…' : '↻ Refresh') + '</button><button type="button" data-dk="present">▶ Present</button></div></div>';
+  }
+  function paint() {
+    var box = $('lcDeck'); if (!box) return;
+    if (!D.data) {
+      box.innerHTML = (D.mode === 'student' ? '<a class="backlink" onclick="backToWeekHub()">← Back to Week ' + (Number(W.state && W.state.week) || '') + '</a>' : '') +
+        (D.err ? '<div class="lc-deck-msg">' + esc(D.err) + '</div><p><button type="button" data-dk="refresh">Try again</button></p>' : '<div class="lc-deck-wait"><span class="spinner"></span> Building your group’s deck…</div>');
+      return;
+    }
+    var list = slides(), i = slideIndex(list), s = list[i]; D.slide = s.key;
+    box.innerHTML = headHtml() + (D.err ? '<div class="lc-deck-msg">' + esc(D.err) + '</div>' : '') +
+      '<div class="lc-deck-body">' + railHtml(list) + '<div class="lc-deck-stage" id="lcDeckStage"><div class="lc-deck-slide" id="lcDeckSlide">' + slideHtml(s) + '</div>' +
+      '<div class="lc-deck-nav"><button type="button" data-dk="prev"' + (i ? '' : ' disabled') + '>← Back</button><span class="count">' + (i + 1) + ' / ' + list.length + '</span><button type="button" data-dk="next"' + (i < list.length - 1 ? '' : ' disabled') + '>Next →</button></div>' +
+      addsHtml(s.key) + '</div></div>';
+    if (D.pseudoFs) { var st = $('lcDeckStage'); if (st) st.classList.add('is-pseudo-fs'); }
+    count();
+  }
+  function count() { var ta = $('lcDeckNew'), c = $('lcDeckCount'); if (ta && c) { var n = ta.value.length, max = (D.data && D.data.noteMax) || 600; c.textContent = n ? n + ' / ' + max : ''; } }
+  /** A refresh while someone is typing only repaints the additions list (never the text box). */
+  function paintSoft() {
+    var a = document.activeElement, typing = a && (a.id === 'lcDeckNew' || a.id === 'lcDeckEdit');
+    if (!typing && !D.editing) { paint(); return; }
+    var list = $('lcDeckNotes'); if (list && !D.editing) list.innerHTML = notesHtml(D.slide);
+  }
+
+  // ---------- loading
+  function load(quiet) {
+    if (D.busy) return Promise.resolve();
+    D.busy = true; if (!quiet) { D.err = ''; paint(); }
+    var arg = D.mode === 'teacher' ? { classId: D.classId, groupId: D.groupId, week: D.wk } : { email: String(W.state.email || ''), week: D.wk };
+    return rpc('getLiteratureDiscussionDeck', arg).then(function (v) {
+      D.busy = false; D.data = v; D.at = Date.now(); D.err = '';
+      if (quiet) paintSoft(); else paint();
+    }, function (e) { D.busy = false; if (!quiet || !D.data) { D.err = errMsg(e); paint(); } });
+  }
+  function startPolling() {
+    stopPolling();
+    D.timer = setInterval(function () {
+      var on = D.mode === 'teacher' ? !!$('lcDeckOverlay') : (W.state && W.state.view === 'week_deck');
+      if (!on) { stopPolling(); return; }
+      if (document.hidden || D.posting) return;
+      if (Date.now() - D.at > 25000) load(true);
+    }, 5000);
+  }
+  function stopPolling() { if (D.timer) { clearInterval(D.timer); D.timer = 0; } }
+
+  // ---------- actions
+  function go(dir) { var list = slides(), i = slideIndex(list) + dir; if (i < 0 || i >= list.length) return; keepDraft(); D.slide = list[i].key; D.msg = ''; D.editing = ''; paint(); }
+  function keepDraft() { var ta = $('lcDeckNew'); if (ta && D.data) { D.drafts[D.slide] = ta.value; store(draftKey(D.slide), ta.value); } }
+  function add() {
+    var ta = $('lcDeckNew'); if (!ta || D.posting) return;
+    var text = ta.value.trim(), slide = D.slide;
+    if (!text) { D.msg = 'Write something first.'; D.msgOk = false; paintSoft(); return; }
+    D.drafts[slide] = ta.value; store(draftKey(slide), ta.value);
+    var clientId = 'n' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+    D.posting = true; D.msg = ''; paint();
+    rpc('addLiteratureDeckNote', { email: String(W.state.email || ''), week: D.wk, slide: slide, text: text, clientId: clientId }).then(function (r) {
+      D.posting = false; D.data.notes = r.notes || D.data.notes; delete D.drafts[slide]; store(draftKey(slide), ''); D.msg = 'Added.'; D.msgOk = true; paint();
+      setTimeout(function () { if (D.msg === 'Added.') { D.msg = ''; paintSoft(); } }, 2500);
+    }, function (e) { D.posting = false; D.msg = errMsg(e) + ' (Your text is still in the box.)'; D.msgOk = false; paint(); });
+  }
+  function saveEdit(id) {
+    var ta = $('lcDeckEdit'); if (!ta || D.posting) return;
+    var text = ta.value; D.posting = true; D.editText = text;
+    rpc('editLiteratureDeckNote', { email: String(W.state.email || ''), week: D.wk, noteId: id, text: text }).then(function (r) {
+      D.posting = false; D.editing = ''; D.data.notes = r.notes || D.data.notes; D.msg = ''; paint();
+    }, function (e) { D.posting = false; D.msg = errMsg(e); D.msgOk = false; paint(); var t2 = $('lcDeckEdit'); if (t2) t2.value = text; });
+  }
+  function remove(id) {
+    var n = (D.data.notes || []).filter(function (x) { return x.id === id; })[0]; if (!n) return;
+    if (!W.confirm(D.mode === 'teacher' ? 'Remove this addition by ' + n.name + '? It stays in the DeckNotes tab, marked removed.' : 'Remove your addition?')) return;
+    var arg = D.mode === 'teacher' ? { classId: D.classId, groupId: D.groupId, week: D.wk, noteId: id } : { email: String(W.state.email || ''), week: D.wk, noteId: id };
+    rpc('removeLiteratureDeckNote', arg).then(function (r) { D.data.notes = r.notes || D.data.notes; paintSoft(); }, function (e) { D.msg = errMsg(e); D.msgOk = false; paint(); });
+  }
+  function present() {
+    var st = $('lcDeckStage'); if (!st) return;
+    var fsEl = document.fullscreenElement || document.webkitFullscreenElement;
+    if (fsEl) { (document.exitFullscreen || document.webkitExitFullscreen).call(document); return; }
+    if (D.pseudoFs) { D.pseudoFs = false; st.classList.remove('is-pseudo-fs'); return; }
+    var req = st.requestFullscreen || st.webkitRequestFullscreen;
+    // inside the Apps Script frame full screen may be refused: fill the window instead
+    if (req) { try { var p = req.call(st); if (p && p.catch) p.catch(function () { D.pseudoFs = true; st.classList.add('is-pseudo-fs'); }); return; } catch (e) {} }
+    D.pseudoFs = true; st.classList.add('is-pseudo-fs');
+  }
+
+  document.addEventListener('click', function (ev) {
+    var el = ev.target && ev.target.closest ? ev.target.closest('[data-dk]') : null;
+    if (!el || !el.closest('.lc-deck')) return;
+    var k = el.getAttribute('data-dk');
+    if (k === 'slide') { keepDraft(); D.slide = el.getAttribute('data-key'); D.msg = ''; D.editing = ''; paint(); var sl = $('lcDeckSlide'); if (sl && window.innerWidth < 900) sl.scrollIntoView({ block: 'start' }); }
+    else if (k === 'next') go(1);
+    else if (k === 'prev') go(-1);
+    else if (k === 'add') add();
+    else if (k === 'edit') { keepDraft(); D.editing = el.getAttribute('data-id'); paint(); var t = $('lcDeckEdit'); if (t) t.focus(); }
+    else if (k === 'edit-cancel') { D.editing = ''; paint(); }
+    else if (k === 'edit-save') saveEdit(el.getAttribute('data-id'));
+    else if (k === 'remove') remove(el.getAttribute('data-id'));
+    else if (k === 'refresh') { keepDraft(); load(false); }
+    else if (k === 'present') present();
+    else if (k === 'go') { keepDraft(); if (document.fullscreenElement) try { document.exitFullscreen(); } catch (e) {} W.openWeekSection(el.getAttribute('data-section')); }
+    else if (k === 'close') closeTeacher();
+  });
+  document.addEventListener('input', function (ev) {
+    if (ev.target && ev.target.id === 'lcDeckNew') { D.drafts[D.slide] = ev.target.value; store(draftKey(D.slide), ev.target.value); count(); }
+  });
+  document.addEventListener('change', function (ev) {
+    if (ev.target && ev.target.id === 'lcDeckGroup') { D.groupId = ev.target.value; D.data = null; D.slide = 'title'; D.drafts = {}; paint(); load(false); }
+  });
+  document.addEventListener('keydown', function (ev) {
+    if (!document.querySelector('.lc-deck') || !D.data) return;
+    var t = ev.target, typing = t && (/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName) || t.isContentEditable);
+    if (typing) return;
+    if (ev.key === 'ArrowRight' || ev.key === 'PageDown') { ev.preventDefault(); go(1); }
+    else if (ev.key === 'ArrowLeft' || ev.key === 'PageUp') { ev.preventDefault(); go(-1); }
+    else if (ev.key === 'Escape' && D.pseudoFs) { D.pseudoFs = false; var st = $('lcDeckStage'); if (st) st.classList.remove('is-pseudo-fs'); }
+  });
+
+  // ---------- student: the card on the week page and the deck page
+  function isStudent() { return W.platform && W.platform.mode === 'student' && W.state && W.state.group; }
+  function cardHtml(wk) {
+    var work = (W.state.weeklyWork || {})[wk], s1 = !!(work && work.prepType), plan = typeof W.discussionPlanFor === 'function' ? !!W.discussionPlanFor(wk) : false;
+    var status = s1 && plan ? '<span class="badge done">Your slides are in</span>' : '<span class="badge pending">' + (!s1 && !plan ? 'Needs Step 1 + 2' : !s1 ? 'Needs Step 1' : 'Needs Step 2') + '</span>';
+    return '<div class="journey-step lc-deck-step" id="lcDeckCard" onclick="lcOpenDeck()"><div class="step-status">' + status + '</div><div class="step-no">▤</div><h3>Discussion Deck</h3><p>Everyone’s strategies and 5-minute plans in one place for your discussion — and room for the whole group to add ideas, quotes and questions.</p><div class="step-action">Open the deck →</div></div>';
+  }
+  var _viewWeek = W.viewWeek;
+  W.viewWeek = function () {
+    var html = _viewWeek.apply(this, arguments);
+    try {
+      if (isStudent()) {
+        var wk = Number(W.state.week), card = cardHtml(wk);
+        // right after Step 2: before the Reading Quiz card if it is there, else before Step 3
+        var at = html.indexOf('<div class="journey-step lc-quiz-step"');
+        if (at < 0) at = html.indexOf('<div class="journey-step" onclick="openWeekSection(\'peer\')"');
+        if (at > 0) html = html.slice(0, at) + card + html.slice(at);
+        else html = html.replace('<div class="journey-step-grid', card + '<div class="journey-step-grid');
+        html = html.replace('<div class="journey-step-grid', '<div class="journey-step-grid has-deck');
+      }
+    } catch (e) {}
+    return html;
+  };
+  W.lcOpenDeck = function () {
+    D.mode = 'student'; D.wk = Number(W.state.week); D.slide = 'title'; D.msg = ''; D.err = ''; D.editing = ''; D.drafts = {};
+    if (!D.data || D.data.week !== D.wk) D.data = null;
+    W.state.view = 'week_deck'; try { W.saveStudentResumeClient(); } catch (e) {} W.render(); load(false); startPolling();
+  };
+  var _render = W.render;
+  W.render = function () {
+    var on = W.platform && W.platform.mode === 'student' && W.state && W.state.view === 'week_deck';
+    if (!on) { if (D.mode === 'student') keepDraftQuiet(); return _render.apply(this, arguments); }
+    try { if (typeof W.lcHistorySyncBeforeRender === 'function') W.lcHistorySyncBeforeRender(); } catch (e) {}
+    try { if (typeof W.renderHeader === 'function') W.renderHeader(); } catch (e) {}
+    var app = $('app'); if (app) app.innerHTML = '<div class="lc-deck" id="lcDeck"></div>';
+    D.mode = 'student';
+    if (!D.wk || D.wk !== Number(W.state.week)) { D.wk = Number(W.state.week); D.data = null; D.drafts = {}; }
+    D.drafts = D.drafts || {};
+    paint(); window.scrollTo(0, 0);
+    if (!D.data && !D.busy) load(false);
+    if (!D.timer) startPolling();
+  };
+  function keepDraftQuiet() { try { keepDraft(); } catch (e) {} }
+
+  // ---------- teacher: every group's deck for a week, from the dashboard tile menu
+  D.openTeacher = function (classId, week) {
+    closeTeacher();
+    D.mode = 'teacher'; D.classId = String(classId); D.wk = Number(week); D.data = null; D.groups = null; D.groupId = ''; D.slide = 'title'; D.drafts = {}; D.err = ''; D.msg = '';
+    var ov = document.createElement('div'); ov.className = 'lc-deck-overlay'; ov.id = 'lcDeckOverlay';
+    ov.innerHTML = '<div class="lc-deck-sheet"><div class="lc-deck"><div class="lc-deck-head"><div><div class="lc-deck-kicker">Teacher view</div><h2>Discussion decks · Week ' + D.wk + '</h2><p>Each group’s strategies and plans, with what the group added. Not graded.</p></div><div class="lc-deck-actions lc-deck-pick" id="lcDeckPick"><span class="lc-deck-wait" style="padding:0"><span class="spinner"></span> Loading groups…</span><button type="button" data-dk="close">Close</button></div></div><div id="lcDeck"></div></div></div>';
+    document.body.appendChild(ov);
+    ov.addEventListener('click', function (e) { if (e.target === ov) closeTeacher(); });
+    rpc('listLiteratureDiscussionDecks', { classId: D.classId, week: D.wk }).then(function (r) {
+      D.groups = r.groups || [];
+      var pick = $('lcDeckPick'); if (!pick) return;
+      if (!D.groups.length) { pick.innerHTML = '<button type="button" data-dk="close">Close</button>'; var b = $('lcDeck'); if (b) b.innerHTML = '<p class="lc-deck-empty">No groups in this class yet.</p>'; return; }
+      pick.innerHTML = '<label for="lcDeckGroup" style="font-weight:700">Group</label><select id="lcDeckGroup">' + D.groups.map(function (g) {
+        return '<option value="' + esc(g.groupId) + '">' + esc(g.bookTitle) + ' — ' + esc(g.members.join(', ')) + ' (Step 1: ' + g.step1 + '/' + g.members.length + ', plans: ' + g.plan + '/' + g.members.length + (g.notes ? ', ' + g.notes + ' added' : '') + ')</option>';
+      }).join('') + '</select><button type="button" data-dk="close">Close</button>';
+      D.groupId = D.groups[0].groupId; paint(); load(false); startPolling();
+    }, function (e) { var b = $('lcDeck'); if (b) b.innerHTML = '<div class="lc-deck-msg">' + esc(errMsg(e)) + '</div>'; var pick = $('lcDeckPick'); if (pick) pick.innerHTML = '<button type="button" data-dk="close">Close</button>'; });
+  };
+  function closeTeacher() {
+    var ov = $('lcDeckOverlay'); if (ov) ov.remove();
+    if (D.mode === 'teacher') { stopPolling(); D.data = null; }
+  }
+  document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape' && $('lcDeckOverlay') && !document.fullscreenElement && !D.pseudoFs) closeTeacher(); });
+
+  W.__MB.DiscussionDeck = 'ok';
+})();
+</script>

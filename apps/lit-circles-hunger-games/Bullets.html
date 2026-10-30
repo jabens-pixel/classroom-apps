@@ -1,0 +1,137 @@
+<!-- ======================================================================
+     Literature Circles — Bullet points in the writing boxes (2026-10-27b)
+     Rides along after BackendClient (LC_INCLUDE_WITH in Code.js).
+
+     Works like Google Docs, in every student writing box (the Reader's Journal, Hybrid
+     moments, strategy boxes, plans, reflections, peer feedback):
+       "- " or "* " at the start of a line  → a bullet, indented a little
+       Enter on a bullet line               → a new bullet at the same level
+       Enter on an empty bullet             → the bullet goes, back to normal writing
+       Tab on a bullet line                 → indents it one more level (3 levels: • ◦ ▪)
+       Shift+Tab                            → one level back (at the first level: no bullet)
+       Backspace right after a bullet       → one level back / no bullet, the words stay
+     Bullets are ordinary characters (non-breaking spaces + •), so they save, count no words,
+     and look the same in the teacher's view, the PDF and Canvas. Ctrl+Z undoes each step.
+     ====================================================================== -->
+<script>
+(function () {
+  var W = window; W.__MB = W.__MB || {};
+  var NB = ' ', MARKS = ['•', '◦', '▪'];           // • ◦ ▪
+  function pad(n) { return new Array(n + 1).join(NB); }
+  function prefix(level) { return pad(2 + 4 * (level - 1)) + MARKS[level - 1] + NB; }  // indent, bullet, space
+  var BULLET_RE = /^([  \t]*)([•◦▪])[  ]/;
+  var START_RE = /^[  \t]*[-*]$/;
+  function levelOf(text) { var m = BULLET_RE.exec(text); if (!m) return 0; var i = MARKS.indexOf(m[2]); return i < 0 ? 0 : i + 1; }
+  function prefixLen(text) { var m = BULLET_RE.exec(text); return m ? m[0].length : 0; }
+
+  /** Is this a student writing box we should help in? */
+  function box(el) {
+    if (!el || !el.closest) return null;
+    if (el.nodeType !== 1) el = el.parentElement;
+    if (!el) return null;
+    var t = el.closest('textarea, .rich-editor');
+    if (!t || t.hasAttribute('data-no-bullets') || !document.getElementById('app') || !document.getElementById('app').contains(t)) return null;
+    if (t.closest('[id^="lch"], [class*="lch-"]')) return null;            // the teacher dashboard
+    if (t.tagName === 'TEXTAREA') return (t.readOnly || t.disabled) ? null : t;
+    return t.isContentEditable ? t : null;
+  }
+  function insert(text) {
+    var s = W.getSelection && W.getSelection();
+    try {
+      if (text) return document.execCommand('insertText', false, text);
+      // nothing to put back: delete just what is selected (an empty insertText can join the line to the one above)
+      var a = document.activeElement;
+      if (a && a.tagName === 'TEXTAREA') { if (a.selectionStart === a.selectionEnd) return true; }
+      else if (!s || s.isCollapsed) return true;
+      return document.execCommand('delete', false);
+    } catch (e) {}
+    return false;
+  }
+
+  // ---------------------------------------------------------------- textarea
+  function taLine(t) {
+    var v = t.value, a = t.selectionStart, s = v.lastIndexOf('\n', a - 1) + 1, e = v.indexOf('\n', a); if (e < 0) e = v.length;
+    return { v: v, start: s, end: e, caret: a, before: v.slice(s, a), line: v.slice(s, e) };
+  }
+  function taReplace(t, from, to, text) {
+    t.focus(); t.setSelectionRange(from, to);
+    if (!insert(text)) { t.setRangeText(text, from, to, 'end'); t.dispatchEvent(new Event('input', { bubbles: true })); }
+  }
+  function taKey(e, t) {
+    if (t.selectionStart !== t.selectionEnd && e.key !== 'Tab') return false;
+    var L = taLine(t), lvl = levelOf(L.line), pl = prefixLen(L.line), caret = L.caret;
+    if (e.key === ' ' && START_RE.test(L.before)) { taReplace(t, L.start, caret, prefix(1)); return true; }
+    if (!lvl) return false;
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (!L.line.slice(pl).replace(/[\s ]+/g, '')) { taReplace(t, L.start, L.end, ''); return true; }  // empty bullet: back to writing
+      if (caret < L.start + pl) return false;
+      taReplace(t, caret, caret, '\n' + prefix(lvl)); return true;
+    }
+    if (e.key === 'Tab') {
+      var nl = e.shiftKey ? lvl - 1 : Math.min(3, lvl + 1); if (nl === lvl) return true;
+      var np = nl ? prefix(nl) : '', off = Math.max(0, caret - L.start - pl);
+      taReplace(t, L.start, L.start + pl, np); t.setSelectionRange(L.start + np.length + off, L.start + np.length + off); return true;
+    }
+    if (e.key === 'Backspace' && caret === L.start + pl && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      var np2 = lvl > 1 ? prefix(lvl - 1) : ''; taReplace(t, L.start, L.start + pl, np2); return true;
+    }
+    return false;
+  }
+
+  // ---------------------------------------------------------------- rich editor (contenteditable)
+  // The line the caret is on: the text from its start to the caret, and from the caret to its end.
+  function ceLine(ed) {
+    var s = W.getSelection(); if (!s || !s.rangeCount) return null;
+    var r = s.getRangeAt(0); if (!ed.contains(r.startContainer)) return null;
+    var keep = r.cloneRange();
+    s.modify('extend', 'backward', 'paragraphboundary'); var before = s.toString();
+    s.removeAllRanges(); s.addRange(keep.cloneRange());
+    s.modify('extend', 'forward', 'paragraphboundary'); var after = s.toString();
+    s.removeAllRanges(); s.addRange(keep.cloneRange());
+    if (before.indexOf('\n') >= 0) before = before.slice(before.lastIndexOf('\n') + 1);
+    if (after.indexOf('\n') >= 0) after = after.slice(0, after.indexOf('\n'));
+    return { before: before, after: after, line: before + after, range: keep };
+  }
+  function ceSelectBack(n) { var s = W.getSelection(); s.collapseToStart(); for (var i = 0; i < n; i++) s.modify('extend', 'backward', 'character'); }
+  function ceToLineStart(n) { var s = W.getSelection(); s.collapseToStart(); for (var i = 0; i < n; i++) s.modify('move', 'backward', 'character'); }
+  function ceMove(n) { var s = W.getSelection(); for (var i = 0; i < n; i++) s.modify('move', 'forward', 'character'); }
+  function ceSelectFwd(n) { var s = W.getSelection(); for (var i = 0; i < n; i++) s.modify('extend', 'forward', 'character'); }
+  function ceKey(e, ed) {
+    var s = W.getSelection(); if (!s || !s.rangeCount || !s.modify) return false;
+    if (!s.isCollapsed && e.key !== 'Tab') return false;
+    var L = ceLine(ed); if (!L) return false;
+    var lvl = levelOf(L.line), pl = prefixLen(L.line);
+    if (e.key === ' ' && START_RE.test(L.before)) { ceSelectBack(L.before.length); insert(prefix(1)); return true; }
+    if (!lvl) return false;
+    if (e.key === 'Enter' && !e.shiftKey) {
+      if (!L.line.slice(pl).replace(/[\s ​]+/g, '')) {           // empty bullet: back to writing
+        ceToLineStart(L.before.length); ceSelectFwd(L.line.length); insert(''); return true;
+      }
+      if (L.before.length < pl) return false;
+      try { document.execCommand('insertParagraph'); } catch (x) { return false; }
+      insert(prefix(lvl)); return true;
+    }
+    if (e.key === 'Tab') {
+      var nl = e.shiftKey ? lvl - 1 : Math.min(3, lvl + 1); if (nl === lvl) return true;
+      var np = nl ? prefix(nl) : '', off = Math.max(0, L.before.length - pl);
+      ceToLineStart(L.before.length); ceSelectFwd(pl); insert(np); ceMove(off); return true;
+    }
+    if (e.key === 'Backspace' && L.before.length === pl && !e.ctrlKey && !e.altKey && !e.metaKey) {
+      ceSelectBack(pl); insert(lvl > 1 ? prefix(lvl - 1) : ''); return true;
+    }
+    return false;
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.defaultPrevented || e.isComposing || e.altKey || e.metaKey || (e.ctrlKey && e.key !== 'Backspace')) return;
+    if (e.key !== ' ' && e.key !== 'Enter' && e.key !== 'Tab' && e.key !== 'Backspace') return;
+    var t = box(e.target); if (!t) return;
+    var done = false;
+    try { done = t.tagName === 'TEXTAREA' ? taKey(e, t) : ceKey(e, t); } catch (x) { done = false; }
+    if (done) e.preventDefault();
+  });
+
+  W.LC_BULLETS = { prefix: prefix, levelOf: levelOf };
+  W.__MB.Bullets = 'ok';
+})();
+</script>
