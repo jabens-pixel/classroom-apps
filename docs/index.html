@@ -62,6 +62,11 @@
   .art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,.86) 0%, rgba(10,8,6,.45) 38%, rgba(10,8,6,0) 70%); }
   .art.plain { background: radial-gradient(120% 90% at 85% 10%, rgba(255,255,255,.16), transparent 60%), var(--accent); }
   .art.plain::after { background: linear-gradient(to top, rgba(10,8,6,.45), rgba(10,8,6,0) 65%); }
+  .art.light { background-color: #f5efe0; }
+  .art.light::after { display: none; }
+  .art.light .art-title { color: #1f3d27; max-width: 58%; }
+  .art.light .art-title h3 { text-shadow: none; }
+  .art.light .art-title .meta { color: #5d554b; }
   .art-initials { position: absolute; right: 18px; top: 6px; font: 700 96px/1 Literata, Georgia, serif; color: rgba(255,255,255,.18); letter-spacing: .02em; }
   .art-title { position: relative; z-index: 1; padding: 0 22px 16px; color: #fff; }
   .art-title h3 { font-size: 24px; text-shadow: 0 1px 12px rgba(0,0,0,.5); }
@@ -133,7 +138,7 @@
       <p class="section-note">You’ll need a Google Workspace for Education account, so students sign in with their school Google account. Canvas and AI feedback are optional.</p>
       <div class="grid">
       <article class="app" style="--accent:#8c2f39">
-        <div class="art" style="background-image:url('img/macbeth-curriculum.webp')">
+        <div class="art light" style="background-image:url('img/macbeth-curriculum.webp')">
           
           <div class="art-title">
             <h3>Macbeth Curriculum</h3>
@@ -157,8 +162,8 @@
         </details>
       </article>
       <article class="app" style="--accent:#1f5f74">
-        <div class="art plain">
-          <span class="art-initials" aria-hidden="true">ME</span>
+        <div class="art light" style="background-image:url('img/memoir.webp')">
+          
           <div class="art-title">
             <h3>Memoir</h3>
             <p class="meta">Grades 9–12</p>
@@ -181,7 +186,7 @@
         </details>
       </article>
       <article class="app" style="--accent:#6a4c93">
-        <div class="art" style="background-image:url('img/podcast-studio.webp')">
+        <div class="art light" style="background-image:url('img/podcast-studio.webp')">
           
           <div class="art-title">
             <h3>Podcast Studio</h3>
@@ -205,8 +210,8 @@
         </details>
       </article>
       <article class="app" style="--accent:#2e6b4f">
-        <div class="art plain">
-          <span class="art-initials" aria-hidden="true">BR</span>
+        <div class="art light" style="background-image:url('img/bell-ringers.webp')">
+          
           <div class="art-title">
             <h3>Bell Ringers</h3>
             <p class="meta">Grades 9–12</p>
@@ -229,7 +234,7 @@
         </details>
       </article>
       <article class="app" style="--accent:#b5651d">
-        <div class="art" style="background-image:url('img/lit-circles.webp')">
+        <div class="art light" style="background-image:url('img/lit-circles.webp')">
           
           <div class="art-title">
             <h3>Lit Circles</h3>
@@ -253,7 +258,7 @@
         </details>
       </article>
       <article class="app" style="--accent:#3d5a80">
-        <div class="art" style="background-image:url('img/lit-circles-hunger-games.webp')">
+        <div class="art light" style="background-image:url('img/lit-circles-hunger-games.webp')">
           
           <div class="art-title">
             <h3>Hunger Games Lit Circles</h3>
@@ -277,8 +282,8 @@
         </details>
       </article>
       <article class="app" style="--accent:#7a5c2e">
-        <div class="art plain">
-          <span class="art-initials" aria-hidden="true">RW</span>
+        <div class="art light" style="background-image:url('img/root-word-study.webp')">
+          
           <div class="art-title">
             <h3>Root Word Study</h3>
             <p class="meta">Grades 9–12</p>
@@ -301,7 +306,7 @@
         </details>
       </article>
       <article class="app" style="--accent:#5b6c2f">
-        <div class="art" style="background-image:url('img/short-story-lab.webp')">
+        <div class="art light" style="background-image:url('img/short-story-lab.webp')">
           
           <div class="art-title">
             <h3>Short Story Lab</h3>
