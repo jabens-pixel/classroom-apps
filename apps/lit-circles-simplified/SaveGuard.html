@@ -1,0 +1,1005 @@
+<!-- ======================================================================
+     Literature Circles — SaveGuard (keeps student writing safe)
+     Rides along after BackendClient and Checklists (LC_INCLUDE_WITH in Code.gs),
+     so Index.html never needs re-pasting for it. Like BackendClient, it only
+     replaces Index globals (later definitions win).
+
+     What it does, in one place:
+       A. Step 1 autosave reads ONLY the form that is on screen for that week, and
+          copies what was typed into memory before any screen change. (Before: a save
+          that fired after leaving the page blanked the strategy, or saved another
+          week's journal into this week.)
+       B. Stale tabs / second devices: every Step 1 save sends the newest server time
+          this tab has seen (base). The server refuses a save from a tab that missed
+          newer work; the student chooses "Load newer" or "Keep this tab's version".
+          A tab coming back into view with nothing unsaved reloads newer work first.
+       C. Steps 2 and 4 keep what is typed: memory + this browser + a server draft
+          (saveStepDraft), so leaving the page or the self-rating gate loses nothing.
+       D. A copy of unsaved writing stays in this browser until the server has it; it
+          is OFFERED back on the next visit (never restored automatically). Leaving the
+          page warns while anything is unsaved. A save with no answer for 45 s retries.
+       E. Shows whichever of draft / submitted work is newer, and says when the screen
+          holds edits that haven't been submitted.
+       F. Never saves over a stored copy that can't be read; never autosaves while a
+          teacher is viewing a student; paste/drop in the rich editors is plain text.
+     ====================================================================== -->
+<style id="lcSaveGuardStyles">
+.lc-sg-stack{position:fixed;left:16px;bottom:16px;z-index:1150;display:flex;flex-direction:column;gap:10px;width:min(420px,calc(100% - 32px))}
+.lc-sg-card{padding:12px 14px;border-radius:12px;background:#fffaf0;border:1px solid #ead8a9;color:#4a3408;font:500 13.5px/1.45 Roboto,Arial,sans-serif;box-shadow:0 10px 26px rgba(23,55,43,.16)}
+.lc-sg-card strong{display:block;margin-bottom:2px;font-weight:800;color:inherit}
+.lc-sg-card.is-error{background:#fff6f4;border-color:#efc7c1;color:#8c1d17}
+.lc-sg-card.is-info{background:#eef7f2;border-color:#bfe0cb;color:#17372b}
+.lc-sg-card p{margin:0}
+.lc-sg-setup{margin:10px 0 18px;padding:14px 16px;background:#E9FE5F;color:#111;border-left:6px solid #111}
+.lc-sg-setup strong{display:block;font-size:17px;margin-bottom:4px}.lc-sg-setup p{margin:4px 0 0;color:#111}
+.lc-sg-setup button{margin-top:10px}.lc-sg-setup .lc-sg-setup-mine{font-size:13.5px}
+.lc-sg-plannote{margin:8px 0 12px;padding:8px 12px;background:#EEEEEA;color:#111;font-size:14px;border-left:4px solid #111}
+.lc-sg-actions{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.lc-sg-actions button{clip-path:none!important;min-height:32px;padding:6px 12px!important;border-radius:8px!important;font:800 13px Roboto,Arial,sans-serif!important;text-transform:none!important;letter-spacing:0!important;cursor:pointer;border:1px solid #17372b!important;background:#17372b!important;color:#fff!important;box-shadow:none!important}
+.lc-sg-actions button.lc-sg-alt{background:#fff!important;color:#17372b!important}
+</style>
+<script>
+window.__MB = window.__MB || {};
+window.__MB.SaveGuard = 'loading';
+(function () {
+  'use strict';
+  var W = window;
+  if (typeof W.focusedAutosave !== 'object' || typeof W.syncFocusedPrep !== 'function' || typeof W.callServer !== 'function' || typeof W.render !== 'function') {
+    W.__MB.SaveGuard = 'error: Index.html did not load first';
+    return;
+  }
+  if (W.LC_SAVEGUARD) { W.__MB.SaveGuard = 'ok'; return; } // included twice — keep the first copy
+
+  var fa = W.focusedAutosave;
+  fa.fails = fa.fails || {};
+  var G = W.LC_SAVEGUARD = {
+    loadedAt: '',     // server time of the last full read (getState)
+    base: {},         // wk -> newest server time of this week's Step 1 this tab has seen (sent as base)
+    mine: {},         // wk -> normalized copies this tab sent (to recognise its own writes)
+    blocked: {},      // wk -> Step 1 stored copy can't be read: never save over it
+    reflBlocked: {},  // wk -> Step 4 stored copy can't be read
+    hold: {},         // 'step1:1' / 'plan:1' / 'reflection:1' -> conflict waiting for the student's choice
+    watch: {}, seq: {}, permanent: {},
+    step: {},         // 'plan:1' -> Step 2/4 background-save state
+    planMem: {},      // wk -> Step 2 fields typed but not saved for real
+    seen: {},         // 'plan:1' / 'reflection:1' -> server time of the saved plan / reflection
+    watchdogMs: 45000 // a save with no answer after this long is treated as failed and retried
+  };
+  var WEEKS = [1, 2, 3, 4];
+  var PLAN_KEYS = ['focus', 'evidence', 'question1', 'question2', 'open', 'explore', 'deepen', 'close', 'backup'];
+
+  // ------------------------------------------------------------------ small helpers
+  function me() { return String((W.state && W.state.email) || '').toLowerCase(); }
+  function clone(x) { return x === undefined ? undefined : JSON.parse(JSON.stringify(x)); }
+  function t(iso) { var d = new Date(iso || ''); return isNaN(d.getTime()) ? NaN : d.getTime(); }
+  function isLater(a, b) { var ta = t(a), tb = t(b); return !isNaN(ta) && !isNaN(tb) && ta > tb + 1000; }
+  function later(a, b) { var ta = t(a), tb = t(b); if (isNaN(ta)) return isNaN(tb) ? '' : b; if (isNaN(tb)) return a; return ta >= tb ? a : b; }
+  function fmtTime(iso) { var d = new Date(iso || ''); if (isNaN(d.getTime())) return 'just now'; try { return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); } catch (e) { return d.toTimeString().slice(0, 5); } }
+  function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function $(id) { return document.getElementById(id); }
+  function stable(v) {
+    if (v === null || v === undefined) return 'null';
+    if (Array.isArray(v)) return '[' + v.map(stable).join(',') + ']';
+    if (typeof v === 'object') return '{' + Object.keys(v).sort().map(function (k) { return JSON.stringify(k) + ':' + stable(v[k]); }).join(',') + '}';
+    if (typeof v === 'string') return JSON.stringify(v.replace(/\s+/g, ' ').trim());
+    return JSON.stringify(v);
+  }
+  function strip(data) { var o = {}; Object.keys(data || {}).forEach(function (k) { if (k.charAt(0) !== '_' && k !== 'discussionPlan' && !/Tags$/.test(k)) o[k] = data[k]; }); return o; }
+  /** One comparable string for a Step 1 copy (pathway + strategies + writing; no bookkeeping). */
+  function norm1(x) { return x ? stable({ p: String(x.prepType || ''), c: (x.choices || []).map(String), d: strip(x.data) }) : ''; }
+  function normS(data) { return stable(data || {}); }
+  function hasWriting(v, depth) {
+    depth = depth || 0; if (depth > 12 || v == null) return false;
+    if (typeof v === 'string') return v.replace(/<[^>]*>/g, '').replace(/&nbsp;/g, ' ').trim().length > 0;
+    if (typeof v !== 'object') return false;
+    return Object.keys(v).some(function (k) { return k.charAt(0) !== '_' && k !== 'discussionPlan' && !/Tags$/.test(k) && hasWriting(v[k], depth + 1); });
+  }
+  /** Pasted pictures etc. never belong in the saved text (they can push it past the size limit). */
+  function stripMedia(html) { return String(html || '').replace(/<(img|picture|video|audio|svg|object|embed|iframe)\b[\s\S]*?(<\/\1>|>)/gi, ''); }
+  function isPreview() {
+    var b = (W.platform && W.platform.bootstrap) || {};
+    return (b.role === 'teacher' || b.role === 'admin') && !!me() && me() !== String(b.email || '').toLowerCase();
+  }
+  function studentMode() { return !!me() && W.platform && W.platform.mode === 'student'; }
+  function ls(key, val) {
+    try {
+      if (val === undefined) { var raw = W.localStorage.getItem(key); return raw ? JSON.parse(raw) : null; }
+      if (val === null) W.localStorage.removeItem(key); else W.localStorage.setItem(key, JSON.stringify(val));
+    } catch (e) { return null; }
+    return null;
+  }
+  // Each open tab keeps its own copy of unsaved writing (two tabs of the same student never write
+  // over each other's copy). A tab says it is alive every 10 s; copies left by tabs that are gone
+  // (closed, crashed, reloaded) are offered back on the next visit.
+  var TAB = Math.random().toString(36).slice(2, 10);
+  G.tab = TAB;
+  function key1(wk) { return 'lc_unsaved_' + me() + '_w' + wk + '_t' + TAB; }
+  function keyS(kind, wk) { return 'lc_unsaved_' + me() + '_' + kind + '_w' + wk + '_t' + TAB; }
+  function beat() { try { W.localStorage.setItem('lc_tab_' + TAB, String(Date.now())); } catch (e) {} }
+  beat(); setInterval(beat, 10000);
+  W.addEventListener('pagehide', function () { try { W.localStorage.removeItem('lc_tab_' + TAB); } catch (e) {} });
+  function tabAlive(id) { if (!id || id === TAB) return id === TAB; var t = 0; try { t = Number(W.localStorage.getItem('lc_tab_' + id) || 0); } catch (e) {} return Date.now() - t < 30000; }
+  /** Copies of one week's unsaved writing left on this device by tabs that are no longer open
+   *  (base: 'lc_unsaved_<email>_w1' or 'lc_unsaved_<email>_plan_w1'); newest first. */
+  function leftovers(base) {
+    var out = [];
+    try {
+      for (var i = 0; i < W.localStorage.length; i++) {
+        var k = W.localStorage.key(i); if (!k || k.indexOf(base) !== 0) continue;
+        var rest = k.slice(base.length), m = /^(?:_t([a-z0-9]+))?$/.exec(rest); if (!m) continue;
+        if (m[1] && tabAlive(m[1])) continue; // another open tab is still working on it
+        var v = null; try { v = JSON.parse(W.localStorage.getItem(k) || 'null'); } catch (e) { v = null; }
+        if (v) out.push({ key: k, v: v });
+      }
+    } catch (e) {}
+    return out.sort(function (a, b) { return t(b.v.at) - t(a.v.at); });
+  }
+  /** File a copy this tab is NOT keeping with the server (WorkBackups), so nothing is ever lost. */
+  function keepOnServer(kind, wk, data) {
+    if (isPreview() || !me() || !data || !hasWriting(data.data || data)) return;
+    try { _csRaw('keepWorkCopy', [W.state.email, Number(wk), kind, data], function () {}, function () {}, { quiet: true }); } catch (e) {}
+  }
+  // ---- other tabs of the same student hear about every save
+  var bc = null; try { if (W.BroadcastChannel) bc = new W.BroadcastChannel('lc-saves'); } catch (e) { bc = null; }
+  function announce(kind, wk, savedAt) {
+    var msg = { email: me(), wk: Number(wk), kind: kind, savedAt: savedAt || '', tab: TAB };
+    try { if (bc) bc.postMessage(msg); else W.localStorage.setItem('lc_bc_' + me(), JSON.stringify(msg)); } catch (e) {}
+  }
+  function heard(msg) {
+    if (!msg || msg.tab === TAB || String(msg.email || '') !== me() || !studentMode() || isPreview()) return;
+    G.refreshWanted = true;
+    if (document.visibilityState !== 'visible' || G.heardTimer) return; // hidden tabs catch up when shown
+    var wait = Math.max(400, 8000 - (Date.now() - lastRefresh)); // at most one re-read every 8 s
+    G.heardTimer = setTimeout(function () { G.heardTimer = null; refreshIfNewer(true); }, wait);
+  }
+  if (bc) bc.onmessage = function (e) { heard(e && e.data); };
+  W.addEventListener('storage', function (e) { if (e && e.key === 'lc_bc_' + me() && e.newValue) { try { heard(JSON.parse(e.newValue)); } catch (err) {} } });
+  function _csRaw() { return (G._cs || W.callServer).apply(W, arguments); }
+  function stash(name, value) { if (me()) ls('lc_stash_' + me() + '_' + name, { at: new Date().toISOString(), value: value }); }
+  function status(text, kind) { if (typeof W.setFocusedAutosaveStatus === 'function') W.setFocusedAutosaveStatus(text, kind); }
+  function resolveWaiters(wk) { if (typeof W.resolveFocusedAutosaveWaiters === 'function') W.resolveFocusedAutosaveWaiters(wk); }
+  function submitted(wk) { var w = W.state.weeklyWork && W.state.weeklyWork[wk]; return !!(w && w.prepType); }
+  function subAt(w) { return w ? (w.submittedAt || (w.data && w.data._submissionUpdatedAt) || w.updatedAt || '') : ''; }
+  function labelFor(kind) { return kind === 'plan' ? 'discussion plan' : kind === 'reflection' ? 'reflection' : 'Lit Circle work'; }
+
+  // ------------------------------------------------------------------ notices (fixed, survive re-renders)
+  function stack() {
+    var s = document.querySelector('.lc-sg-stack');
+    if (!s) { s = document.createElement('div'); s.className = 'lc-sg-stack'; s.setAttribute('role', 'region'); s.setAttribute('aria-label', 'Saving notices'); document.body.appendChild(s); }
+    return s;
+  }
+  function card(id, cls, title, body, buttons) {
+    var old = $(id); if (old) old.remove();
+    var c = document.createElement('div'); c.id = id; c.className = 'lc-sg-card' + (cls ? ' ' + cls : ''); c.setAttribute('role', cls === 'is-error' ? 'alert' : 'status');
+    c.innerHTML = '<strong>' + esc(title) + '</strong><p>' + esc(body) + '</p>' + (buttons && buttons.length ? '<div class="lc-sg-actions"></div>' : '');
+    (buttons || []).forEach(function (b, i) {
+      var el = document.createElement('button'); el.type = 'button'; el.textContent = b.text; if (i > 0) el.className = 'lc-sg-alt';
+      el.addEventListener('click', function () { try { b.fn(); } finally { if (!b.keep) c.remove(); } });
+      c.querySelector('.lc-sg-actions').appendChild(el);
+    });
+    stack().appendChild(c);
+    return c;
+  }
+  function dropCard(id) { var c = $(id); if (c) c.remove(); }
+  function clearCards() { var s = document.querySelector('.lc-sg-stack'); if (s) s.innerHTML = ''; }
+
+  /** Same box BackendClient used, now also for errors that won't fix themselves (e.g. "too long"). */
+  function paintTrouble() {
+    var bad = false, msg = '';
+    Object.keys(fa.fails || {}).forEach(function (wk) { if (fa.fails[wk] >= 2) bad = true; if (fa.fails[wk] >= 99 && G.permanent['step1:' + wk]) msg = G.permanent['step1:' + wk]; });
+    Object.keys(G.step).forEach(function (k) { var st = G.step[k]; if (st.fails >= 2) bad = true; if (st.fails >= 99 && st.msg) msg = st.msg; });
+    var el = document.querySelector('.lc-save-trouble');
+    if (bad && !el) { el = document.createElement('div'); el.className = 'lc-save-trouble'; el.setAttribute('role', 'alert'); document.body.appendChild(el); }
+    var many = Object.keys(fa.fails || {}).some(function (wk) { return fa.fails[wk] >= 4 && fa.fails[wk] < 99; }) || Object.keys(G.step).some(function (k) { return G.step[k].fails >= 4 && G.step[k].fails < 99; });
+    if (bad && /Set up your group|changed your Literature Circle group/i.test(msg)) el.textContent = 'Your writing isn’t saving because your group changed (a teammate or your teacher changed who is in it). Reload the page — your writing is kept on this device and will be offered back. If you land on “Set Up Your Group”, ask your teacher to put you back in your group.';
+    else if (bad) el.textContent = msg ? 'Your latest writing can’t be saved: ' + msg + ' Copy your writing somewhere safe and tell your teacher.' : many ? 'Your latest writing still hasn’t reached the server. Your Google sign-in may have expired or the Wi-Fi dropped. Your writing is kept on this device: reload the page (sign in again if asked) and it will be offered back.' : 'Your latest writing hasn’t reached the server yet. Keep this tab open — it keeps retrying. If this stays, copy your writing somewhere safe and tell your teacher.';
+    else if (el) el.remove();
+  }
+
+  // ================================================================== A. on-screen form only
+  var shown = null; // the Step 1 workspace that is in the DOM right now
+  function shownFor(wk) { return shown && shown.email === me() && shown.week === Number(wk) && document.querySelector('.focus-workspace') ? shown : null; }
+  var _sync = W.syncFocusedPrep;
+  W.syncFocusedPrep = function (wk) {
+    var s = shownFor(wk); if (!s) return; // not on screen: what is in memory is the latest
+    var fi = W.prepFocusIndex(wk), mi = W.hybridMomentIndex(wk);
+    W.setPrepFocusIndex(wk, s.focus); W.setHybridMomentIndex(wk, s.moment); // read the form actually shown
+    try { return _sync(wk); } finally { W.setPrepFocusIndex(wk, fi); W.setHybridMomentIndex(wk, mi); }
+  };
+  function memoryPrep(d) {
+    var tags = function (h) { return W.computeTagsFromHtml(h || ''); };
+    if (d.prepType === 'journal') { var j = stripMedia(d.data.journalText), jd = { journalText: j, journalTags: tags(j) }; if (Array.isArray(d.data.journalImages) && d.data.journalImages.length) jd.journalImages = clone(d.data.journalImages); return { prepType: 'journal', choices: ['journal'], data: jd }; }
+    if (d.prepType === 'hybrid') { if (d.choices.length !== 3) return null; var m = (d.data.hybridMoments || ['', '', '']).slice(0, 3).map(stripMedia); return { prepType: 'hybrid', choices: d.choices.slice(), data: { hybridMoments: m, hybridTags: m.map(tags) } }; }
+    if (d.prepType !== 'strategies' || d.choices.length !== 2) return null;
+    var nd = {}; d.choices.forEach(function (k) { nd[k] = clone(d.data[k] || {}); });
+    return { prepType: 'strategies', choices: d.choices.slice(), data: nd };
+  }
+  W.focusedAutosaveSnapshot = function (wk) {
+    W.syncFocusedPrep(wk);
+    var d = W.prepDraftForWeek(wk), g = memoryPrep(d); if (!g) return null;
+    var plan = W.discussionPlanFor(wk) || (d.data && d.data.discussionPlan);
+    var data = clone(g.data); if (plan) data.discussionPlan = clone(plan);
+    return { prepType: g.prepType, choices: g.choices, data: data };
+  };
+  // Submit reads the form directly — keep pasted pictures out of it too.
+  var _collect = W.collectCurrentPrepData;
+  W.collectCurrentPrepData = function (d) {
+    var g = _collect.apply(this, arguments);
+    if (g && g.data) {
+      if (typeof g.data.journalText === 'string') g.data.journalText = stripMedia(g.data.journalText);
+      // pictures live beside the text (JournalPictures.html), never inside it
+      if (g.prepType === 'journal' && d && d.data && Array.isArray(d.data.journalImages) && d.data.journalImages.length) g.data.journalImages = clone(d.data.journalImages);
+      if (Array.isArray(g.data.hybridMoments)) g.data.hybridMoments = g.data.hybridMoments.map(stripMedia);
+    }
+    return g;
+  };
+
+  var _render = W.render;
+  /** A page that can't be drawn from what's saved (e.g. "resume at the writing workspace" for a
+   *  week with no pathway chosen, or a strategy name that no longer exists) goes one step back
+   *  instead of showing an error and a blank screen. */
+  function repairView() {
+    try {
+      if (!W.state || W.platform.mode !== 'student') return;
+      var v = W.state.view;
+      if (v !== 'login' && v !== 'setup' && !W.state.group && W.state.email && /^week|^feedback|^growth|^dashboard/.test(String(v))) { W.state.view = 'setup'; return; }
+      if (v !== 'week_strategies') return;
+      var wk = Number(W.state.week) || 1, d = W.prepDraftForWeek(wk), defs = W.STRATEGY_DEFS || {};
+      d.choices = (d.choices || []).filter(function (k) { return d.prepType === 'journal' ? k === 'journal' : !!defs[k]; });
+      if (d.prepType === 'journal' && !d.choices.length) d.choices = ['journal'];
+      var stage = W.prepFlowStage(wk);
+      var ready = d.prepType === 'journal' || (d.prepType === 'strategies' && d.choices.length === 2) || (d.prepType === 'hybrid' && d.choices.length === 3);
+      if ((stage === 'workspace' || stage === 'rubric') && !ready) W.setPrepFlowStage(wk, d.prepType && d.prepType !== 'journal' ? 'picker' : 'pathway');
+      if (stage === 'picker' && !d.prepType) W.setPrepFlowStage(wk, 'pathway');
+      if (W.prepFocusIndex(wk) >= Math.max(1, d.choices.length)) W.setPrepFocusIndex(wk, 0);
+      if (W.hybridMomentIndex(wk) > 2) W.setHybridMomentIndex(wk, 0);
+    } catch (e) {}
+  }
+  W.render = function () {
+    if (shown) { try { W.syncFocusedPrep(shown.week); } catch (e) {} } // capture typing before the DOM is replaced
+    repairView();
+    var out = _render.apply(this, arguments);
+    try {
+      var app = document.getElementById('app');
+      if (app && !app.innerHTML.trim() && W.platform.mode === 'student' && W.state.view !== 'dashboard' && W.state.view !== 'login' && W.state.group) {
+        // still couldn't draw it: go home rather than leave a blank page
+        W.state.view = 'dashboard'; shown = null;
+        document.querySelectorAll('.msg.error').forEach(function (m) { if (/\(render\)/.test(m.textContent)) m.remove(); });
+        _render.apply(this, arguments);
+        card('lcSgHome', 'is-info', 'Back to your home page', 'That page couldn’t open, so you’re on your home page. Your work is saved — open the week again.', [{ text: 'OK', fn: function () {} }]);
+      }
+    } catch (e) {}
+    try {
+      var wk = Number(W.state.week);
+      shown = (W.platform.mode === 'student' && W.state.view === 'week_strategies' && W.prepFlowStage(wk) === 'workspace')
+        ? { email: me(), week: wk, focus: W.prepFocusIndex(wk), moment: W.hybridMomentIndex(wk) } : null;
+      afterRender(wk);
+    } catch (e) { if (W.reportClientError) W.reportClientError(e, 'save guard'); }
+    return out;
+  };
+  /** The group setup page says plainly that ONE person sets the group up for everyone. */
+  function setupNote() {
+    var h = document.querySelector('#app .card h2'); if (!h || !/Set Up Your Group/i.test(h.textContent) || document.getElementById('lcSgSetupNote')) return;
+    var box = document.createElement('div'); box.id = 'lcSgSetupNote'; box.className = 'lc-sg-setup';
+    if (W.state.group) {
+      box.innerHTML = '<strong>Changes here update the group for everyone in it.</strong><p>Add or remove a teammate’s email, fix the book title or the reading schedule, then save.</p>';
+    } else {
+      box.innerHTML = '<strong>Only ONE person in your group fills this in.</strong><p>Decide who it is. They type the book title, everyone’s school email and the reading schedule — that sets up the group for all of you. Everyone else: don’t fill this in. Wait until they’ve saved, then press the button below.</p><button type="button" class="secondary" id="lcSgCheckGroup">I’ve been added — open my group</button><p class="lc-sg-setup-mine">Your email (so they type it exactly): <b>' + esc(me()) + '</b></p>';
+    }
+    h.parentNode.insertBefore(box, h.nextSibling);
+    Array.prototype.forEach.call(h.parentNode.querySelectorAll('p.muted'), function (p) { if (/Do this together as a group/i.test(p.textContent)) p.style.display = 'none'; });
+    var btn = document.getElementById('lcSgCheckGroup');
+    if (btn) btn.addEventListener('click', function () {
+      btn.disabled = true; btn.textContent = 'Checking…';
+      W.callServer('getState', [W.state.email], function (s) {
+        btn.disabled = false; btn.textContent = 'I’ve been added — open my group';
+        if (s && s.group) { W.applyLoadedStudentState(s, { forceHome: true }); W.state.view = 'dashboard'; W.render(); card('lcSgJoined', 'is-info', 'You’re in your group', '“' + (s.group.bookTitle || 'Your book') + '” with ' + (s.group.memberEmails || []).filter(function (m) { return String(m).toLowerCase() !== me(); }).join(', ') + '.', [{ text: 'OK', fn: function () {} }]); }
+        else card('lcSgNotYet', 'is-error', 'Not added yet', 'Your group hasn’t added you yet. Make sure the person setting it up typed your email exactly: ' + me() + ' — then try again.', [{ text: 'OK', fn: function () {} }]);
+      }, function (msg) { btn.disabled = false; btn.textContent = 'I’ve been added — open my group'; W.showError(msg); }, { quiet: true });
+    });
+  }
+  function afterRender(wk) {
+    if (W.platform.mode !== 'student') return;
+    if (W.state.view === 'setup') { try { setupNote(); } catch (e) {} }
+    if (W.state.view === 'week_strategies' && shown) {
+      if (isPreview()) status('Teacher view · changes here are not saved', 'saving');
+      else if (G.blocked[wk]) status('Not saved — your saved copy couldn’t be read. Tell your teacher.', 'error');
+      else if (G.hold['step1:' + wk]) status('Not saved — choose which version to keep', 'error');
+      else if (submitted(wk) && hasUnsubmittedEdits(wk)) status('Submitted · newer edits not submitted yet', '');
+    }
+    if (W.state.view === 'week_plan') { try { planPasteNote(); } catch (e) {} }
+    if (W.state.view === 'week_plan' && G.planMem[wk]) {
+      PLAN_KEYS.forEach(function (k) { var el = $('plan_' + k); if (el && G.planMem[wk][k] !== undefined) el.value = G.planMem[wk][k]; });
+    }
+  }
+  function hasUnsubmittedEdits(wk) {
+    var w = W.state.weeklyWork && W.state.weeklyWork[wk], d = W.state.weeklyDrafts && W.state.weeklyDrafts[wk];
+    if (fa.dirty[wk]) return true;
+    return !!(w && w.prepType && d && d.prepType && norm1(d) !== norm1(w));
+  }
+
+  // ================================================================== D. this browser's copy
+  function writeLocal(wk, snap) {
+    if (isPreview() || !me() || !snap || !hasWriting(snap.data)) return;
+    ls(key1(wk), { at: new Date().toISOString(), json: norm1(snap), snap: snap });
+  }
+  function clearLocalIf(wk, json) { var L = ls(key1(wk)); if (L && L.json === json) ls(key1(wk), null); }
+  function saveLocalNow(wk) { if (isPreview() || !me() || !wk) return; try { var snap = W.focusedAutosaveSnapshot(wk); if (snap) writeLocal(wk, snap); } catch (e) {} }
+  var localTimer = null;
+  var _schedule = W.scheduleFocusedAutosave;
+  W.scheduleFocusedAutosave = function (wk) {
+    var r = _schedule.apply(this, arguments);
+    if (isPreview()) status('Teacher view · changes here are not saved', 'saving');
+    clearTimeout(localTimer); localTimer = setTimeout(function () { saveLocalNow(Number(wk)); }, 300);
+    return r;
+  };
+
+  // ================================================================== B. Step 1 background save (replaces BackendClient's)
+  function remember(wk, json) { var a = G.mine[wk] = G.mine[wk] || []; if (a.indexOf(json) < 0) a.push(json); if (a.length > 8) a.shift(); }
+  function noteSaved(wk, json, savedAt) {
+    remember(wk, json);
+    if (savedAt) G.base[wk] = later(G.base[wk], savedAt) || savedAt;
+    clearLocalIf(wk, json);
+    announce('step1', wk, savedAt);
+    if (G.refreshWanted) setTimeout(function () { refreshIfNewer(true); }, 300);
+  }
+  function flush(wk, onSettled) {
+    wk = Number(wk);
+    if (onSettled) { fa.waiters[wk] = fa.waiters[wk] || []; fa.waiters[wk].push(onSettled); }
+    clearTimeout(fa.timers[wk]); fa.timers[wk] = null; clearTimeout(fa.retryTimers[wk]); fa.retryTimers[wk] = null;
+    if (isPreview()) { fa.dirty[wk] = false; status('Teacher view · changes here are not saved', 'saving'); resolveWaiters(wk); return; }
+    if (G.blocked[wk]) { saveLocalNow(wk); status('Not saved — your saved copy couldn’t be read. Tell your teacher.', 'error'); resolveWaiters(wk); return; }
+    if (G.hold['step1:' + wk]) { saveLocalNow(wk); status('Not saved — choose which version to keep', 'error'); resolveWaiters(wk); return; }
+    if (fa.inFlight[wk]) return;
+    if (!fa.dirty[wk]) { resolveWaiters(wk); return; }
+    var snap = W.focusedAutosaveSnapshot(wk);
+    if (!snap) { resolveWaiters(wk); return; }
+    writeLocal(wk, snap);
+    sizeCheck(wk, snap);
+    fa.dirty[wk] = false; fa.inFlight[wk] = true;
+    status('Saving…', 'saving');
+    var forSubmit = (fa.waiters[wk] || []).length > 0, who = me(), json = norm1(snap), seq = G.seq[wk] = (G.seq[wk] || 0) + 1, settled = false;
+    remember(wk, json); // a copy this tab sent is its own, even before the answer arrives
+    clearTimeout(G.watch[wk]);
+    G.watch[wk] = setTimeout(function () { if (settled || G.seq[wk] !== seq) return; settled = true; failed('No answer from the server.', true); }, G.watchdogMs);
+    W.callServer('saveWeeklyDraft', [W.state.email, wk, snap.prepType, snap.choices, snap.data, G.base[wk] || ''], function (res) {
+      if (who !== me()) return;
+      if (settled) { if (res && res.ok) noteSaved(wk, json, res.savedAt); return; } // the watchdog gave up; just learn the time
+      settled = true; clearTimeout(G.watch[wk]); fa.inFlight[wk] = false;
+      if (res && res.stale) { onStale('step1', wk, res, function () { fa.dirty[wk] = true; flush(wk); }, function () { resolveWaiters(wk); }); return; }
+      noteSaved(wk, json, res && res.savedAt);
+      fa.fails[wk] = 0; delete G.permanent['step1:' + wk]; paintTrouble();
+      W.state.weeklyDrafts = W.state.weeklyDrafts || {};
+      W.state.weeklyDrafts[wk] = { prepType: snap.prepType, choices: snap.choices.slice(), data: clone(snap.data), updatedAt: (res && res.savedAt) || new Date().toISOString() };
+      if (fa.dirty[wk]) { flush(wk); return; }
+      status(submitted(wk) ? '✓ Edits saved · not submitted yet' : '✓ Draft saved', 'saved');
+      resolveWaiters(wk);
+    }, function (msg) {
+      if (who !== me() || settled) return;
+      settled = true; clearTimeout(G.watch[wk]); failed(msg, false);
+    }, { quiet: true });
+    function failed(msg, timedOut) {
+      fa.inFlight[wk] = false; fa.dirty[wk] = true;
+      var permanent = !timedOut && /signed in as|too long|Set up your group|Invalid week/i.test(String(msg || ''));
+      if (permanent) {
+        fa.fails[wk] = 99; G.permanent['step1:' + wk] = String(msg || ''); paintTrouble();
+        status('Not saved: ' + msg, 'error'); resolveWaiters(wk); return;
+      }
+      fa.fails[wk] = (fa.fails[wk] || 0) + 1; paintTrouble();
+      status('Not saved yet — retrying…', 'error');
+      // A flush that a Submit is waiting on doesn't schedule its own retry: the submission
+      // carries the same writing, and a late draft would reappear over the submitted work.
+      if (!forSubmit) fa.retryTimers[wk] = setTimeout(function () { flush(wk); }, Math.min(30000, 1500 * Math.pow(2, Math.min(fa.fails[wk], 5))));
+      resolveWaiters(wk);
+    }
+  }
+  W.flushFocusedAutosave = flush;
+  /** One week of Step 1 writing can hold about 220,000 characters; warn well before that. */
+  function sizeCheck(wk, snap) {
+    var n = 0; try { n = JSON.stringify(snap.data || {}).length; } catch (e) { n = 0; }
+    if (n > 180000) card('lcSgSize' + wk, 'is-error', 'This is getting very long', 'Your Week ' + wk + ' writing is about ' + Math.round(n / 1000) + ',000 characters. One week can hold about 220,000, so please wrap up or trim it — anything past that can’t be saved.', [{ text: 'OK', fn: function () {} }]);
+    else dropCard('lcSgSize' + wk);
+  }
+
+  /** The copy a student would see for a week: the draft only when it is newer than the submission. */
+  function pick(s, wk) {
+    var d = s.weeklyDrafts && s.weeklyDrafts[wk], w = s.weeklyWork && s.weeklyWork[wk];
+    if (d && w && w.prepType && !w.unreadable && !d.unreadable && (!isLater(d.updatedAt, subAt(w)) || norm1(d) === norm1(w))) return w;
+    return d || w || null;
+  }
+  function step1At(s, wk) { var d = s.weeklyDrafts && s.weeklyDrafts[wk], w = s.weeklyWork && s.weeklyWork[wk]; return later(d ? d.updatedAt : '', w ? (w.submittedAt || '') : ''); }
+
+  /**
+   * The server refused a save because something newer is stored. If that newer copy is this tab's
+   * own (e.g. its submission finished first), carry on; otherwise ask the student which to keep.
+   * kind: 'step1' | 'plan' | 'reflection'.
+   */
+  function onStale(kind, wk, res, retry, settle, finalRetry) {
+    var key = kind + ':' + wk, who = me();
+    if (kind === 'step1') saveLocalNow(wk);
+    W.callServer('getState', [W.state.email], function (s) {
+      if (who !== me() || !s) { if (settle) settle(); return; }
+      var own = false, at = res.serverAt || s.loadedAt;
+      if (kind === 'step1') {
+        var cur = pick(s, wk);
+        own = !cur || !hasWriting(cur.data) || (G.mine[wk] || []).indexOf(norm1(cur)) >= 0 || G.pendingSubmit[wk] === norm1(cur);
+        if (own) G.base[wk] = later(at, s.loadedAt) || at;
+      } else {
+        var sd = ((s.stepDrafts || {})[wk] || {})[kind], st = stepState(kind, wk);
+        own = !sd || !sd.data || !hasWriting(sd.data) || st.mine.indexOf(normS(sd.data)) >= 0;
+        // the real saved copy must be this tab's own too (or blank)
+        var fin = null, finAt = '';
+        if (kind === 'plan') { var fw = s.weeklyWork && s.weeklyWork[wk]; fin = fw && fw.data ? fw.data.discussionPlan : null; finAt = fw ? fw.planUpdatedAt : ''; }
+        else { var fr = s.reflections && s.reflections[wk]; fin = fr ? { answers: fr.answers || {}, goal: fr.goal || '' } : null; finAt = fr ? fr.updatedAt : ''; }
+        if (own && fin && hasWriting(fin) && st.mine.indexOf(normS(fin)) < 0 && isLater(finAt, st.base)) own = false;
+        if (own) st.base = later(at, s.loadedAt) || at;
+      }
+      if (own) { retry(); return; }
+      G.hold[key] = { at: at, s: s, final: finalRetry || null };
+      if (kind === 'step1' && shown && shown.week === wk) status('Not saved — choose which version to keep', 'error');
+      showConflict(kind, wk);
+      if (settle) settle();
+    }, function () {
+      // couldn't check right now — try again shortly
+      if (kind === 'step1') { fa.dirty[wk] = true; fa.retryTimers[wk] = setTimeout(function () { flush(wk); }, 5000); }
+      else { var st = stepState(kind, wk); st.dirty = true; st.retry = setTimeout(function () { flushStep(st); }, 5000); }
+      if (settle) settle();
+    }, { quiet: true });
+  }
+  function showConflict(kind, wk) {
+    var key = kind + ':' + wk, h = G.hold[key]; if (!h) return;
+    card('lcSgConflict-' + kind + wk, 'is-error', 'Changed on another device at ' + fmtTime(h.at),
+      'Your Week ' + wk + ' ' + labelFor(kind) + ' was saved on another device or tab after this one opened it. Which version do you want to keep? This tab’s version stays on this device until you choose.',
+      [{ text: 'Load newer', fn: function () { loadNewer(kind, wk); } }, { text: 'Keep this tab’s version', fn: function () { keepMine(kind, wk); } }]);
+  }
+  function loadNewer(kind, wk) {
+    var h = G.hold[kind + ':' + wk]; if (!h) return;
+    // this tab's version is filed with the server (WorkBackups) before it is replaced on screen
+    if (kind === 'step1') {
+      var mineSnap = null; try { mineSnap = W.focusedAutosaveSnapshot(wk); } catch (e) {}
+      var L = ls(key1(wk)); if (!mineSnap && L) mineSnap = L.snap;
+      if (mineSnap) { stash('w' + wk + '_conflict', mineSnap); keepOnServer('draft', wk, mineSnap); }
+      ls(key1(wk), null);
+    } else {
+      var st = stepState(kind, wk), LS = ls(keyS(kind, wk));
+      var mineData = kind === 'plan' ? (G.planMem[wk] || (LS && LS.data)) : (W.draft['reflect' + wk] || (LS && LS.data)) || st.data;
+      if (mineData) { stash(kind + '_w' + wk + '_conflict', mineData); keepOnServer('step-' + kind, wk, mineData); }
+      ls(keyS(kind, wk), null);
+    }
+    adoptWeek(h.s, wk);
+  }
+  function keepMine(kind, wk) {
+    var key = kind + ':' + wk, h = G.hold[key]; if (!h) return;
+    delete G.hold[key];
+    if (kind === 'step1') {
+      G.base[wk] = later(h.at, h.s.loadedAt) || h.at; // the server kept the other version in WorkBackups
+      fa.dirty[wk] = true; flush(wk);
+      if (shown && shown.week === wk) W.render(true);
+    } else {
+      var st = stepState(kind, wk); st.base = later(h.at, h.s.loadedAt) || h.at;
+      if (h.final) h.final(); // the Save the student pressed goes ahead now (it replaces the half-finished copy too)
+      else { st.dirty = !!st.data; if (st.data) flushStep(st); }
+    }
+  }
+  /** Replace this tab's copy of one week with the server's (after "Load newer"). */
+  function adoptWeek(s, wk) {
+    prepareState(s);
+    ['weeklyWork', 'weeklyDrafts', 'reflections', 'selfAssessments'].forEach(function (k) {
+      W.state[k] = W.state[k] || {};
+      if (s[k] && s[k][wk]) W.state[k][wk] = s[k][wk]; else delete W.state[k][wk];
+    });
+    delete W.draft['week' + wk]; delete W.draft['reflect' + wk]; delete G.planMem[wk];
+    ['step1', 'plan', 'reflection'].forEach(function (k) { delete G.hold[k + ':' + wk]; dropCard('lcSgConflict-' + k + wk); });
+    clearTimeout(fa.timers[wk]); clearTimeout(fa.retryTimers[wk]); fa.timers[wk] = null; fa.dirty[wk] = false; fa.fails[wk] = 0;
+    ['plan', 'reflection'].forEach(function (k) { var st = stepState(k, wk); clearTimeout(st.timer); clearTimeout(st.retry); st.dirty = false; st.data = null; st.fails = 0; st.base = s.loadedAt || st.base; });
+    learnWeek(s, wk); applyStepDrafts(s, wk);
+    paintTrouble();
+    shown = null; // the screen shows this tab's old text: don't copy it back in
+    W.render(true);
+  }
+
+  // ================================================================== C. Steps 2 and 4
+  function stepState(kind, wk) {
+    var k = kind + ':' + wk;
+    return G.step[k] || (G.step[k] = { kind: kind, wk: Number(wk), email: me(), data: null, dirty: false, inFlight: false, timer: null, retry: null, watch: null, fails: 0, base: G.loadedAt, mine: [], seq: 0, msg: '' });
+  }
+  function readPlanDom(wk) {
+    var p = clone(G.planMem[wk] || W.discussionPlanFor(wk) || {}) || {};
+    PLAN_KEYS.forEach(function (k) { var el = $('plan_' + k); if (el) p[k] = el.value; });
+    return p;
+  }
+  function readReflDom(wk) {
+    var prev = W.draft['reflect' + wk] || {}, out = { answers: clone(prev.answers || {}) || {}, goal: prev.goal || '' };
+    var qs = typeof W.reflectionQuestionsForWeek === 'function' ? W.reflectionQuestionsForWeek(wk) : [];
+    qs.forEach(function (q) { var el = $('refl_' + wk + '_' + q.key); if (el) out.answers[q.key] = el.value; });
+    var g = $('reflGoal_' + wk); if (g) out.goal = g.value;
+    return out;
+  }
+  function stepChanged(kind, wk, data) {
+    var st = stepState(kind, wk);
+    st.email = me(); st.data = clone(data); st.dirty = true;
+    if (isPreview()) { st.dirty = false; return; }
+    if (hasWriting(data)) ls(keyS(kind, wk), { at: new Date().toISOString(), data: data, json: normS(data) });
+    clearTimeout(st.timer); st.timer = setTimeout(function () { flushStep(st); }, 1500);
+  }
+  document.addEventListener('input', function (e) {
+    var el = e.target, id = (el && el.id) || '', m;
+    if (!studentMode()) return;
+    if ((m = /^plan_(\w+)$/.exec(id))) {
+      var wk = Number(W.state.week); G.planMem[wk] = readPlanDom(wk); stepChanged('plan', wk, G.planMem[wk]);
+    } else if ((m = /^refl_(\d)_/.exec(id)) || (m = /^reflGoal_(\d)$/.exec(id))) {
+      var rw = Number(m[1]); W.draft['reflect' + rw] = readReflDom(rw); stepChanged('reflection', rw, W.draft['reflect' + rw]);
+    }
+  }, true);
+  function flushStep(st) {
+    clearTimeout(st.timer); st.timer = null; clearTimeout(st.retry); st.retry = null;
+    if (st.email !== me() || isPreview()) { st.dirty = false; return; }
+    if (st.inFlight || !st.dirty || G.hold[st.kind + ':' + st.wk] || !st.data) return;
+    var data = clone(st.data), json = normS(data), seq = ++st.seq, settled = false, who = me();
+    st.dirty = false; st.inFlight = true;
+    if (st.mine.indexOf(json) < 0) { st.mine.push(json); if (st.mine.length > 8) st.mine.shift(); }
+    clearTimeout(st.watch);
+    st.watch = setTimeout(function () { if (settled || st.seq !== seq) return; settled = true; failed('No answer from the server.', true); }, G.watchdogMs);
+    W.callServer('saveStepDraft', [W.state.email, st.wk, st.kind, data, st.base || G.loadedAt || ''], function (res) {
+      if (who !== me()) return;
+      if (settled) { if (res && res.ok) stepSaved(st, json, res.savedAt); return; }
+      settled = true; clearTimeout(st.watch); st.inFlight = false;
+      if (res && res.stale) { onStale(st.kind, st.wk, res, function () { st.dirty = true; flushStep(st); }); return; }
+      stepSaved(st, json, res && res.savedAt); st.fails = 0; st.msg = ''; paintTrouble();
+      if (st.dirty) flushStep(st);
+    }, function (msg) {
+      if (who !== me() || settled) return;
+      settled = true; clearTimeout(st.watch); failed(msg, false);
+    }, { quiet: true });
+    function failed(msg, timedOut) {
+      st.inFlight = false; st.dirty = true;
+      if (!timedOut && /signed in as|too long|Set up your group|Invalid week|Invalid draft/i.test(String(msg || ''))) { st.fails = 99; st.msg = String(msg || ''); paintTrouble(); return; }
+      st.fails++; paintTrouble();
+      st.retry = setTimeout(function () { flushStep(st); }, Math.min(30000, 1500 * Math.pow(2, Math.min(st.fails, 5))));
+    }
+  }
+  function stepSaved(st, json, savedAt) {
+    if (savedAt) st.base = later(st.base, savedAt) || savedAt;
+    announce(st.kind, st.wk, savedAt);
+    var L = ls(keyS(st.kind, st.wk)); if (L && L.json === json) ls(keyS(st.kind, st.wk), null);
+  }
+  /** The real Plan / Reflection save succeeded: the half-finished copy is no longer needed. */
+  function stepDone(kind, wk, res) {
+    var st = stepState(kind, wk);
+    clearTimeout(st.timer); clearTimeout(st.retry); st.timer = st.retry = null; st.dirty = false; st.data = null; st.fails = 0; st.msg = '';
+    if (res && res.savedAt) { st.base = later(st.base, res.savedAt) || res.savedAt; G.seen[kind + ':' + wk] = res.savedAt; announce(kind, wk, res.savedAt); }
+    ls(keyS(kind, wk), null);
+    if (kind === 'plan') delete G.planMem[wk];
+    paintTrouble();
+  }
+
+  // ================================================================== state arriving from the server
+  /** Adjust a getState reply before the page uses it. */
+  function prepareState(s) {
+    s.weeklyDrafts = s.weeklyDrafts || {}; s.weeklyWork = s.weeklyWork || {}; s.reflections = s.reflections || {};
+    WEEKS.forEach(function (wk) {
+      var d = s.weeklyDrafts[wk];
+      if (d && d.unreadable) { delete s.weeklyDrafts[wk]; s.__draftUnreadable = s.__draftUnreadable || {}; s.__draftUnreadable[wk] = true; return; }
+      // E. show the submitted work when it is newer than the draft (or the same writing)
+      if (d && pick(s, wk) !== d) delete s.weeklyDrafts[wk];
+    });
+  }
+  function learnWeek(s, wk) {
+    var w = s.weeklyWork[wk], r = s.reflections[wk];
+    G.base[wk] = s.loadedAt || '';
+    G.mine[wk] = [];
+    if ((s.__draftUnreadable && s.__draftUnreadable[wk]) || (w && w.unreadable)) G.blocked[wk] = true; else delete G.blocked[wk];
+    if (r && r.unreadable) G.reflBlocked[wk] = true; else delete G.reflBlocked[wk];
+    G.seen['plan:' + wk] = w ? (w.planUpdatedAt || '') : '';
+    G.seen['reflection:' + wk] = r ? (r.updatedAt || '') : '';
+  }
+  function applyStepDrafts(s, wk) {
+    var sd = (s.stepDrafts || {})[wk] || {}, w = s.weeklyWork[wk], r = s.reflections[wk];
+    var p = sd.plan, savedPlanAt = w && w.data && w.data.discussionPlan ? (w.planUpdatedAt || w.updatedAt) : '';
+    if (p && p.data && hasWriting(p.data) && (!savedPlanAt || isLater(p.updatedAt, savedPlanAt))) G.planMem[wk] = clone(p.data);
+    var q = sd.reflection;
+    if (q && q.data && hasWriting(q.data) && (!r || !r.updatedAt || isLater(q.updatedAt, r.updatedAt))) W.draft['reflect' + wk] = { answers: clone(q.data.answers || {}), goal: String(q.data.goal || '') };
+  }
+  function learnAll(s) {
+    G.loadedAt = s.loadedAt || '';
+    WEEKS.forEach(function (wk) { learnWeek(s, wk); });
+    Object.keys(G.step).forEach(function (k) { G.step[k].base = G.loadedAt; });
+  }
+  function resetForStudent() {
+    W.draft = {};
+    ['timers', 'retryTimers'].forEach(function (k) { Object.keys(fa[k] || {}).forEach(function (wk) { clearTimeout(fa[k][wk]); delete fa[k][wk]; }); });
+    ['dirty', 'inFlight', 'waiters', 'fails'].forEach(function (k) { Object.keys(fa[k] || {}).forEach(function (wk) { delete fa[k][wk]; }); });
+    Object.keys(G.step).forEach(function (k) { var st = G.step[k]; clearTimeout(st.timer); clearTimeout(st.retry); clearTimeout(st.watch); });
+    Object.keys(G.watch).forEach(function (wk) { clearTimeout(G.watch[wk]); });
+    G.base = {}; G.mine = {}; G.blocked = {}; G.reflBlocked = {}; G.hold = {}; G.step = {}; G.planMem = {}; G.seen = {}; G.permanent = {}; G.pendingSubmit = {}; G.peerDirty = {}; G.submitting = {};
+    shown = null; clearCards(); paintTrouble();
+  }
+  G.pendingSubmit = {};
+
+  var _apply = W.applyLoadedStudentState;
+  W.applyLoadedStudentState = function (s, opts) {
+    if (!s) return _apply.apply(this, arguments);
+    // 9. A teacher opening another student must never see (or save) the previous student's drafts.
+    if (String(s.email || '').toLowerCase() !== me() || isPreview()) resetForStudent();
+    prepareState(s); learnAll(s);
+    W.draft = W.draft || {};
+    WEEKS.forEach(function (wk) { applyStepDrafts(s, wk); });
+    var out = _apply.apply(this, arguments);
+    try { showBlockedCards(); offerRestores(); restorePeerDrafts(); } catch (e) {}
+    return out;
+  };
+  function showBlockedCards() {
+    if (isPreview()) return;
+    WEEKS.forEach(function (wk) {
+      if (G.blocked[wk]) card('lcSgUnreadable' + wk, 'is-error', 'Your saved work couldn’t be read', 'Your saved Week ' + wk + ' Lit Circle work couldn’t be read, so this page won’t save over it. Please tell your teacher — nothing has been deleted.', [{ text: 'OK', fn: function () {} }]);
+      if (G.reflBlocked[wk]) card('lcSgUnreadableR' + wk, 'is-error', 'Your saved reflection couldn’t be read', 'Your saved Week ' + wk + ' reflection couldn’t be read, so this page won’t save over it. Please tell your teacher — nothing has been deleted.', [{ text: 'OK', fn: function () {} }]);
+    });
+  }
+
+  /** D. Writing that never reached the server is offered back — never restored on its own. A copy
+   *  older than what the server has is offered too (labelled older) and filed with the server. */
+  function offerRestores() {
+    if (isPreview() || !me()) return;
+    WEEKS.forEach(function (wk) {
+      var found = leftovers('lc_unsaved_' + me() + '_w' + wk), offered = false;
+      found.forEach(function (f) {
+        var L = f.v;
+        if (!L || !L.snap || !hasWriting(L.snap.data)) { ls(f.key, null); return; }
+        var cur = pick(W.state, wk), curAt = step1At(W.state, wk);
+        if (cur && norm1(cur) === L.json) { ls(f.key, null); return; }
+        keepOnServer('draft', wk, L.snap); // whatever the student picks, the server has this copy
+        if (offered) { stash('w' + wk + '_older', L.snap); ls(f.key, null); return; }
+        offered = true;
+        var older = !!(cur && curAt && !isLater(L.at, curAt));
+        offerRestore('step1', wk, L.at, function () { ls(f.key, null); restoreStep1(wk, L.snap); }, f.key, older);
+      });
+      ['plan', 'reflection'].forEach(function (kind) {
+        var foundS = leftovers('lc_unsaved_' + me() + '_' + kind + '_w' + wk), offeredS = false;
+        foundS.forEach(function (f) {
+          var LS = f.v; if (!LS || !LS.data || !hasWriting(LS.data)) { ls(f.key, null); return; }
+          var curData, curAt;
+          if (kind === 'plan') { curData = G.planMem[wk] || W.discussionPlanFor(wk); var w = W.state.weeklyWork[wk]; curAt = w ? (w.planUpdatedAt || '') : ''; }
+          else { var r = W.state.reflections[wk]; curData = W.draft['reflect' + wk] || (r ? { answers: r.answers, goal: r.goal } : null); curAt = r ? r.updatedAt : ''; }
+          if (curData && normS(curData) === normS(LS.data)) { ls(f.key, null); return; }
+          keepOnServer('step-' + kind, wk, LS.data);
+          if (offeredS) { stash(kind + '_w' + wk + '_older', LS.data); ls(f.key, null); return; }
+          offeredS = true;
+          var olderS = !!(curData && hasWriting(curData) && curAt && !isLater(LS.at, curAt));
+          offerRestore(kind, wk, LS.at, function () { ls(f.key, null); restoreStep(kind, wk, LS.data); }, f.key, olderS);
+        });
+      });
+    });
+  }
+  function offerRestore(kind, wk, at, doRestore, key, older) {
+    card('lcSgRestore-' + kind + wk, '', older ? 'Older writing found on this device' : 'Unsaved writing found on this device',
+      older ? 'This device has a copy of your Week ' + wk + ' ' + labelFor(kind) + ' from ' + fmtTime(at) + ' that never reached the server. What you saved later is on screen now. Restore the older copy only if it has something you need — your teacher can also get it back.'
+            : 'Your Week ' + wk + ' ' + labelFor(kind) + ' from ' + fmtTime(at) + ' never reached the server.',
+      [{ text: older ? 'Restore the older copy' : 'Restore unsaved writing from this device', fn: doRestore },
+       { text: 'Dismiss', fn: function () { var L = ls(key); if (L) stash((kind === 'step1' ? 'w' + wk : kind + '_w' + wk) + '_dismissed', L.snap || L.data); ls(key, null); } }]);
+  }
+  function restoreStep1(wk, snap) {
+    if (G.blocked[wk]) { W.showError('Week ' + wk + ' can’t be changed until your teacher fixes the saved copy.'); return; }
+    var c = clone(snap);
+    W.draft['week' + wk] = { prepType: c.prepType, choices: c.choices || [], data: c.data || {} };
+    shown = null;
+    W.state.week = wk; W.state.view = 'week_strategies'; W.setPrepFlowStage(wk, 'workspace'); W.setPrepFocusIndex(wk, 0); W.setHybridMomentIndex(wk, 0);
+    W.render();
+    fa.dirty[wk] = true; flush(wk);
+  }
+  function restoreStep(kind, wk, data) {
+    W.state.week = wk;
+    if (kind === 'plan') { G.planMem[wk] = clone(data); W.state.view = 'week_plan'; }
+    else { W.draft['reflect' + wk] = { answers: clone(data.answers || {}), goal: String(data.goal || '') }; W.state.view = 'week_reflection'; }
+    W.render();
+    stepChanged(kind, wk, data);
+  }
+
+  // ================================================================== server calls this file watches
+  var _cs = W.callServer;
+  G._cs = _cs;
+  var STUDENT_WRITES = { saveWeeklyWork: 1, saveDiscussionPlan: 1, saveReflection: 1, submitPeerAssessment: 1, saveDiscussionSelfAssessment: 1, saveGroupSetup: 1, startNewBook: 1 };
+  var PERMANENT = /too long|signed in as|Teacher view|Set up your group|Invalid|could not be read|couldn.t be read|choose a rating|complete all three|only rate members|changed your Literature Circle group|already in another|Please /i;
+  var TRANSIENT = /busy|timed out|time ?out|network|connection|HTTP 0|try again|too many|unavailable|temporar|failed to fetch|No answer/i;
+  /** A real Save / Submit retries by itself (twice) when the server was only busy or the
+   *  connection blinked, instead of showing an error for something that fixes itself. */
+  function withRetry(fn, args, onOk, onErr, opts) {
+    var tries = (opts && opts.__tries) || 0;
+    return function (msg) {
+      if (tries < 2 && TRANSIENT.test(String(msg || '')) && !PERMANENT.test(String(msg || ''))) {
+        var o = {}; Object.keys(opts || {}).forEach(function (k) { o[k] = opts[k]; }); o.__tries = tries + 1;
+        setTimeout(function () { W.callServer(fn, args, onOk, onErr, o); }, tries ? 4000 : 1500);
+        return;
+      }
+      if (onErr) onErr(msg); else W.showError(msg);
+    };
+  }
+  function isDemoStudent() { return /@demo\.litcircles\.local$/i.test(me()); }
+  W.callServer = function (fn, args, onOk, onErr, opts) {
+    try {
+      if (STUDENT_WRITES[fn] && isPreview() && !isDemoStudent()) { if (fn === 'saveWeeklyWork') endSubmit(Number(args[1])); W.showError('Teacher view is read-only: this student’s work was not changed. (Open a demo student to try saving.)'); return; }
+      if (fn === 'saveWeeklyWork' && args && args.length === 5) return submitStep1(args, onOk, onErr, opts);
+      var origArgs = args, origOk = onOk, origErr = onErr;
+      if (STUDENT_WRITES[fn]) onErr = withRetry(fn, origArgs, origOk, origErr, opts);
+      if (fn === 'saveDiscussionPlan' || fn === 'saveReflection') {
+        var kind = fn === 'saveDiscussionPlan' ? 'plan' : 'reflection', wk = Number(args[1]);
+        if (kind === 'reflection' && G.reflBlocked[wk]) { W.showError('Not saved: your saved Week ' + wk + ' reflection couldn’t be read, so it wasn’t replaced. Please tell your teacher.'); return; }
+        if (G.hold[kind + ':' + wk]) { W.showError('Not saved: your Week ' + wk + ' ' + labelFor(kind) + ' was changed on another device. Choose which version to keep first.'); return; }
+        var stF = stepState(kind, wk), finalJson = kind === 'plan' ? normS(args[2] || {}) : normS({ answers: args[3] || {}, goal: args[4] || '' });
+        if (stF.mine.indexOf(finalJson) < 0) { stF.mine.push(finalJson); if (stF.mine.length > 8) stF.mine.shift(); }
+        // send what this tab has seen, so a save from a tab that missed newer work is refused
+        var want = kind === 'plan' ? 3 : 5;
+        args = args.slice(0, want); while (args.length < want) args.push(kind === 'plan' ? {} : '');
+        args.push(isPreview() ? '' : (stF.base || G.loadedAt || ''));
+        var again = function () { W.callServer(fn, origArgs, origOk, origErr, opts); };
+        onOk = function (res) {
+          if (res && res.stale) {
+            onStale(kind, wk, res, again, function () {
+              if (!G.hold[kind + ':' + wk]) { W.showError('Not saved yet — the connection dropped. Please press Save again.'); return; }
+              W.showError('Not saved yet: your Week ' + wk + ' ' + labelFor(kind) + ' was saved on another device or tab after this one opened it. Choose which version to keep — if you keep this tab’s, it saves right away.');
+            }, again);
+            return;
+          }
+          stepDone(kind, wk, res); if (origOk) return origOk(res);
+        };
+      }
+      if (fn === 'submitPeerAssessment') {
+        var pWk = Number(args[2]), pMate = String(args[1] || ''), okP = onOk;
+        onOk = function (res) { peerLocal(pWk, pMate, null); announce('peer', pWk, ''); if (okP) return okP(res); };
+      }
+      if (fn === 'saveGroupSetup' && args && args.length === 4 && W.state.group) {
+        // the teammates this tab loaded: the server applies only the changes made here
+        args = args.concat([(W.state.group.memberEmails || []).join(',')]);
+      }
+      if (fn === 'saveGroupSetup' || fn === 'startNewBook') {
+        var ok2 = onOk;
+        onOk = function (s) {
+          if (s && s.notice) setTimeout(function () { card('lcSgGroupNotice', 'is-info', 'Your group', s.notice, [{ text: 'OK', fn: function () {} }]); }, 50);
+          if (s && typeof s === 'object') { var regroup = !W.state.group || !s.group || String(W.state.group.groupId) !== String(s.group.groupId); if (regroup) { resetForStudent(); } prepareState(s); learnAll(s); }
+          if (ok2) return ok2(s);
+        };
+      }
+    } catch (e) { /* never block a call because of this file */ }
+    return _cs.call(this, fn, args, onOk, onErr, opts);
+  };
+  /** Step 1 Submit: send base; a refusal shows the version choice instead of replacing newer work. */
+  function endSubmit(wk) { delete G.submitting[wk]; var b = $('savePrepBtn'); if (b && !b.querySelector('.spinner')) b.disabled = false; }
+  function submitStep1(args, onOk, onErr, opts) {
+    var wk = Number(args[1]);
+    if (G.blocked[wk]) { endSubmit(wk); W.showError('Not submitted: your saved Week ' + wk + ' work couldn’t be read, so it wasn’t replaced. Please tell your teacher.'); return; }
+    if (G.hold['step1:' + wk]) { endSubmit(wk); W.showError('Not submitted: your Week ' + wk + ' work was changed on another device. Choose which version to keep, then submit again.'); return; }
+    var json = norm1({ prepType: args[2], choices: args[3], data: args[4] }), who = me();
+    G.pendingSubmit[wk] = json;
+    var full = args.concat([isPreview() ? '' : (G.base[wk] || '')]);
+    var tries = (opts && opts.__tries) || 0;
+    return _cs.call(this, 'saveWeeklyWork', full, function (res) {
+      if (who !== me()) return;
+      delete G.pendingSubmit[wk];
+      if (!(res && res.stale)) endSubmit(wk);
+      if (res && res.stale) {
+        remember(wk, json);
+        // own earlier write (e.g. this tab's draft landed first) → submit again with the new base;
+        // someone else's → the version choice appears and nothing is replaced
+        onStale('step1', wk, res, function () { W.callServer('saveWeeklyWork', args, onOk, onErr, opts); }, function () {
+          endSubmit(wk);
+          if (G.hold['step1:' + wk]) W.showError('Not submitted yet: your Week ' + wk + ' work was saved on another device after this tab opened it. Choose which version to keep, then submit again.');
+          else W.showError('Not submitted yet — the connection dropped. Please try again.');
+        });
+        return;
+      }
+      noteSaved(wk, json, res && res.savedAt);
+      var out = onOk ? onOk(res) : undefined;
+      // Anything typed while the submission was on its way is NOT lost: it stays on this device and
+      // saves as "edits not submitted yet" (the page above just marked everything as submitted).
+      try {
+        var nowSnap = shownFor(wk) ? W.focusedAutosaveSnapshot(wk) : null;
+        if (nowSnap && hasWriting(nowSnap.data) && norm1(nowSnap) !== json) {
+          writeLocal(wk, nowSnap);
+          fa.dirty[wk] = true; W.scheduleFocusedAutosave(wk);
+          status('Submitted · newer edits not submitted yet', '');
+        }
+      } catch (e) {}
+      return out;
+    }, function (msg) {
+      delete G.pendingSubmit[wk];
+      var m = String(msg || '');
+      if (tries < 2 && TRANSIENT.test(m) && !PERMANENT.test(m)) {
+        var o = {}; Object.keys(opts || {}).forEach(function (k) { o[k] = opts[k]; }); o.__tries = tries + 1;
+        setTimeout(function () { submitStep1(args, onOk, onErr, o); }, tries ? 4000 : 1500);
+        return;
+      }
+      endSubmit(wk);
+      if (onErr) onErr(msg); else W.showError(msg);
+    }, opts);
+  }
+  G.submitting = {};
+  var _fsp = W.finishSavePrep;
+  if (typeof _fsp === 'function') W.finishSavePrep = function (wk) {
+    // a second click while the first submission is still on its way does nothing
+    if (G.submitting[wk] && Date.now() - G.submitting[wk] < 90000) return;
+    G.submitting[wk] = Date.now();
+    var b = $('savePrepBtn'); if (b) b.disabled = true;
+    try { return _fsp.apply(this, arguments); } catch (e) { endSubmit(wk); throw e; }
+  };
+
+  // ================================================================== peer feedback in progress
+  // Ratings and comments for a groupmate stay in this browser until they are submitted, so a
+  // reload, a closed lid or a Chromebook tab discard doesn't take them.
+  G.peerDirty = {};
+  function peerKeyLocal(wk, mate) { return 'lc_unsaved_' + me() + '_peer_w' + wk + '_' + String(mate || '').toLowerCase(); }
+  function peerLocal(wk, mate, d) {
+    var k = peerKeyLocal(wk, mate);
+    if (d && (hasWriting(d.comments) || Object.keys(d.ratings || {}).length)) { if (!isPreview()) { ls(k, { at: new Date().toISOString(), wk: Number(wk), mate: String(mate), d: d }); G.peerDirty[k] = true; } }
+    else { ls(k, null); delete G.peerDirty[k]; }
+  }
+  ['syncPeerComment', 'selectRating'].forEach(function (name) {
+    var orig = W[name]; if (typeof orig !== 'function') return;
+    W[name] = function (wk, mate) {
+      var out = orig.apply(this, arguments);
+      try { if (studentMode() && typeof W.peerDraftKey === 'function') peerLocal(wk, mate, clone(W.draft[W.peerDraftKey(wk, mate)])); } catch (e) {}
+      return out;
+    };
+  });
+  function restorePeerDrafts() {
+    if (isPreview() || !me() || typeof W.peerDraftKey !== 'function') return;
+    var pre = 'lc_unsaved_' + me() + '_peer_w', names = [];
+    try { for (var i = 0; i < W.localStorage.length; i++) { var k = W.localStorage.key(i); if (k && k.indexOf(pre) === 0) names.push(k); } } catch (e) {}
+    names.forEach(function (k) {
+      var v = ls(k); if (!v || !v.d) { ls(k, null); return; }
+      var given = (W.state.peerAssessmentsGiven || []).filter(function (p) { return Number(p.week) === Number(v.wk) && String(p.assessedEmail || '').toLowerCase() === String(v.mate).toLowerCase(); })[0];
+      var c = v.d.comments || {};
+      if (given && String(given.participationComment || '') === String(c.participation || '') && String(given.leadershipComment || '') === String(c.leadership || '') && String(given.activeEngagementComment || '') === String(c.activeEngagement || '')) { ls(k, null); return; }
+      var dk = W.peerDraftKey(v.wk, v.mate);
+      if (!W.draft[dk]) { W.draft[dk] = { ratings: v.d.ratings || {}, comments: v.d.comments || {} }; G.peerDirty[k] = true; }
+    });
+  }
+
+  // ================================================================== B. tab comes back into view
+  function anyPending(netOnly) {
+    var any = false;
+    Object.keys(fa.dirty || {}).forEach(function (wk) { if ((fa.dirty[wk] && !(netOnly && (G.blocked[wk] || G.hold['step1:' + wk]))) || fa.inFlight[wk] || fa.timers[wk]) any = true; });
+    Object.keys(G.step).forEach(function (k) { var st = G.step[k]; if ((st.dirty && !(netOnly && G.hold[k])) || st.inFlight) any = true; });
+    return any;
+  }
+  var lastRefresh = 0;
+  function refreshIfNewer(force) {
+    if (!studentMode() || isPreview()) return;
+    if (anyPending() || Object.keys(G.hold).length) { G.refreshWanted = true; return; } // after this tab's own saves settle
+    if (!force && Date.now() - lastRefresh < 3000) return;
+    lastRefresh = Date.now(); G.refreshWanted = false;
+    var who = me();
+    W.callServer('getState', [W.state.email], function (s) {
+      if (!s || who !== me() || anyPending() || Object.keys(G.hold).length) return;
+      var changed = WEEKS.filter(function (wk) {
+        if (isLater(step1At(s, wk), G.base[wk])) return true;
+        var w = s.weeklyWork && s.weeklyWork[wk], r = s.reflections && s.reflections[wk], sd = (s.stepDrafts || {})[wk] || {};
+        if (w && isLater(w.planUpdatedAt, G.seen['plan:' + wk])) return true;
+        if (r && isLater(r.updatedAt, G.seen['reflection:' + wk])) return true;
+        return ['plan', 'reflection'].some(function (k) { return sd[k] && isLater(sd[k].updatedAt, stepState(k, wk).base); });
+      });
+      if (!changed.length) return;
+      prepareState(s);
+      ['weeklyWork', 'weeklyDrafts', 'reflections', 'selfAssessments', 'peerFeedbackReceived'].forEach(function (k) { W.state[k] = s[k] || {}; });
+      W.state.peerAssessmentsGiven = s.peerAssessmentsGiven || [];
+      learnAll(s);
+      changed.forEach(function (wk) { delete W.draft['week' + wk]; delete W.draft['reflect' + wk]; delete G.planMem[wk]; applyStepDrafts(s, wk); });
+      shown = null;
+      W.render(true);
+      var c = card('lcSgRefreshed', 'is-info', 'Updated', 'This page now shows newer work you saved on another device.', []);
+      setTimeout(function () { if (c.parentNode) c.remove(); }, 6000);
+    }, function () {}, { quiet: true });
+  }
+  G.refreshNow = function () { lastRefresh = 0; refreshIfNewer(); };
+  document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') refreshIfNewer(); });
+  W.addEventListener('pageshow', function (e) { if (e.persisted) refreshIfNewer(); });
+
+  // ================================================================== D. leaving the page
+  function saveLocalShown() { if (shown && fa.dirty[shown.week]) saveLocalNow(shown.week); }
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState !== 'hidden') return;
+    saveLocalShown();
+    Object.keys(G.step).forEach(function (k) { if (G.step[k].dirty) flushStep(G.step[k]); });
+  });
+  W.addEventListener('pagehide', function () { saveLocalShown(); Object.keys(G.step).forEach(function (k) { if (G.step[k].dirty) flushStep(G.step[k]); }); });
+  W.addEventListener('beforeunload', function (e) {
+    if (!studentMode() || isPreview() || !(anyPending() || Object.keys(G.hold).length || Object.keys(G.peerDirty).length)) return;
+    saveLocalShown();
+    e.preventDefault(); e.returnValue = 'Your latest writing has not saved yet.'; return e.returnValue;
+  });
+  /** Send everything waiting, then call back(allSaved) — at most 8 seconds. */
+  function flushEverything(back) {
+    var start = Date.now();
+    saveLocalShown();
+    Object.keys(fa.dirty || {}).forEach(function (wk) { if (fa.dirty[wk] && !fa.inFlight[wk]) flush(Number(wk)); });
+    Object.keys(G.step).forEach(function (k) { if (G.step[k].dirty) flushStep(G.step[k]); });
+    (function poll() {
+      if (!anyPending(true)) return back(!anyPending());
+      if (Date.now() - start > 8000) return back(false);
+      setTimeout(poll, 200);
+    })();
+  }
+  G.flushEverything = flushEverything;
+  var _switch = W.switchStudent;
+  if (typeof _switch === 'function') W.switchStudent = function () {
+    var self = this, a = arguments;
+    if (!studentMode() || isPreview() || !anyPending()) return _switch.apply(self, a);
+    flushEverything(function () { _switch.apply(self, a); });
+  };
+
+  // ================================================================== 12. update bar waits for saves
+  document.addEventListener('click', function (e) {
+    var b = e.target && e.target.closest && e.target.closest('.lc-update-bar .lc-update-go');
+    if (!b || b.getAttribute('data-ready') === '1' || !anyPending()) return; // nothing waiting: the link opens the new version
+    e.preventDefault(); e.stopPropagation(); if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+    b.textContent = 'Saving…';
+    flushEverything(function (allSaved) {
+      // a link the student clicks again (the browser only lets a real click leave the page)
+      b.textContent = allSaved ? 'Saved — open the new version' : 'Not everything saved (a copy stays on this device) — open anyway';
+      b.setAttribute('data-ready', '1');
+    });
+  }, true);
+
+  // ================================================================== 4. pathway / strategy changes ask first
+  function pathName(type) { return typeof W.pathwayLabel === 'function' ? W.pathwayLabel(type) : type; }
+  W.choosePrepPathway = function (wk, type) {
+    var d = W.prepDraftForWeek(wk), changing = d.prepType && d.prepType !== type;
+    if (changing) {
+      W.syncFocusedPrep(wk);
+      if (hasWriting(d.data)) {
+        stash('w' + wk + '_' + d.prepType, { prepType: d.prepType, choices: d.choices.slice(), data: clone(d.data) });
+        if (!W.confirm('Switch to ' + pathName(type) + '? Your ' + pathName(d.prepType) + ' writing for Week ' + wk + ' will be cleared from this draft' + (submitted(wk) ? ' (your submitted work stays as it is until you submit the new pathway)' : '') + '. A copy is kept on this device.')) return;
+      } else if (submitted(wk) && !W.confirm('You already have saved Week ' + wk + ' work in a different pathway. Change pathways? Your saved work will remain until you save the new pathway.')) return;
+      var plan = d.data && d.data.discussionPlan; d.data = {}; if (plan) d.data.discussionPlan = plan; d.choices = [];
+    }
+    d.prepType = type;
+    if (type === 'journal') { d.choices = ['journal']; W.setPrepFlowStage(wk, 'rubric'); }
+    else { if (type === 'strategies' && d.choices.length > 2) d.choices = d.choices.slice(0, 2); if (type === 'hybrid' && d.choices.length > 3) d.choices = d.choices.slice(0, 3); W.setPrepFlowStage(wk, 'picker'); }
+    W.setPrepFocusIndex(wk, 0); W.setHybridMomentIndex(wk, 0); W.saveStudentResumeClient(); W.render();
+  };
+  var _pick = W.pickFocusedStrategy;
+  W.pickFocusedStrategy = function (wk, key) {
+    var d = W.prepDraftForWeek(wk);
+    if (d.choices.indexOf(key) >= 0 && hasWriting(d.data[key])) {
+      var label = W.STRATEGY_DEFS && W.STRATEGY_DEFS[key] ? W.STRATEGY_DEFS[key].label : key;
+      stash('w' + wk + '_' + key, clone(d.data[key]));
+      if (!W.confirm('Remove ' + label + '? You have already written in it. If you start with a different strategy, that writing won’t be part of your Week ' + wk + ' work. A copy is kept on this device.')) return;
+    }
+    return _pick.apply(this, arguments);
+  };
+
+  // ================================================================== 9b. pasting allowed in the discussion plan
+  // Step 2 is built from the student's own Step 1 work, so copying it in is allowed (Jaben,
+  // 2026-10-20). Every paste is still counted and highlighted for the teacher (WritingStats).
+  var _pasteOk = W.pasteAllowedForTarget;
+  W.pasteAllowedForTarget = function (t) {
+    if (t && t.tagName === 'TEXTAREA' && /^plan_\w+$/.test(t.id || '')) return true;
+    return typeof _pasteOk === 'function' ? _pasteOk.apply(this, arguments) : false;
+  };
+  function planPasteNote() {
+    if (document.getElementById('lcSgPlanPaste')) return;
+    var first = document.querySelector('#app textarea[id^="plan_"]'); if (!first) return;
+    var lab = first.previousElementSibling && first.previousElementSibling.tagName === 'LABEL' ? first.previousElementSibling : first;
+    var n = document.createElement('p'); n.id = 'lcSgPlanPaste'; n.className = 'lc-sg-plannote';
+    n.textContent = 'You can paste from your own Step 1 work into this plan. Your teacher sees how much was pasted.';
+    lab.parentNode.insertBefore(n, lab);
+  }
+
+  // ================================================================== 10. rich editors: plain text only
+  function editorOf(node) { var el = node && (node.nodeType === 1 ? node : node.parentElement); return el && el.closest ? el.closest('[contenteditable="true"]') : null; }
+  document.addEventListener('paste', function (e) {
+    if (!studentMode() || !editorOf(e.target)) return;
+    e.preventDefault();
+    var text = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+    if (text) { try { document.execCommand('insertText', false, text); } catch (err) {} }
+  }, true);
+  function hasFiles(e) { var ty = e.dataTransfer && e.dataTransfer.types; return !!ty && Array.prototype.indexOf.call(ty, 'Files') >= 0; }
+  document.addEventListener('drop', function (e) { if (studentMode() && (editorOf(e.target) || hasFiles(e))) e.preventDefault(); }, true);
+  // a file dropped anywhere else would open it in this tab and leave the page
+  document.addEventListener('dragover', function (e) { if (studentMode() && hasFiles(e)) e.preventDefault(); }, true);
+
+  // ================================================================== 11. saved text with &amp; / <p> reads back as text
+  W.looksLikeRichEditorHtml = function (s) { return /<(mark|br|div|span|b|i|u|p|strong|em)[\s>/]|&(?:amp|lt|gt|nbsp|quot|#\d+|#x[0-9a-f]+);/i.test(s || ''); };
+  if (W.RICH_EDITOR_ALLOWED_TAGS) { W.RICH_EDITOR_ALLOWED_TAGS.P = 1; W.RICH_EDITOR_ALLOWED_TAGS.STRONG = 1; W.RICH_EDITOR_ALLOWED_TAGS.EM = 1; }
+
+  W.__MB.SaveGuard = 'ok';
+})();
+</script>

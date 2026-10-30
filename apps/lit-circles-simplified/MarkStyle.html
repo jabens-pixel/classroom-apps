@@ -1,0 +1,163 @@
+<!-- ======================================================================
+     Literature Circles — Underline or highlight: each student's choice (2026-10-29b)
+     Rides along after BackendClient (LC_INCLUDE_WITH in Code.js), so Index.html didn't change.
+
+     Strategy marks (the coloured <mark class="hl-…"> a student puts on their own writing) show as
+     a coloured UNDERLINE (the default since 2026-10-27b). A student can switch to HIGHLIGHT (the
+     same colours as a highlighter background) with the "Show my marks as" switch next to the
+     strategy buttons. It is only how marks LOOK on that student's screen (their writing, the
+     Discussion Deck, printing): the saved writing doesn't change, and the teacher's screens stay
+     as they were. The choice follows the student to any computer (StudentResume.MarkStyle) and is
+     remembered in the browser for an instant start. The wording follows the choice too
+     ("underline it" ↔ "highlight it", "Remove underline" ↔ "Remove highlight").
+     ====================================================================== -->
+<style id="lcMarkStyle">
+/* highlighter colours, one per strategy / lens (light enough to read black text through) */
+body.lc-marks-fill mark.hl-summarizer{background:#fff59d!important}
+body.lc-marks-fill mark.hl-researcher{background:#c5e1a5!important}
+body.lc-marks-fill mark.hl-connector{background:#b3e5fc!important}
+body.lc-marks-fill mark.hl-questioner{background:#f8bbd0!important}
+body.lc-marks-fill mark.hl-literaryLuminary{background:#ffe0b2!important}
+body.lc-marks-fill mark.hl-predictor{background:#e1bee7!important}
+body.lc-marks-fill mark.hl-inferences{background:#b2dfdb!important}
+body.lc-marks-fill mark.hl-illustrator{background:#ffcdd2!important}
+body.lc-marks-fill mark.hl-theme{background:#d8eaf8!important}
+body.lc-marks-fill mark.hl-symbolism{background:#f4d9ee!important}
+body.lc-marks-fill mark[class*="hl-"]{text-decoration:none!important;color:#1a1a1a!important;padding:1px 0!important;border-radius:2px!important;box-decoration-break:clone;-webkit-box-decoration-break:clone;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+/* the words that follow the choice */
+.lc-ms-h{display:none}
+body.lc-marks-fill .lc-ms-u{display:none}
+body.lc-marks-fill .lc-ms-h{display:inline}
+/* the switch */
+.lc-ms{display:inline-flex;align-items:center;gap:8px;flex-wrap:wrap;margin:10px 0 2px;font-size:13.5px;color:var(--rr-muted,#454545)}
+.lc-ms-label{font-weight:700;color:var(--rr-ink,#17372b)}
+.lc-ms-opts{display:inline-flex;border:2px solid var(--rr-ink,#17372b)}
+button.lc-ms-opt{clip-path:none!important;margin:0!important;min-height:0!important;min-width:0!important;width:auto!important;padding:6px 12px!important;border:0!important;border-radius:0!important;box-shadow:none!important;background:var(--rr-paper,#fff)!important;color:var(--rr-ink,#17372b)!important;font:700 13.5px var(--rr-body,Roboto,Arial,sans-serif)!important;text-transform:none!important;letter-spacing:0!important;cursor:pointer}
+button.lc-ms-opt+button.lc-ms-opt{border-left:2px solid var(--rr-ink,#17372b)!important}
+button.lc-ms-opt[aria-pressed="true"]{background:var(--rr-ink,#17372b)!important;color:#fff!important}
+button.lc-ms-opt:focus-visible{outline:3px solid var(--rr-lime,#E9FE5F);outline-offset:2px}
+.lc-ms-sample-u{text-decoration:underline;text-decoration-color:#1b8fd0;text-decoration-thickness:3px;text-underline-offset:3px}
+.lc-ms-sample-h{background:#b3e5fc;padding:0 2px}
+button.lc-ms-opt[aria-pressed="true"] .lc-ms-sample-h{color:#1a1a1a}
+@media print{.lc-ms{display:none!important}}
+</style>
+<script>
+window.__MB = window.__MB || {};
+window.__MB.MarkStyle = 'loading';
+(function () {
+  'use strict';
+  var W = window;
+  var M = W.LC_MARKS = { style: 'underline', saving: false };
+
+  function me() { return String((W.state && W.state.email) || '').toLowerCase(); }
+  function key(email) { return 'lc_mark_style|' + String(email || '').toLowerCase(); }
+  function stored(email) { try { var v = W.localStorage.getItem(key(email)); return v === 'fill' || v === 'underline' ? v : ''; } catch (e) { return ''; } }
+  function remember(email, v) { try { if (email) W.localStorage.setItem(key(email), v); } catch (e) {} }
+  function isStudent() { return !W.platform || W.platform.mode === 'student'; }
+
+  /** Show marks one way or the other. Teachers always see underlines (their own screens). */
+  function apply(style) {
+    M.style = style === 'fill' ? 'fill' : 'underline';
+    var on = M.style === 'fill' && isStudent();
+    if (document.body) document.body.classList.toggle('lc-marks-fill', on);
+    Array.prototype.forEach.call(document.querySelectorAll('button.lc-ms-opt'), function (b) { b.setAttribute('aria-pressed', String(b.getAttribute('data-ms') === M.style)); });
+  }
+
+  // ---------- the words: "underline" ↔ "highlight" wherever the app tells students how to mark
+  var FORMS = { underline: 'highlight', underlines: 'highlights', underlined: 'highlighted', underlining: 'highlighting' };
+  var RX = /\b([Uu])nderlin(e|es|ed|ing)\b/g;
+  function cap(w, upper) { return upper ? w.charAt(0).toUpperCase() + w.slice(1) : w; }
+  function both(m, u) { var low = m.toLowerCase(); return '<span class="lc-ms-u">' + m + '</span><span class="lc-ms-h">' + cap(FORMS[low] || 'highlight', u === 'U') + '</span>'; }
+  W.lcMarkWords = function (html) { return String(html == null ? '' : html).replace(/(^|>)([^<]+)/g, function (all, gt, text) { return gt + text.replace(RX, function (m, u) { return both(m, u); }); }); };
+  function plainSwap(text) {
+    if (M.style !== 'fill') return text;
+    return String(text).replace(RX, function (m, u) { return cap(FORMS[m.toLowerCase()] || 'highlight', u === 'U'); });
+  }
+  /** Words in hints and checklists that were drawn by other parts of the page. Student writing
+   *  (anything editable) is never touched. */
+  var WORD_AREAS = '.hint, .lc-ck-list, .lc-ck-deeper, .focus-guide, .quality-callout, .pill-row, .msg';
+  function swapIn(root) {
+    if (!root || !root.querySelectorAll) return;
+    var areas = [];
+    if (root.matches && root.matches(WORD_AREAS)) areas.push(root);
+    Array.prototype.push.apply(areas, root.querySelectorAll(WORD_AREAS));
+    areas.forEach(function (el) {
+      if (el.closest('[contenteditable="true"], textarea, input')) return;
+      var walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null), nodes = [], n;
+      while ((n = walker.nextNode())) {
+        if (!RX.test(n.nodeValue)) { RX.lastIndex = 0; continue; }
+        RX.lastIndex = 0;
+        var p = n.parentNode;
+        if (!p || (p.classList && (p.classList.contains('lc-ms-u') || p.classList.contains('lc-ms-h'))) || (p.closest && p.closest('[contenteditable="true"]'))) continue;
+        nodes.push(n);
+      }
+      nodes.forEach(function (t) {
+        var span = document.createElement('span'); span.innerHTML = W.lcMarkWords(t.nodeValue.replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }));
+        var frag = document.createDocumentFragment(); while (span.firstChild) frag.appendChild(span.firstChild);
+        t.parentNode.replaceChild(frag, t);
+      });
+    });
+  }
+  var pending = false;
+  function soon() { if (pending) return; pending = true; (W.requestAnimationFrame || setTimeout)(function () { pending = false; swapIn(document.getElementById('app') || document.body); }); }
+  try { new MutationObserver(function (list) { for (var i = 0; i < list.length; i++) { if (list[i].addedNodes && list[i].addedNodes.length) { soon(); return; } } }).observe(document.documentElement, { childList: true, subtree: true }); } catch (e) {}
+
+  // ---------- the switch, next to every row of strategy buttons
+  function switchHtml() {
+    var u = M.style !== 'fill';
+    return '<div class="lc-ms" role="group" aria-label="Show my marks as"><span class="lc-ms-label">Show my marks as</span><span class="lc-ms-opts">' +
+      '<button type="button" class="lc-ms-opt" data-ms="underline" aria-pressed="' + u + '" onmousedown="event.preventDefault()"><span class="lc-ms-sample-u">Underline</span></button>' +
+      '<button type="button" class="lc-ms-opt" data-ms="fill" aria-pressed="' + !u + '" onmousedown="event.preventDefault()"><span class="lc-ms-sample-h">Highlight</span></button>' +
+      '</span><span>Only changes how it looks to you.</span></div>';
+  }
+  function wrapToolbar(name) {
+    var orig = W[name]; if (typeof orig !== 'function') return;
+    W[name] = function () { var html = orig.apply(this, arguments); return W.lcMarkWords(html) + (isStudent() ? switchHtml() : ''); };
+  }
+  wrapToolbar('renderHighlightToolbar');
+  wrapToolbar('renderSelectedHighlightToolbar');
+
+  // error messages from the mark buttons ("…click a strategy to underline it")
+  if (typeof W.showError === 'function') { var _err = W.showError; W.showError = function (msg) { return _err.call(this, typeof msg === 'string' && isStudent() ? plainSwap(msg) : msg); }; }
+
+  document.addEventListener('click', function (ev) {
+    var b = ev.target && ev.target.closest ? ev.target.closest('button.lc-ms-opt') : null;
+    if (!b) return;
+    ev.preventDefault();
+    choose(b.getAttribute('data-ms'));
+  });
+  function choose(style) {
+    style = style === 'fill' ? 'fill' : 'underline';
+    if (style === M.style) return;
+    apply(style);
+    var email = me(); remember(email, style);
+    if (W.state && W.state.resume) W.state.resume.markStyle = style;
+    if (!email || !W.google || !W.google.script) return;
+    // saved for this student on any computer; a failed save only means the next computer starts
+    // from the default — nothing else depends on it
+    try { W.google.script.run.withSuccessHandler(function () {}).withFailureHandler(function () {}).saveStudentMarkStyle(email, style); } catch (e) {}
+  }
+
+  // ---------- which style to start with: this browser first (instant), then the saved choice
+  var _apply = W.applyLoadedStudentState;
+  if (typeof _apply === 'function') {
+    W.applyLoadedStudentState = function (s) {
+      try {
+        var email = s && s.email ? String(s.email).toLowerCase() : '';
+        var saved = s && s.resume && (s.resume.markStyle === 'fill' || s.resume.markStyle === 'underline') ? s.resume.markStyle : '';
+        var pick = saved || stored(email) || 'underline';
+        if (saved) remember(email, saved);
+        apply(pick);
+      } catch (e) {}
+      return _apply.apply(this, arguments);
+    };
+  }
+  var _render = W.render;
+  if (typeof _render === 'function') {
+    W.render = function () { var out = _render.apply(this, arguments); try { apply(isStudent() ? (stored(me()) || M.style) : 'underline'); } catch (e) {} return out; };
+  }
+  try { var first = W.loadEmailLocally ? String(W.loadEmailLocally() || '') : ''; apply(stored(first) || 'underline'); } catch (e) {}
+
+  W.__MB.MarkStyle = 'ok';
+})();
+</script>

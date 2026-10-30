@@ -1,0 +1,293 @@
+<!-- UnitPlan: Lit Circles (Simplified). Rides along LAST after BackendClient (LC_INCLUDE_WITH in
+     Code.js), so it wraps the functions the other files set up ("later definitions win").
+     - Step 1 is always two reading strategies: no Reader's Journal, no Hybrid, no pathway page.
+     - Which two comes from the class's Unit setup (state.plan, worked out on the server):
+       the same two for everyone each week, or rotating roles inside each group.
+     - One book for the class: the setup page only asks for teammates; the book and its four
+       sections are shown, not typed. Different books: the setup page is Lit Circles' own.
+     - Teacher: "Unit setup…" on the dashboard opens the window that sets all of this.
+     Nothing here saves student work or grades; the server applies the same plan on every save. -->
+<style>
+.hg-plan-shell{max-width:1120px;margin:0 auto}
+.hg-plan-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:18px 0}
+.hg-plan-card{background:#fff;color:#17201b;border:2px solid #17201b;padding:18px 20px 20px}
+.hg-plan-card .strategy-picture{height:96px;display:flex;align-items:center;justify-content:center;background:#eeeee8;margin-bottom:12px}
+.hg-plan-card .hg-num{display:inline-block;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#3d4a43;margin-bottom:4px}
+.hg-plan-card h4{margin:0 0 6px;font-size:22px;color:#17201b}
+.hg-plan-card p{margin:0 0 10px;color:#33413a;font-size:15px;line-height:1.5}
+.hg-plan-card ol{margin:0;padding-left:20px;color:#26332c;font-size:14.5px;line-height:1.5}
+.hg-plan-card li{margin:4px 0}
+.prep-section-title .hg-fixed-note,.hg-fixed-note{display:inline-block;margin-top:10px;font-size:14px;font-weight:700;background:#eef3d6!important;color:#26330c!important;padding:6px 10px}
+.hg-roles{background:#fff;color:#17201b;border:2px solid #17201b;padding:14px 18px;margin:0 0 18px}
+.hg-roles h4{margin:0 0 8px;font-size:17px}
+.hg-roles table{width:100%;border-collapse:collapse;font-size:15px}
+.hg-roles td{padding:6px 8px;border-top:1px solid #e1e1d8}
+.hg-roles tr.is-me td{font-weight:800;background:#f4f8e4}
+.hg-setup .hg-fixed{background:#f4f4ef;border:1px solid #d8d8cf;padding:12px 14px;margin:6px 0 14px;color:#17201b}
+.hg-setup .hg-fixed strong{display:block;font-size:18px}
+.hg-setup .hg-sched{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:6px 0 14px}
+.hg-setup .hg-sched div{background:#f4f4ef;border:1px solid #d8d8cf;padding:8px 10px;font-size:14px;color:#17201b}
+.hg-setup .hg-sched b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#4a564f}
+.week-focus-reading .hg-week-strats{display:block;margin-top:6px;font-size:13px;font-weight:600;color:#3d4a43;line-height:1.35}
+.lch .lch-unitline{margin-top:6px!important;font-size:14px}
+/* Unit setup window */
+.lc-unit-back{position:fixed;inset:0;background:rgba(10,12,10,.62);z-index:9000;display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:28px 16px}
+.lc-unit{background:#fff;color:#17201b;max-width:880px;width:100%;padding:24px 26px 22px;border:2px solid #17201b;font-size:15px;line-height:1.45}
+.lc-unit h2{margin:0 0 4px;font-size:26px;color:#17201b}
+.lc-unit h3{margin:20px 0 8px;font-size:18px;color:#17201b}
+.lc-unit p.sub{margin:0 0 6px;color:#3d4a43}
+.lc-unit label.opt{display:flex;gap:10px;align-items:flex-start;border:1.5px solid #cfd2c8;padding:10px 12px;margin:8px 0;cursor:pointer;background:#fafaf6}
+.lc-unit label.opt.is-on{border-color:#17201b;background:#f4f8e4}
+.lc-unit label.opt input{margin-top:4px}
+.lc-unit label.opt b{display:block}
+.lc-unit .row{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.lc-unit .row4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.lc-unit .fld label{display:block;font-size:13px;font-weight:700;margin:6px 0 4px;color:#26332c}
+.lc-unit input[type=text],.lc-unit select{width:100%;box-sizing:border-box;padding:8px 10px;border:1.5px solid #9aa197;font-size:15px;background:#fff;color:#17201b}
+.lc-unit .pairs{display:grid;grid-template-columns:auto 1fr 1fr;gap:8px 10px;align-items:center;margin-top:6px}
+.lc-unit .pairs b{font-size:14px}
+.lc-unit .sub-block{margin:4px 0 0 30px}
+.lc-unit .preview{font-size:13.5px;color:#33413a;background:#f4f4ef;border:1px solid #d8d8cf;padding:10px 12px;margin-top:10px}
+.lc-unit .preview table{border-collapse:collapse;width:100%}
+.lc-unit .preview td,.lc-unit .preview th{padding:3px 6px;text-align:left;border-bottom:1px solid #e1e1d8}
+.lc-unit .note{font-size:13.5px;color:#4a564f;margin-top:14px}
+.lc-unit .msg{min-height:20px;margin-top:10px;font-weight:700}
+.lc-unit .msg.is-error{color:#9b1c1c}
+.lc-unit .msg.is-ok{color:#1b5e20}
+.lc-unit .acts{display:flex;gap:10px;justify-content:flex-end;margin-top:12px}
+.lc-unit .acts button{font-size:15px;font-weight:700;padding:9px 16px;border:2px solid #17201b;background:#fff;color:#17201b;cursor:pointer}
+.lc-unit .acts button.primary{background:#17201b;color:#fff}
+.lc-unit .acts button:disabled{background:#d8d8cf;border-color:#9aa197;color:#3d4a43;cursor:default}
+@media (max-width:760px){.hg-plan-cards,.lc-unit .row{grid-template-columns:1fr}.hg-setup .hg-sched,.lc-unit .row4{grid-template-columns:repeat(2,minmax(0,1fr))}.lc-unit .sub-block{margin-left:0}}
+</style>
+<script>
+(function () {
+  'use strict';
+  var W = window;
+  var KEYS = ['summarizer', 'researcher', 'connector', 'questioner', 'literaryLuminary', 'predictor', 'inferences', 'illustrator'];
+  var PAIRS = [['summarizer', 'researcher'], ['predictor', 'illustrator'], ['connector', 'questioner'], ['literaryLuminary', 'inferences']];
+  function esc(s) { return W.esc ? W.esc(s) : String(s == null ? '' : s); }
+  function label(k) { return (W.STRATEGY_DEFS && W.STRATEGY_DEFS[k]) ? W.STRATEGY_DEFS[k].label : k; }
+  function valid(k) { return !!(W.STRATEGY_DEFS && W.STRATEGY_DEFS[k]); }
+
+  // ================================================================ student
+  function plan() {
+    var p = W.state && W.state.plan;
+    if (p && p.mine) return p;
+    return { bookMode: 'multiple', book: { title: '', author: '', reading: ['', '', '', ''] }, strategyMode: 'same', mine: { 1: PAIRS[0], 2: PAIRS[1], 3: PAIRS[2], 4: PAIRS[3] }, roles: {} };
+  }
+  function single() { var p = plan(); return p.bookMode === 'single' && p.book && p.book.title; }
+  function rotate() { return plan().strategyMode === 'rotate'; }
+  function planPair(wk) { var m = plan().mine || {}; return (m[String(wk)] || m[wk] || PAIRS[(wk - 1) % 4]).filter(valid); }
+  /** The two this student does this week: what their saved work holds, else the plan's. */
+  function mine(wk) {
+    var saved = (W.state.weeklyDrafts && W.state.weeklyDrafts[wk]) || W.state.weeklyWork[wk];
+    if (saved && saved.prepType === 'strategies' && Array.isArray(saved.choices) && saved.choices.length === 2 && saved.choices.every(valid)) return saved.choices.slice();
+    return planPair(wk);
+  }
+  function names(keys) { return keys.map(label); }
+  W.lcUnitPlan = { plan: plan, mine: mine };
+
+  // getState answers (load, group setup, reload) carry the plan: keep it.
+  var _apply = W.applyLoadedStudentState;
+  if (typeof _apply === 'function') W.applyLoadedStudentState = function (s) { if (s && s.plan) W.state.plan = s.plan; return _apply.apply(this, arguments); };
+  var _call = W.callServer;
+  if (typeof _call === 'function') W.callServer = function (fn, args, onOk, onErr, opts) {
+    if (fn === 'saveGroupSetup' || fn === 'startNewBook' || fn === 'getState') {
+      var ok = onOk;
+      onOk = function (s) { if (s && s.plan && W.state && (!s.email || !W.state.email || String(s.email).toLowerCase() === String(W.state.email).toLowerCase())) W.state.plan = s.plan; if (ok) return ok.apply(this, arguments); };
+    }
+    return _call.call(this, fn, args, onOk, onErr, opts);
+  };
+
+  // ---- Step 1 is always two strategies ----
+  var _draft = W.prepDraftForWeek;
+  W.prepDraftForWeek = function (wk) {
+    var d = _draft.apply(this, arguments);
+    var keep = d.prepType === 'strategies' && Array.isArray(d.choices) && d.choices.length === 2 && d.choices.every(valid);
+    d.prepType = 'strategies';
+    if (!keep) d.choices = mine(wk);
+    d.data = d.data || {};
+    return d;
+  };
+  var _stage = W.prepFlowStage;
+  W.prepFlowStage = function (wk) { var s = _stage.apply(this, arguments); return (s === 'pathway' || s === 'rubric') ? 'picker' : s; };
+  W.choosePrepPathway = function (wk) { W.setPrepFlowStage(wk, 'picker'); W.saveStudentResumeClient(); W.render(); };
+  W.returnToPathway = function (wk) { W.returnToPicker(wk); };
+  W.pickFocusedStrategy = function () {};
+
+  function rolesHtml(wk) {
+    var r = (plan().roles || {})[String(wk)] || (plan().roles || {})[wk];
+    if (!rotate() || !r || !r.length) return '';
+    var me = String(W.state.email || '').toLowerCase();
+    return '<div class="hg-roles"><h4>Who does what in your group this week</h4><table>' + r.map(function (x) {
+      return '<tr class="' + (String(x.email).toLowerCase() === me ? 'is-me' : '') + '"><td>' + esc(x.name || x.email) + (String(x.email).toLowerCase() === me ? ' (you)' : '') + '</td><td>' + esc(names(x.choices || []).join(' + ')) + '</td></tr>';
+    }).join('') + '</table></div>';
+  }
+  W.renderStrategyPicker = function (wk) {
+    var keys = W.prepDraftForWeek(wk).choices, reading = (W.state.group && W.state.group.weekReading && W.state.group.weekReading[wk - 1]) || '';
+    var started = !!((W.state.weeklyDrafts && W.state.weeklyDrafts[wk] && W.state.weeklyDrafts[wk].prepType) || (W.state.weeklyWork[wk] && W.state.weeklyWork[wk].prepType));
+    var cards = keys.map(function (k, i) {
+      var def = W.STRATEGY_DEFS[k], v = (W.STRATEGY_VISUALS || {})[k] || { icon: '📖', tag: '' }, guide = (W.STRATEGY_GUIDES || {})[k] || { steps: [def.blurb || ''] };
+      return '<div class="hg-plan-card"><div class="strategy-picture">' + v.icon + '</div><span class="hg-num">Strategy ' + (i + 1) + ' of ' + keys.length + '</span><h4>' + esc(def.label) + '</h4><p>' + esc(v.tag) + '</p><ol>' + guide.steps.map(function (x) { return '<li>' + esc(x) + '</li>'; }).join('') + '</ol></div>';
+    }).join('');
+    var intro = rotate()
+      ? 'Everyone in your group has a different role this week. You are the <b>' + names(keys).map(esc).join('</b> and the <b>') + '</b>. You will work through them one at a time.'
+      : 'Everyone in the class uses the same two strategies this week: <b>' + esc(names(keys).join(' and ')) + '</b>. You will work through them one at a time.';
+    return '<div class="hg-plan-shell"><a class="backlink" onclick="openWeekHub(' + wk + ')">← Back to Week ' + wk + '</a>' +
+      '<div class="prep-section-title"><h3>Week ' + wk + (reading ? ' · ' + esc(reading) : '') + ' · Your two reading strategies</h3><p>' + intro + '</p><span class="hg-fixed-note">' + (rotate() ? 'Your role this week · roles rotate every week' : 'Assigned by your teacher for this week') + '</span></div>' +
+      '<div class="hg-plan-cards">' + cards + '</div>' + rolesHtml(wk) +
+      (W.lcStudentRubricHtml ? W.lcStudentRubricHtml('strategies') : '') +
+      '<div class="start-work-row"><button onclick="startFocusedWork(' + wk + ')">' + (started ? 'Continue My Weekly Work →' : 'I Understand the Rubric · Start My Weekly Work →') + '</button></div></div>';
+  };
+
+  var _vws = W.viewWeekStrategies;
+  W.viewWeekStrategies = function () {
+    var html = _vws.apply(this, arguments), wk = W.state.week;
+    return String(html)
+      .split('← Change strategies').join('← This week’s strategies')
+      .split('← Change pathway').join('← This week’s strategies')
+      .split('Pick two strategies that fit what you noticed in this week’s reading.').join('This week you do ' + esc(names(mine(wk)).join(' and ')) + '.');
+  };
+
+  var STEP1_OLD = 'Complete this week’s two reading strategies. This is your main reading response for the week.';
+  var _vw = W.viewWeek;
+  W.viewWeek = function () {
+    var html = _vw.apply(this, arguments), wk = W.state.week;
+    return String(html).split(STEP1_OLD).join('Complete your two reading strategies: <b>' + esc(names(mine(wk)).join(' + ')) + '</b>. This is your main reading response for the week.');
+  };
+
+  var _dash = W.viewDashboard;
+  W.viewDashboard = function () {
+    var html = String(_dash.apply(this, arguments));
+    if (single()) {
+      html = html.split('<div style="margin-top:18px"><button class="secondary" onclick="startNewBookFlow()">Start a New Book</button></div>').join('');
+      html = html.split('>Edit Book / Group Setup<').join('>Edit My Group<');
+      if (plan().book.author) html = html.split('<div class="eyebrow">Lit Circles</div>').join('<div class="eyebrow">Lit Circles · ' + esc(plan().book.author) + '</div>');
+    }
+    var g = W.state.group;
+    [1, 2, 3, 4].forEach(function (wk) {
+      var r = '<div class="week-focus-reading">Weekly reading<strong>' + esc((g && g.weekReading && g.weekReading[wk - 1]) || 'Reading range not set') + '</strong>';
+      var at = html.indexOf(r, html.indexOf('week-focus-card week-' + wk + ' '));
+      if (at >= 0) html = html.slice(0, at + r.length) + '<span class="hg-week-strats">Your strategies: ' + esc(names(mine(wk)).join(' + ')) + '</span>' + html.slice(at + r.length);
+    });
+    return html;
+  };
+  var _snb = W.startNewBookFlow;
+  W.startNewBookFlow = function () { if (single()) { W.showInfo('Everyone in this class reads ' + plan().book.title + ', so there is no new book to start.'); return; } return _snb.apply(this, arguments); };
+
+  // Group setup: with one book for the class, only teammates.
+  var _setup = W.viewSetup, _save = W.doSaveSetup;
+  W.viewSetup = function () {
+    if (!single()) return _setup.apply(this, arguments);
+    var p = plan(), g = W.state.group, me = String(W.state.email || '').toLowerCase();
+    var others = g ? g.memberEmails.filter(function (m) { return m.toLowerCase() !== me; }) : [];
+    var boxes = '<div class="email-box-label">Your email</div><input type="email" value="' + esc(W.state.email) + '" disabled style="opacity:0.7;">';
+    for (var i = 0; i < 4; i++) boxes += '<div class="email-box-label" style="margin-top:10px;">Teammate ' + (i + 1) + ' email' + (i === 0 ? '' : ' (optional)') + '</div><input type="email" id="teammate' + i + '" placeholder="teammate@school.org" value="' + esc(others[i] || '') + '">';
+    var sched = p.book.reading.map(function (r, i) { return '<div><b>Week ' + (i + 1) + '</b>' + esc(r) + (rotate() ? '' : '<br><small>' + esc(names(planPair(i + 1)).join(' + ')) + '</small>') + '</div>'; }).join('');
+    return '<div class="card hg-setup"><h2>' + (g ? 'Edit Your Group' : 'Set Up Your Group') + '</h2><p class="muted">Do this together as a group during your first meeting. Everyone in your group adds the same teammates.' + (rotate() ? ' Each of you will have a different pair of strategies each week; the pairs rotate.' : '') + '</p>' +
+      '<label>Book</label><div class="hg-fixed"><strong>' + esc(p.book.title) + '</strong>' + (p.book.author ? esc(p.book.author) + ' · ' : '') + 'the whole class reads this book</div>' +
+      '<label>Reading schedule</label><div class="hg-sched">' + sched + '</div>' +
+      '<label>Group members</label>' + boxes +
+      '<div style="margin-top:18px;"><button id="setupSaveBtn" onclick="doSaveSetup()">' + (g ? 'Save Group' : 'Save &amp; Continue to Week 1') + '</button>' + (g ? ' <button class="secondary" onclick="goHome()">Cancel</button>' : '') + '</div></div>';
+  };
+  W.doSaveSetup = function () {
+    if (!single() || document.getElementById('setupBook')) return _save.apply(this, arguments);
+    var p = plan(), teammates = [0, 1, 2, 3].map(function (i) { var el = document.getElementById('teammate' + i); return el ? el.value.trim() : ''; }).filter(Boolean);
+    W.callServer('saveGroupSetup', [W.state.email, p.book.title, [W.state.email].concat(teammates).join(','), p.book.reading.slice()], function (s) {
+      var st = W.state;
+      st.group = s.group; st.weeklyWork = s.weeklyWork; st.weeklyDrafts = s.weeklyDrafts || {}; st.teacherFeedback = s.teacherFeedback || {}; st.discussionAway = s.discussionAway || {}; st.peerAssessmentsGiven = s.peerAssessmentsGiven; st.pastBooks = s.pastBooks || []; st.reflections = s.reflections || {}; st.selfAssessments = s.selfAssessments || {}; st.peerFeedbackReceived = s.peerFeedbackReceived || {};
+      if (s.plan) st.plan = s.plan;
+      st.week = 1; st.view = 'week'; W.render();
+    }, null, { button: document.getElementById('setupSaveBtn') });
+  };
+
+  // ================================================================ teacher: Unit setup
+  function pairText(p) { return names(p).join(' + '); }
+  W.lcUnitPlanLine = function (p) {
+    p = p || {};
+    var books = p.bookMode === 'single' && p.book && p.book.title ? 'One book: <b>' + esc(p.book.title) + '</b>' + (p.book.author ? ' (' + esc(p.book.author) + ')' : '') : (p.bookMode === 'single' ? '<b>One book — title not set yet</b> (groups type their own until it is)' : 'Different books: <b>each group types its own</b>');
+    var strat = p.strategyMode === 'rotate' ? '<b>rotating roles</b> (a different pair for each group member)' : 'the <b>same two strategies</b> for everyone each week';
+    return 'Unit: ' + books + ' · ' + strat;
+  };
+  function teacherSettings() { var d = W.platform && W.platform.dashboard; return (d && d.classInfo && d.classInfo.settings) || {}; }
+  function opts(sel) { return KEYS.map(function (k) { return '<option value="' + k + '"' + (k === sel ? ' selected' : '') + '>' + esc(label(k)) + '</option>'; }).join(''); }
+  function pairRow(lbl, id, p) { return '<b>' + lbl + '</b><select id="' + id + 'a">' + opts(p[0]) + '</select><select id="' + id + 'b">' + opts(p[1]) + '</select>'; }
+  function readForm() {
+    var v = function (id) { var el = document.getElementById(id); return el ? el.value : ''; };
+    var bm = (document.querySelector('input[name="lcuBook"]:checked') || {}).value || 'multiple', sm = (document.querySelector('input[name="lcuStrat"]:checked') || {}).value || 'same';
+    return {
+      bookMode: bm, strategyMode: sm,
+      book: { title: v('lcuTitle').trim(), author: v('lcuAuthor').trim(), reading: [1, 2, 3, 4].map(function (w) { return v('lcuRead' + w).trim(); }) },
+      weeks: { 1: [v('lcuW1a'), v('lcuW1b')], 2: [v('lcuW2a'), v('lcuW2b')], 3: [v('lcuW3a'), v('lcuW3b')], 4: [v('lcuW4a'), v('lcuW4b')] },
+      pairs: [1, 2, 3, 4].map(function (i) { return [v('lcuP' + i + 'a'), v('lcuP' + i + 'b')]; })
+    };
+  }
+  function previewHtml(f) {
+    if (f.strategyMode !== 'rotate') return '';
+    var rows = [0, 1, 2, 3].map(function (m) { return '<tr><td>Member ' + (m + 1) + '</td>' + [0, 1, 2, 3].map(function (w) { return '<td>' + esc(pairText(f.pairs[(m + w) % 4])) + '</td>'; }).join('') + '</tr>'; }).join('');
+    return '<div class="preview"><table><tr><th></th><th>Week 1</th><th>Week 2</th><th>Week 3</th><th>Week 4</th></tr>' + rows + '</table>A fifth member follows Member 1’s pattern. Member order is the order of the group’s emails, so it rotates by itself.</div>';
+  }
+  function paint() {
+    var f = readForm();
+    Array.prototype.forEach.call(document.querySelectorAll('.lc-unit label.opt'), function (l) { var i = l.querySelector('input'); l.classList.toggle('is-on', !!(i && i.checked)); });
+    var b = document.getElementById('lcuBookBlock'); if (b) b.style.display = f.bookMode === 'single' ? '' : 'none';
+    var s1 = document.getElementById('lcuSameBlock'); if (s1) s1.style.display = f.strategyMode === 'same' ? '' : 'none';
+    var s2 = document.getElementById('lcuRotBlock'); if (s2) s2.style.display = f.strategyMode === 'rotate' ? '' : 'none';
+    var pv = document.getElementById('lcuPreview'); if (pv) pv.innerHTML = previewHtml(f);
+  }
+  var onKey = null;
+  function close() { var x = document.getElementById('lcUnitBack'); if (x) x.remove(); if (onKey) { document.removeEventListener('keydown', onKey); onKey = null; } }
+  W.lcOpenUnitSetup = function () {
+    close();
+    var s = teacherSettings(), p = s.plan || {}, b = p.book || { title: '', author: '', reading: ['', '', '', ''] };
+    var weeks = p.weeks || { 1: PAIRS[0], 2: PAIRS[1], 3: PAIRS[2], 4: PAIRS[3] }, pairs = p.pairs || PAIRS;
+    var ci = (W.platform.dashboard && W.platform.dashboard.classInfo) || {};
+    var div = document.createElement('div'); div.id = 'lcUnitBack'; div.className = 'lc-unit-back';
+    div.innerHTML = '<div class="lc-unit" role="dialog" aria-modal="true" aria-labelledby="lcuH"><h2 id="lcuH">Unit setup</h2><p class="sub">' + esc(ci.className || 'This class') + (ci.period ? ' · Period ' + esc(ci.period) : '') + '. Students always do two reading strategies in Step 1; you decide the books and who does which two.</p>' +
+      '<h3>Books</h3>' +
+      '<label class="opt"><input type="radio" name="lcuBook" value="single"' + (p.bookMode === 'single' ? ' checked' : '') + '><span><b>One book for the whole class</b>You type the book and its four weekly sections. Groups only add teammates.</span></label>' +
+      '<div id="lcuBookBlock" class="sub-block"><div class="row"><div class="fld"><label for="lcuTitle">Title</label><input type="text" id="lcuTitle" value="' + esc(b.title) + '"></div><div class="fld"><label for="lcuAuthor">Author (optional)</label><input type="text" id="lcuAuthor" value="' + esc(b.author) + '"></div></div>' +
+      '<div class="row4">' + [1, 2, 3, 4].map(function (w) { return '<div class="fld"><label for="lcuRead' + w + '">Week ' + w + ' reading</label><input type="text" id="lcuRead' + w + '" placeholder="e.g. Ch. 1–6" value="' + esc((b.reading || [])[w - 1] || '') + '"></div>'; }).join('') + '</div></div>' +
+      '<label class="opt"><input type="radio" name="lcuBook" value="multiple"' + (p.bookMode !== 'single' ? ' checked' : '') + '><span><b>Different books</b>Each group types its own book and the chapters for each week when they set up their group.</span></label>' +
+      '<h3>Strategies</h3>' +
+      '<label class="opt"><input type="radio" name="lcuStrat" value="same"' + (p.strategyMode !== 'rotate' ? ' checked' : '') + '><span><b>Everyone does the same two each week</b>You pick the two for each week.</span></label>' +
+      '<div id="lcuSameBlock" class="sub-block"><div class="pairs">' + [1, 2, 3, 4].map(function (w) { return pairRow('Week ' + w, 'lcuW' + w, weeks[w] || PAIRS[w - 1]); }).join('') + '</div></div>' +
+      '<label class="opt"><input type="radio" name="lcuStrat" value="rotate"' + (p.strategyMode === 'rotate' ? ' checked' : '') + '><span><b>Rotating roles</b>Each member of a group gets a different pair each week, and the pairs rotate, so over four weeks every student does all of them.</span></label>' +
+      '<div id="lcuRotBlock" class="sub-block"><div class="pairs">' + [1, 2, 3, 4].map(function (i) { return pairRow('Pair ' + i, 'lcuP' + i, pairs[i - 1] || PAIRS[i - 1]); }).join('') + '</div><div id="lcuPreview"></div></div>' +
+      '<p class="note">Changes only affect work that hasn’t been started: a student who already began a week keeps the strategies they were writing. With one book, every group in this class is moved onto that book and its sections (nobody’s writing changes). Groups reading the same book and section share one Reading Quiz.</p>' +
+      '<div class="msg" id="lcuMsg" aria-live="polite"></div><div class="acts"><button type="button" id="lcuCancel">Cancel</button><button type="button" class="primary" id="lcuSave">Save unit setup</button></div></div>';
+    document.body.appendChild(div);
+    div.addEventListener('change', paint); div.addEventListener('input', function (e) { if (e.target.tagName === 'SELECT') paint(); });
+    div.addEventListener('click', function (e) { if (e.target === div) close(); });
+    document.getElementById('lcuCancel').onclick = close;
+    document.getElementById('lcuSave').onclick = save;
+    onKey = function (e) { if (e.key === 'Escape') close(); }; document.addEventListener('keydown', onKey);
+    paint();
+    var first = div.querySelector('input[name="lcuBook"]:checked'); if (first) first.focus();
+  };
+  function save() {
+    var f = readForm(), btn = document.getElementById('lcuSave'), msg = document.getElementById('lcuMsg');
+    var dup = [];
+    if (f.strategyMode === 'same') [1, 2, 3, 4].forEach(function (w) { if (f.weeks[w][0] === f.weeks[w][1]) dup.push('Week ' + w); });
+    else f.pairs.forEach(function (p, i) { if (p[0] === p[1]) dup.push('Pair ' + (i + 1)); });
+    if (dup.length) { msg.className = 'msg is-error'; msg.textContent = dup.join(', ') + ': pick two different strategies.'; return; }
+    var cid = W.platform.activeClassId;
+    btn.disabled = true; msg.className = 'msg'; msg.textContent = 'Saving…';
+    W.google.script.run.withSuccessHandler(function (res) {
+      btn.disabled = false;
+      var d = W.platform.dashboard;
+      if (d && d.classInfo && String(d.classInfo.classId) === String(cid) && res && res.settings) d.classInfo.settings = res.settings;
+      if (Array.isArray(W.platform.classes)) W.platform.classes.forEach(function (c) { if (String(c.classId) === String(cid) && res && res.settings) c.settings = res.settings; });
+      msg.className = 'msg is-ok'; msg.textContent = 'Saved.' + (res && res.groupsUpdated ? ' ' + res.groupsUpdated + ' group' + (res.groupsUpdated === 1 ? ' was' : 's were') + ' moved onto the class book.' : '');
+      if (W.lchRepaintDashboard) W.lchRepaintDashboard();
+      if (res && res.groupsUpdated && W.lchReloadDashboard) W.lchReloadDashboard().catch(function () {});
+      setTimeout(close, res && res.groupsUpdated ? 1600 : 700);
+    }).withFailureHandler(function (e) {
+      btn.disabled = false; msg.className = 'msg is-error'; msg.textContent = (e && e.message) || String(e);
+    }).saveLiteratureUnitPlan({ classId: cid, plan: f });
+  }
+
+  (W.__MB = W.__MB || {}).UnitPlan = 'ok';
+})();
+</script>

@@ -1,0 +1,35 @@
+<!-- StrategyArt: drawn pictures for the eight reading strategies (replaces the emoji).
+     Rides along after BackendClient (LC_INCLUDE_WITH in Code.gs). Only STRATEGY_VISUALS[key].icon
+     changes; the picker tiles and the workspace hero already print that value. -->
+<style>
+.lc-art{width:100%;height:100%;max-height:96px;display:block}
+.strategy-picture .lc-art{height:84px}
+.focus-strategy-visual .lc-art{height:88px;max-width:150px;margin:0 auto}
+.lc-art .i{fill:none;stroke:#17372b;stroke-width:2.6;stroke-linecap:round;stroke-linejoin:round}
+.lc-art .p{fill:#ffffff}
+.lc-art .k{fill:#17372b}
+</style>
+<script>
+(function () {
+  'use strict';
+  var W = window;
+  function svg(acc, body) {
+    return '<svg class="lc-art" viewBox="0 0 160 96" aria-hidden="true" focusable="false" style="--acc:' + acc + '">' +
+      body.replace(/class="([^"]*)\ba\b([^"]*)"/g, function (m, x, y) { return 'class="' + x + y + '" style="fill:' + acc + '"'; }) + '</svg>';
+  }
+  var ART = {
+    summarizer: svg('#fff176', '<path class="i p" d="M26 24 L58 16 L94 24 L134 16 L134 76 L94 84 L58 76 L26 84 Z"/><path class="i a" d="M58 16 L94 24 L94 84 L58 76 Z"/><path class="i" d="M36 70 C46 56 54 66 64 54 S82 40 90 46 S108 58 122 32" stroke-dasharray="1 6"/><circle class="k" cx="36" cy="70" r="3.6"/><circle class="k" cx="64" cy="54" r="3.6"/><circle class="k" cx="90" cy="46" r="3.6"/><path class="i p" d="M122 20 a8 8 0 0 1 8 8 c0 6 -8 14 -8 14 s-8 -8 -8 -14 a8 8 0 0 1 8 -8 Z"/><circle class="k" cx="122" cy="28" r="2.6"/>'),
+    researcher: svg('#aed581', '<path class="i p" d="M22 30 Q50 22 78 30 L78 82 Q50 74 22 82 Z"/><path class="i p" d="M78 30 Q106 22 134 30 L134 82 Q106 74 78 82 Z"/><path class="i" d="M32 40 L66 37 M32 50 L62 47 M32 60 L66 57 M32 70 L58 67"/><circle class="i a" cx="106" cy="46" r="21"/><path class="i" d="M94 40 L118 38 M94 48 L114 47 M94 56 L116 55" stroke-width="4"/><path class="i" d="M121 61 L140 80" stroke-width="8"/>'),
+    connector: svg('#81d4fa', '<path class="i p" d="M18 34 h34 v48 h-34 Z"/><path class="i" d="M24 34 v48"/><path class="i" d="M30 46 h16 M30 54 h12"/><path class="i p" d="M104 50 L122 34 L140 50 V82 H104 Z"/><path class="i a" d="M116 82 v-16 h12 v16"/><path d="M52 58 C70 16 92 18 104 56" fill="none" stroke="#17372b" stroke-width="9" stroke-linecap="round"/><path d="M52 58 C70 16 92 18 104 56" fill="none" stroke="#81d4fa" stroke-width="4.5" stroke-linecap="round"/><path class="i" d="M10 82 H150"/>'),
+    questioner: svg('#f48fb1', '<path class="i p" d="M92 22 h44 a8 8 0 0 1 8 8 v22 a8 8 0 0 1 -8 8 h-6 l2 10 l-12 -10 h-28 a8 8 0 0 1 -8 -8 v-22 a8 8 0 0 1 8 -8 Z"/><circle class="k" cx="102" cy="41" r="2.6"/><circle class="k" cx="114" cy="41" r="2.6"/><circle class="k" cx="126" cy="41" r="2.6"/><path class="i a" d="M28 14 h58 a10 10 0 0 1 10 10 v40 a10 10 0 0 1 -10 10 h-34 l-16 14 l2 -14 h-10 a10 10 0 0 1 -10 -10 v-40 a10 10 0 0 1 10 -10 Z"/><path class="i" d="M47 34 a10 10 0 1 1 15 8.6 c-4 2.4 -5 4.4 -5 8.4" stroke-width="5"/><circle class="k" cx="57" cy="61" r="3.6"/>'),
+    literaryLuminary: svg('#ffcc80', '<path class="a" d="M66 26 L94 26 L124 66 L36 66 Z"/><path class="i" d="M80 2 V10"/><path class="i p" d="M70 10 h20 l8 16 h-36 Z"/><path class="i p" d="M24 52 Q52 46 80 52 L80 90 Q52 84 24 90 Z"/><path class="i p" d="M80 52 Q108 46 136 52 L136 90 Q108 84 80 90 Z"/><path d="M88 66 L128 64" stroke="#ffcc80" stroke-width="8" stroke-linecap="round"/><path class="i" d="M32 62 L70 59 M32 70 L66 67 M32 78 L70 75 M88 66 L126 64 M88 76 L122 74"/><path class="i" d="M44 40 l-8 -4 M116 40 l8 -4"/>'),
+    predictor: svg('#ce93d8', '<g transform="rotate(-24 70 50)"><rect class="i a" x="30" y="40" width="44" height="18" rx="3"/><rect class="i p" x="74" y="37" width="34" height="24" rx="3"/><rect class="i p" x="18" y="43" width="12" height="12" rx="2"/></g><path class="i" d="M68 60 L50 88 M68 60 L70 88 M68 60 L88 88"/><path class="k" d="M128 14 l2.6 7 l7 2.6 l-7 2.6 l-2.6 7 l-2.6 -7 l-7 -2.6 l7 -2.6 Z"/><path class="k" d="M146 36 l1.6 4.4 l4.4 1.6 l-4.4 1.6 l-1.6 4.4 l-1.6 -4.4 l-4.4 -1.6 l4.4 -1.6 Z"/><circle class="k" cx="140" cy="62" r="2.2"/>'),
+    inferences: svg('#80cbc4', '<path class="i a" d="M52 40 L40 62 L52 86 L84 92 L118 84 L128 60 L108 40 Z"/><path class="i p" d="M62 40 L74 20 L84 26 L94 16 L108 40 Z"/><path class="i" d="M14 40 q8 -5 16 0 t16 0 M108 40 q8 -5 16 0 t16 0"/><path class="i" d="M46 40 H114" stroke-dasharray="2 5"/>'),
+    illustrator: svg('#ef9a9a', '<path class="i a" d="M40 90 v-6 a22 22 0 0 1 44 0 v6"/><circle class="i a" cx="62" cy="44" r="17"/><path class="i p" d="M96 14 h40 a8 8 0 0 1 8 8 v14 a8 8 0 0 1 -8 8 h-26 l-10 9 l1 -9 h-5 a8 8 0 0 1 -8 -8 v-14 a8 8 0 0 1 8 -8 Z"/><path class="i" d="M100 25 h30 M100 33 h20"/><path class="i p" d="M16 34 a8 8 0 0 1 2 -15 a10 10 0 0 1 17 -6 a9 9 0 0 1 15 6 a8 8 0 0 1 -2 15 Z"/><circle class="i p" cx="44" cy="42" r="3"/><circle class="i p" cx="48" cy="49" r="1.8"/><circle class="k" cx="25" cy="26" r="2"/><circle class="k" cx="33" cy="26" r="2"/><circle class="k" cx="41" cy="26" r="2"/>')
+  };
+  try {
+    if (W.STRATEGY_VISUALS) Object.keys(ART).forEach(function (k) { if (W.STRATEGY_VISUALS[k]) W.STRATEGY_VISUALS[k].icon = ART[k]; });
+    (W.__MB = W.__MB || {}).StrategyArt = 'ok';
+  } catch (e) { (W.__MB = W.__MB || {}).StrategyArt = 'error: ' + e.message; }
+})();
+</script>

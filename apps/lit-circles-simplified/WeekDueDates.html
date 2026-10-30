@@ -1,0 +1,190 @@
+<!-- ======================================================================
+     Literature Circles — due dates on the week page (2026-10-26a)
+     Rides along after BackendClient (LC_INCLUDE_WITH in Code.js).
+
+     Each step tile on a week's page (Step 1, Step 2, Reading Quiz, Step 3,
+     Step 4) shows its due date — the one set in "Week N · Due dates & Canvas"
+     (or in Canvas) — and is coloured:
+        green  = done
+        amber  = not done, due within 2 days (today / tomorrow / the next day)
+        red    = not done and past due
+        plain  = not done, due later (or no due date)
+     The home page's week cards get one line too ("1 overdue: Plan" in red,
+     "Due tomorrow: Discussion Day" in amber, or "Next due ..."), and the card's
+     outline turns red / amber.
+     A step left out for the class says "Not graded this week"; a student who
+     was away on Discussion Day sees Step 3 as excused. The server sends students
+     only the due dates (getLiteratureBootstrap -> settings.stepDue).
+     ====================================================================== -->
+<style id="lcDueStyles">
+.lc-due-legend{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;margin:0 0 12px;padding:8px 14px;background:rgba(255,255,255,.94);font-size:13px;color:#111}
+.lc-due-legend b{font-weight:700;margin-right:2px}
+.lc-due-legend span{display:inline-flex;align-items:center;gap:6px}
+.lc-due-legend i{display:inline-block;width:14px;height:14px;border:2px solid #111}
+.lc-due-legend i.is-done{background:#E3F2E8;border-color:#1D7A3A}
+.lc-due-legend i.is-soon{background:#FFF3C7;border-color:#C98A00}
+.lc-due-legend i.is-late{background:#FCE4E1;border-color:#B0281F}
+.lc-due-legend i.is-later{background:#fff}
+.journey-step .lc-due{display:flex;width:fit-content;max-width:100%;align-items:center;gap:6px;margin:12px 0 10px;padding:5px 10px;font-size:13.5px;font-weight:700;line-height:1.3;background:#F1F1EC;color:#111}
+.journey-step .lc-due.is-done{background:#1D7A3A;color:#fff}
+.journey-step .lc-due.is-soon{background:#C98A00;color:#fff}
+.journey-step .lc-due.is-late{background:#B0281F;color:#fff}
+.journey-step .lc-due.is-off{background:#E8E8E3;color:#555;font-weight:600}
+.journey-step.lc-due-done{background:#1D7A3A!important}
+.journey-step.lc-due-done:before{background:#F2F9F4!important}
+.journey-step.lc-due-soon{background:#C98A00!important}
+.journey-step.lc-due-soon:before{background:#FFF8E1!important}
+.journey-step.lc-due-late{background:#B0281F!important}
+.journey-step.lc-due-late:before{background:#FDEDEB!important}
+.lc-deck-step .lc-due{grid-column:2}
+/* home page week cards */
+.week-focus-side .lc-home-due{margin-top:6px;padding:6px 10px;font-size:13px;font-weight:700;line-height:1.3;background:#F1F1EC;color:#111}
+.week-focus-side .lc-home-due.is-late{background:#B0281F;color:#fff}
+.week-focus-side .lc-home-due.is-soon{background:#C98A00;color:#fff}
+.week-focus-card.lc-home-late{background:#B0281F!important}
+.week-focus-card.lc-home-soon{background:#C98A00!important}
+</style>
+<script>
+window.__MB = window.__MB || {};
+window.__MB.WeekDueDates = 'loading';
+(function () {
+  'use strict';
+  var W = window;
+  if (W.LC_DUE) { W.__MB.WeekDueDates = 'ok'; return; }
+  if (typeof W.render !== 'function') { W.__MB.WeekDueDates = 'error: Index.html did not load first'; return; }
+  var D = W.LC_DUE = { soonMs: 48 * 3600 * 1000 };
+
+  function settings() { try { var c = W.platformClassById(W.platform.activeClassId); return (c && c.settings) || {}; } catch (e) { return {}; } }
+  /** The step's due date (ISO / date-time text) or ''. */
+  function dueFor(wk, stage) {
+    var s = settings(), k = 'w' + wk + '_' + stage;
+    if (s.stepDue && s.stepDue[k]) return s.stepDue[k];
+    var key = 'assessment:' + wk + ':' + stage, sch = (s.assignmentSchedule || {})[key] || {}, link = (((s.canvas || {}).assignments) || {})[key] || {};
+    return String(sch.dueAt || link.dueAt || '');
+  }
+  function notGraded(wk, stage) {
+    var s = settings(), k = 'w' + wk + '_' + stage;
+    return (s.notGraded || []).indexOf(k) >= 0 || !!(s.excluded && s.excluded[k]);
+  }
+  function parseDue(v) { if (!v) return null; var d = new Date(v); return isNaN(d.getTime()) ? null : d; }
+  D.dueFor = dueFor;
+
+  /** Is the student's part of this step done? null = not applicable. */
+  function doneFor(wk, stage) {
+    var st = W.state || {};
+    if (stage === 'submission') { var w = (st.weeklyWork || {})[wk]; return !!(w && w.prepType); }
+    if (stage === 'preparation') return !!(typeof W.discussionPlanFor === 'function' && W.discussionPlanFor(wk));
+    if (stage === 'peer') {
+      var mates = typeof W.getGroupmatesLocal === 'function' ? W.getGroupmatesLocal() : [];
+      if (!mates.length) return null;
+      return W.uniquePeerGivenCount(wk) >= mates.length && !!(st.selfAssessments && st.selfAssessments[wk]);
+    }
+    if (stage === 'quiz') { var q = (st.quizzes || {})[wk]; return q ? q.state === 'finished' : null; }
+    if (stage === 'reflection') return !!(st.reflections && st.reflections[wk]);
+    return null;
+  }
+
+  function fmt(d) {
+    var now = new Date(), day = new Date(d.getFullYear(), d.getMonth(), d.getDate()), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var diff = Math.round((day - today) / 86400000);
+    var time = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    var date = d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+    if (diff === 0) return 'today, ' + time;
+    if (diff === 1) return 'tomorrow, ' + time;
+    if (diff === -1) return 'yesterday, ' + time;
+    return date + ', ' + time;
+  }
+  /** { cls, text } for one step. */
+  function info(wk, stage) {
+    if (notGraded(wk, stage)) return { cls: 'off', text: 'Not graded this week' };
+    if (stage === 'peer' && typeof W.lcIAmAway === 'function' && W.lcIAmAway(wk)) return { cls: 'done', text: 'Excused — away on Discussion Day' };
+    var done = doneFor(wk, stage), due = parseDue(dueFor(wk, stage));
+    if (done === true) return { cls: 'done', text: 'Done' + (due ? ' · was due ' + fmt(due) : '') };
+    if (!due) return null;
+    var left = due.getTime() - Date.now();
+    if (left < 0) return { cls: 'late', text: 'Overdue — was due ' + fmt(due) };
+    if (left <= D.soonMs) return { cls: 'soon', text: 'Due ' + fmt(due) };
+    return { cls: 'later', text: 'Due ' + fmt(due) };
+  }
+  D.info = info;
+
+  function stageOf(tile) {
+    if (tile.id === 'lcQuizCard' || tile.classList.contains('lc-quiz-step')) return 'quiz';
+    var m = /openWeekSection\('(\w+)'\)/.exec(tile.getAttribute('onclick') || '');
+    if (!m) return '';
+    return { strategies: 'submission', plan: 'preparation', peer: 'peer', reflection: 'reflection' }[m[1]] || '';
+  }
+  var CLASSES = ['lc-due-done', 'lc-due-soon', 'lc-due-late', 'lc-due-later', 'lc-due-off'];
+  function decorate() {
+    if (!W.state || W.state.view !== 'week' || !W.platform || W.platform.mode !== 'student') return;
+    var grid = document.querySelector('.journey-step-grid'); if (!grid) return;
+    var wk = Number(W.state.week) || 1, any = false;
+    Array.prototype.forEach.call(grid.querySelectorAll('.journey-step'), function (tile) {
+      var stage = stageOf(tile); if (!stage) return;
+      var x = info(wk, stage), chip = tile.querySelector('.lc-due');
+      var want = x ? 'lc-due-' + x.cls : '';
+      CLASSES.forEach(function (c) { if (c !== want && tile.classList.contains(c)) tile.classList.remove(c); });
+      if (want && !tile.classList.contains(want)) tile.classList.add(want);
+      if (!x) { if (chip) chip.remove(); return; }
+      any = any || x.cls !== 'off';
+      if (!chip) { chip = document.createElement('div'); var act = tile.querySelector('.step-action'); if (act) tile.insertBefore(chip, act); else tile.appendChild(chip); }
+      var cls = 'lc-due is-' + x.cls; if (chip.className !== cls) chip.className = cls;
+      if (chip.textContent !== x.text) chip.textContent = x.text;
+    });
+    var leg = document.querySelector('.lc-due-legend');
+    if (any && !leg) {
+      leg = document.createElement('div'); leg.className = 'lc-due-legend'; leg.setAttribute('aria-hidden', 'true');
+      leg.innerHTML = '<b>Due dates:</b><span><i class="is-done"></i>Done</span><span><i class="is-soon"></i>Due in the next 2 days</span><span><i class="is-late"></i>Overdue</span><span><i class="is-later"></i>Coming up</span>';
+      grid.parentNode.insertBefore(leg, grid);
+    } else if (!any && leg) leg.remove();
+  }
+  D.decorate = decorate;
+
+  // ------------------------------------------------------------------ home page: one line per week
+  var SHORT = { submission: 'Submission', preparation: 'Plan', quiz: 'Reading Quiz', peer: 'Discussion Day', reflection: 'Reflection' };
+  var ORDER = ['submission', 'preparation', 'quiz', 'peer', 'reflection'];
+  function weekSummary(wk) {
+    var late = [], soon = [], later = [];
+    ORDER.forEach(function (st) {
+      if (st === 'quiz' && !((W.state.quizzes || {})[wk])) return; // no approved quiz this week
+      var x = info(wk, st), due = parseDue(dueFor(wk, st)); if (!x || !due) return;
+      var it = { st: st, due: due };
+      if (x.cls === 'late') late.push(it); else if (x.cls === 'soon') soon.push(it); else if (x.cls === 'later') later.push(it);
+    });
+    if (late.length) return { cls: 'late', text: late.length + ' overdue: ' + late.map(function (i) { return SHORT[i.st]; }).join(', ') };
+    var by = function (a, b) { return a.due - b.due; };
+    if (soon.length) { soon.sort(by); return { cls: 'soon', text: 'Due ' + fmt(soon[0].due) + ': ' + SHORT[soon[0].st] + (soon.length > 1 ? ' (+' + (soon.length - 1) + ' more)' : '') }; }
+    if (later.length) { later.sort(by); return { cls: 'later', text: 'Next due ' + fmt(later[0].due) + ': ' + SHORT[later[0].st] }; }
+    return null;
+  }
+  D.weekSummary = weekSummary;
+  function decorateHome() {
+    if (!W.state || W.state.view !== 'dashboard' || !W.platform || W.platform.mode !== 'student') return;
+    Array.prototype.forEach.call(document.querySelectorAll('.week-focus-card'), function (card) {
+      var m = /\bweek-(\d)\b/.exec(card.className), wk = m ? Number(m[1]) : 0;
+      var side = card.querySelector('.week-focus-side'), line = card.querySelector('.lc-home-due');
+      var x = wk && !card.classList.contains('locked') ? weekSummary(wk) : null;
+      ['lc-home-late', 'lc-home-soon'].forEach(function (c) { var on = !!x && c === 'lc-home-' + x.cls; if (card.classList.contains(c) !== on) card.classList.toggle(c, on); });
+      if (!x || !side) { if (line) line.remove(); return; }
+      if (!line) { line = document.createElement('div'); var prog = side.querySelector('.week-focus-progress'); if (prog && prog.nextSibling) side.insertBefore(line, prog.nextSibling); else side.appendChild(line); }
+      var cls = 'lc-home-due is-' + x.cls; if (line.className !== cls) line.className = cls;
+      if (line.textContent !== x.text) line.textContent = x.text;
+    });
+  }
+  D.decorateHome = decorateHome;
+  var _render = W.render;
+  W.render = function () { var out = _render.apply(this, arguments); try { decorate(); decorateHome(); } catch (e) {} return out; };
+  // the quiz card is added / refreshed in place a moment after the page draws
+  var queued = false;
+  try {
+    new MutationObserver(function () {
+      if (queued || !W.state || (W.state.view !== 'week' && W.state.view !== 'dashboard')) return; queued = true;
+      setTimeout(function () { queued = false; try { decorate(); decorateHome(); } catch (e) {} }, 30);
+    }).observe(document.getElementById('app') || document.body, { childList: true, subtree: true });
+  } catch (e) {}
+  // "due tomorrow" turns into "due today" / "overdue" while the page stays open
+  setInterval(function () { try { decorate(); decorateHome(); } catch (e) {} }, 60000);
+
+  W.__MB.WeekDueDates = 'ok';
+})();
+</script>
