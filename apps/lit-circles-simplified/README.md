@@ -2,7 +2,7 @@
 
 Lit Circles without the Reader’s Journal: every week is two reading strategies. Set up one book for the class or different books by group, the same strategies for everyone or rotating roles, with shared reading quizzes, discussion, grading and Canvas.
 
-Grades 9–12 · Google Apps Script · free for teachers and schools · works with any Google Workspace for Education school.
+Grades 6–12 · Google Apps Script · free for teachers and schools · works with any Google Workspace for Education school.
 
 ## Use it in your classroom (about 5 minutes)
 
