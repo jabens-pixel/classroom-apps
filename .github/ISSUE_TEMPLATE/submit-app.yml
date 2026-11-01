@@ -1,0 +1,58 @@
+name: Submit an app
+description: Offer your own classroom app for the Classroom Apps site.
+title: "Submit an app: "
+labels: ["app submission"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you! Please read the [Classroom Apps standard](../blob/main/APP-STANDARD.md) first.
+        Every listed app follows it, so teachers can rely on every app the same way.
+  - type: input
+    id: name
+    attributes: { label: App name, placeholder: "e.g. Poetry Workshop" }
+    validations: { required: true }
+  - type: input
+    id: grades
+    attributes: { label: Grades, placeholder: "e.g. 9–12" }
+    validations: { required: true }
+  - type: textarea
+    id: what
+    attributes: { label: What does it do?, description: "Two or three sentences a teacher would read on the site." }
+    validations: { required: true }
+  - type: input
+    id: code
+    attributes: { label: Link to the code, description: "A GitHub fork with the app in apps/<name>/, or an Apps Script project shared with view access." }
+    validations: { required: true }
+  - type: textarea
+    id: content
+    attributes: { label: Where the content and pictures came from, description: "Your own writing? Public domain (which works)? Licensed pictures (which licence)?" }
+    validations: { required: true }
+  - type: textarea
+    id: classroom
+    attributes: { label: How you've used it, description: "Which class, how many students, for how long. Apps are listed after they've been used with real students." }
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist (from the standard)
+      options:
+        - label: Writing autosaves, keeps a local copy until saved, and warns before leaving with unsaved work.
+        - label: Two tabs of the same student can't overwrite each other.
+        - label: Submit can't be sent twice; text typed during submit is kept.
+        - label: A teacher viewing a real student's page can't change it.
+        - label: Teacher dashboard tiles, grading screen with the rubric and Focused grading, gradebook.
+        - label: Ungraded is blank; Exclude from grade works per student and per class.
+        - label: Student / Teacher / Admin buttons at the top.
+        - label: No copyrighted text; pictures are mine, public domain, or licensed.
+        - label: No emails, school domains, Canvas addresses or keys in the code.
+        - label: Only the usual Google permissions, or each extra one is explained.
+        - label: '"Set up my app" on a fresh copy makes the teacher admin and uses the copied Sheet.'
+        - label: Works on a phone; readable in light and dark mode.
+        - label: Tile picture, pretend class and tour script included (or I'd like help making them).
+  - type: checkboxes
+    id: licence
+    attributes:
+      label: Licence
+      options:
+        - label: I agree my app is shared under this project's licenses, and that Jaben Schalk may also offer it under other terms (see CONTRIBUTING.md).
+          required: true

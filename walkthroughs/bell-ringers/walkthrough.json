@@ -1,0 +1,24 @@
+{
+  "title": "Bell Ringers",
+  "summary": "Daily writing warm-ups for grades 9–12, with a built-in library of short craft lessons, a five-point rubric, quick grading and Canvas.",
+  "steps": [
+    { "as": "student", "wait": 2500 },
+    { "caption": "The student view. Today’s bell ringer is waiting at the top.", "hold": 3400 },
+    { "click": "text=Start Bell Ringer", "after": 1600 },
+    { "caption": "A short craft lesson, a task, and the rubric. Students write right below.", "hold": 3800 },
+    { "scrollTo": "#studentText", "block": "center" },
+    { "type": "#studentText", "text": "Phones in class pull attention away from learning. When a phone buzzes, even students who don’t check it lose their focus for several minutes.", "after": 1400 },
+    { "caption": "Their writing saves as they type. One click turns it in.", "hold": 1600 },
+    { "move": "button:has-text(\"Submit\") >> nth=-1", "after": 1500 },
+    { "as": "teacher", "wait": 2500 },
+    { "caption": "The teacher dashboard. Add a bell ringer from the library in two clicks.", "hold": 3600 },
+    { "scrollTo": ".hub-open-btn >> nth=0", "block": "center" },
+    { "caption": "Each bell ringer is a tile. A red number means responses are waiting.", "hold": 3400 },
+    { "click": ".hub-open-btn >> nth=0", "after": 1800 },
+    { "scrollTo": ".gs-score >> nth=0", "block": "center" },
+    { "caption": "Score each response on the five-point rubric and leave a comment.", "hold": 1200 },
+    { "click": ".gs-score >> nth=1", "after": 900 },
+    { "type": ".gs-comment >> nth=0", "text": "Clear claim. Add one example from your own day.", "optional": true },
+    { "caption": "Scores and comments save on their own. Push grades to Canvas when you’re ready.", "hold": 4000 }
+  ]
+}

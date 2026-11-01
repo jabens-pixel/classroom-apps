@@ -1,0 +1,24 @@
+{
+  "title": "Root Word Study",
+  "summary": "Twenty weeks of Greek and Latin roots for grades 9–12: a pretest game, a sentence a day, flashcards, and a final quiz that scores itself.",
+  "reset": "RW_X_ = { ss: null, sheets: {}, headers: {}, users: null, classes: null, enroll: null, students: null };",
+  "steps": [
+    { "as": "student", "wait": 2500 },
+    { "caption": "The student view. One list of roots each week.", "hold": 3200 },
+    { "click": ".week-tile >> nth=0", "after": 1300 },
+    { "caption": "Each week starts with a quick pretest. It isn’t graded.", "hold": 2600 },
+    { "click": "#start-pretest-btn", "after": 1400 },
+    { "caption": "A matching game: pick a root, then its meaning.", "hold": 1200 },
+    { "click": "button.mg-term:has-text(\"MIS\")", "after": 500 },
+    { "click": "button.mg-card:has-text(\"bad\")", "after": 900 },
+    { "click": "button.mg-term:has-text(\"ANTI\")", "after": 500 },
+    { "click": "button.mg-card:has-text(\"against\")", "after": 900 },
+    { "click": "button.mg-term:has-text(\"BI\")", "after": 500 },
+    { "click": "button.mg-card:has-text(\"two\")", "after": 1200 },
+    { "caption": "Then a sentence for every root, flashcards, and a 12-question final quiz that scores itself.", "hold": 4000 },
+    { "as": "teacher", "wait": 2500 },
+    { "caption": "The teacher dashboard. Choose which weeks students see and when the quiz opens.", "hold": 4200 },
+    { "click": ".tab[data-tab=\"gradebook\"]", "after": 1500 },
+    { "caption": "The gradebook fills in on its own. Push quiz scores to Canvas in one click.", "hold": 4200 }
+  ]
+}

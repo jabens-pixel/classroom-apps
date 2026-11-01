@@ -1,0 +1,33 @@
+{
+  "title": "Lit Circles",
+  "summary": "Four-week literature circles for grades 9–12: groups read the book they choose, prepare with reading strategies, discuss, assess each other and reflect.",
+  "reset": "LC_X_ = { ss: null, sheets: {}, headers: {}, users: null, classes: null, enroll: null };",
+  "steps": [
+    { "as": "student", "wait": 2200 },
+    { "caption": "The student view. Each group reads its own book, one week at a time.", "hold": 3800 },
+    { "move": ".week-focus-card.week-1 .week-go-resume", "after": 400 },
+    { "caption": "Every week starts with a question worth thinking about.", "hold": 2600 },
+    { "click": ".week-focus-card.week-1 .week-go-resume", "after": 1300 },
+    { "caption": "Students choose how to prepare: close reading, connections, or a journal.", "hold": 3200 },
+    { "click": ".prep-pathway-card >> nth=0", "after": 1200 },
+    { "caption": "They pick two reading strategies that fit what they noticed.", "hold": 1400 },
+    { "click": ".strategy-pick-card >> nth=0", "after": 500 },
+    { "click": ".strategy-pick-card >> nth=5", "after": 900 },
+    { "click": "text=I Understand the Rubric", "after": 1400 },
+    { "caption": "One strategy at a time, with a checklist beside the writing. It saves as they type.", "hold": 600 },
+    { "type": "#f_summarizer__summary", "text": "Buck is stolen from his comfortable home in California and sold to men who take him north to the Yukon.", "after": 1600 },
+    { "caption": "Then the group meets to discuss, assesses each other, and reflects.", "hold": 1600 },
+    { "move": "#savePrepBtn", "after": 1500 },
+    { "as": "teacher", "wait": 2200 },
+    { "caption": "The teacher dashboard. Every step of every week is a tile.", "hold": 3200 },
+    { "scrollTo": ".lch-open >> nth=0", "block": "center" },
+    { "caption": "Red numbers are work waiting for you. ↻ means a student redid something after you graded it.", "hold": 4200 },
+    { "click": ".lch-open >> nth=0", "after": 1500 },
+    { "caption": "The rubric is right on the grading screen.", "hold": 2400 },
+    { "scrollTo": "button.lch-band >> nth=0", "block": "center" },
+    { "caption": "Click a score, then add a comment. Ready-made comments are one click away.", "hold": 1200 },
+    { "click": "button.lch-band >> nth=1", "after": 900 },
+    { "click": ".lch-bank-chip >> nth=0", "after": 1200, "optional": true },
+    { "caption": "Everything saves on its own. Push grades to Canvas when you’re ready.", "hold": 4000 }
+  ]
+}

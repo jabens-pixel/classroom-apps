@@ -1,0 +1,30 @@
+{
+  "title": "Podcast Studio",
+  "summary": "A three-week podcast unit for grades 9–12: listen like a producer, plan and script a show, then record and publish it.",
+  "reset": "PC_X_ = { ss: null, sheets: {}, headers: {}, users: null, classes: null, scriptLocked: false };",
+  "steps": [
+    { "as": "student" },
+    { "caption": "The student view. Each student plans their own show, solo or with a crew.", "hold": 3800 },
+    { "scroll": 330 },
+    { "caption": "Three weeks of work. “This week” always points to where the class is.", "hold": 3200 },
+    { "click": "[data-act=\"openWeek\"][data-week=\"2\"]", "after": 1200 },
+    { "caption": "Every week has an essential question and short steps: lessons, assignments and discussions.", "hold": 4200 },
+    { "click": ".pc-step[data-step=\"process\"]", "after": 1100 },
+    { "caption": "Students work right on the page. Their writing saves itself as they type.", "hold": 600 },
+    { "scrollTo": "#fld_central", "block": "center" },
+    { "type": "#fld_central", "text": "Why do some people stay afraid of small things for their whole lives?", "after": 1800 },
+    { "caption": "When it’s ready, they turn it in. It shows up on the teacher’s dashboard.", "hold": 1800 },
+    { "move": "#pcTurnIn", "after": 1600 },
+    { "as": "teacher" },
+    { "caption": "The teacher dashboard. Students join with a class code.", "hold": 3200 },
+    { "scrollTo": ".pc-tile-open[data-key=\"w1_listen1\"]", "block": "center" },
+    { "caption": "Every assignment is a tile. A red number means work is waiting for you.", "hold": 4000 },
+    { "click": ".pc-tile-open[data-key=\"w1_listen1\"]", "after": 1300 },
+    { "caption": "Grade with the rubric beside each student’s work.", "hold": 1200 },
+    { "click": "[data-act=\"markFocus\"][data-email=\"{student}\"]", "after": 1300 },
+    { "caption": "Focused grading: one student at a time, rubric beside the work.", "hold": 2600 },
+    { "click": "[data-act=\"markBand\"][data-email=\"{student}\"][data-score=\"6\"]", "after": 900 },
+    { "type": ".pc-comment[data-email=\"{student}\"]", "text": "Great hook. Your map shows exactly where the story turns.", "optional": true },
+    { "caption": "Scores and comments save on their own. Push grades to Canvas when you’re ready.", "hold": 4200 }
+  ]
+}

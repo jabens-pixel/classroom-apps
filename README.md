@@ -29,6 +29,8 @@ Free Google Apps Script apps for high-school English, built and used in real cla
 
 Ideas, bug reports and improvements are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
+**Have your own classroom app?** Every app here follows the same [app standard](APP-STANDARD.md). Read it, then open a *Submit an app* issue. Each app's one-minute tour video is made from a short script in [walkthroughs/](walkthroughs/).
+
 ## Support this project
 
 These apps are free, but building them costs real money for tools and hosting. If they help your class, you can help keep them free: [Support on Ko-fi](https://ko-fi.com/jabenschalk).

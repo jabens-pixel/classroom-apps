@@ -87,6 +87,19 @@
   .small { font-size: 15px; color: var(--muted); margin: 0; }
 
   .two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .panel.wide { margin-top: 20px; display: flex; gap: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+  .panel.wide p { margin: 6px 0 0; max-width: 62ch; }
+  .panel.wide .actions { flex: 0 1 auto; min-width: 0; }
+  @media (max-width: 520px) { .panel.wide .actions .btn { flex: 1 1 100%; } }
+  .art-play { position: absolute; left: 18px; top: 16px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(31,27,22,.82); color: #fff; font-size: 16px; cursor: pointer; display: grid; place-items: center; padding-left: 3px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
+  .art-play:hover { background: var(--brand); }
+  .art-play:focus-visible, .tour-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .tour-btn { cursor: pointer; font-family: inherit; }
+  dialog.tour { border: 0; padding: 0; border-radius: 14px; width: min(1000px, calc(100vw - 32px)); background: #111; color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
+  dialog.tour::backdrop { background: rgba(10,8,6,.72); }
+  dialog.tour video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; }
+  dialog.tour .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; font-weight: 700; }
+  dialog.tour .bar button { min-height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff; font: inherit; cursor: pointer; }
   .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
   .panel h3 { font-size: 21px; margin-bottom: 8px; }
   .panel p { margin: 0 0 16px; color: var(--muted); }
@@ -140,6 +153,7 @@
       <article class="app" style="--accent:#8c2f39">
         <div class="art light" style="background-image:url('img/macbeth-curriculum.webp')">
           
+          <button type="button" class="art-play" data-tour="videos/macbeth-curriculum.mp4" data-title="Macbeth Curriculum" aria-label="Watch the Macbeth Curriculum tour"><span aria-hidden="true">▶</span></button>
           <div class="art-title">
             <h3>Macbeth Curriculum</h3>
             <p class="meta">Grades 9–12</p>
@@ -148,6 +162,7 @@
         <p class="blurb">A full Macbeth unit: the play act by act with side-by-side support, activities, discussion, grading and Canvas.</p>
         <div class="actions">
           <a class="btn primary" href="https://docs.google.com/spreadsheets/d/18axTT492SozC-Hm58W3Wlxhltz1P3ra3SV2lPbupo-M/copy" target="_blank" rel="noopener">Make a copy</a>
+          <button type="button" class="btn tour-btn" data-tour="videos/macbeth-curriculum.mp4" data-title="Macbeth Curriculum"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
           <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/macbeth-curriculum" target="_blank" rel="noopener">View code</a>
         </div>
         <details>
@@ -164,6 +179,7 @@
       <article class="app" style="--accent:#1f5f74">
         <div class="art light" style="background-image:url('img/memoir.webp')">
           
+          <button type="button" class="art-play" data-tour="videos/memoir.mp4" data-title="Memoir" aria-label="Watch the Memoir tour"><span aria-hidden="true">▶</span></button>
           <div class="art-title">
             <h3>Memoir</h3>
             <p class="meta">Grades 9–12</p>
@@ -172,6 +188,7 @@
         <p class="blurb">A memoir writing unit: mentor ideas, drafting, revision, grading and Canvas.</p>
         <div class="actions">
           <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1hoW5dByuvNmlzMB_HR_uWdXudnwVgdX35bU-r1DEcdc/copy" target="_blank" rel="noopener">Make a copy</a>
+          <button type="button" class="btn tour-btn" data-tour="videos/memoir.mp4" data-title="Memoir"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
           <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/memoir" target="_blank" rel="noopener">View code</a>
         </div>
         <details>
@@ -188,6 +205,7 @@
       <article class="app" style="--accent:#6a4c93">
         <div class="art light" style="background-image:url('img/podcast-studio.webp')">
           
+          <button type="button" class="art-play" data-tour="videos/podcast-studio.mp4" data-title="Podcast Studio" aria-label="Watch the Podcast Studio tour"><span aria-hidden="true">▶</span></button>
           <div class="art-title">
             <h3>Podcast Studio</h3>
             <p class="meta">Grades 9–12</p>
@@ -196,6 +214,7 @@
         <p class="blurb">A podcast unit: planning, scripting, read-aloud practice, grading and Canvas.</p>
         <div class="actions">
           <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1228gIdrr4K0K-xtpQ0x423oD4A6lKycMXOr84WNGUy0/copy" target="_blank" rel="noopener">Make a copy</a>
+          <button type="button" class="btn tour-btn" data-tour="videos/podcast-studio.mp4" data-title="Podcast Studio"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
           <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/podcast-studio" target="_blank" rel="noopener">View code</a>
         </div>
         <details>
@@ -212,6 +231,7 @@
       <article class="app" style="--accent:#2e6b4f">
         <div class="art light" style="background-image:url('img/bell-ringers.webp')">
           
+          <button type="button" class="art-play" data-tour="videos/bell-ringers.mp4" data-title="Bell Ringers" aria-label="Watch the Bell Ringers tour"><span aria-hidden="true">▶</span></button>
           <div class="art-title">
             <h3>Bell Ringers</h3>
             <p class="meta">Grades 9–12</p>
@@ -220,6 +240,7 @@
         <p class="blurb">Daily writing warm-ups with a built-in library of craft lessons, scoring and Canvas.</p>
         <div class="actions">
           <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1GVgqIBrLinbX3YQQ_lhyy3tEDe5FC-e-0Hj2YFQA8uc/copy" target="_blank" rel="noopener">Make a copy</a>
+          <button type="button" class="btn tour-btn" data-tour="videos/bell-ringers.mp4" data-title="Bell Ringers"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
           <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/bell-ringers" target="_blank" rel="noopener">View code</a>
         </div>
         <details>
@@ -236,6 +257,7 @@
       <article class="app" style="--accent:#b5651d">
         <div class="art light" style="background-image:url('img/lit-circles.webp')">
           
+          <button type="button" class="art-play" data-tour="videos/lit-circles.mp4" data-title="Lit Circles" aria-label="Watch the Lit Circles tour"><span aria-hidden="true">▶</span></button>
           <div class="art-title">
             <h3>Lit Circles</h3>
             <p class="meta">Grades 9–12</p>
@@ -244,6 +266,7 @@
         <p class="blurb">Literature circles: weekly roles and steps, discussion, peer and self assessment, grading and Canvas.</p>
         <div class="actions">
           <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1BmsksuPD6p4CSNcVy2Q8BojVah01oZi2bB-y-DfecAU/copy" target="_blank" rel="noopener">Make a copy</a>
+          <button type="button" class="btn tour-btn" data-tour="videos/lit-circles.mp4" data-title="Lit Circles"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
           <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles" target="_blank" rel="noopener">View code</a>
         </div>
         <details>
@@ -260,6 +283,7 @@
       <article class="app" style="--accent:#3d5a80">
         <div class="art light" style="background-image:url('img/lit-circles-hunger-games.webp')">
           
+          <button type="button" class="art-play" data-tour="videos/lit-circles-hunger-games.mp4" data-title="Hunger Games Lit Circles" aria-label="Watch the Hunger Games Lit Circles tour"><span aria-hidden="true">▶</span></button>
           <div class="art-title">
             <h3>Hunger Games Lit Circles</h3>
             <p class="meta">Grades 9</p>
@@ -268,6 +292,7 @@
         <p class="blurb">A four-week literature circle unit on The Hunger Games (Suzanne Collins): two assigned reading strategies a week, built-in reading quizzes, discussion, peer and self assessment, grading and Canvas. Students need their own copy of the book.</p>
         <div class="actions">
           <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1OA1mHfE8VGhnNCJ32zScy0zA1e_iPfd9gNGQSC2OQ8I/copy" target="_blank" rel="noopener">Make a copy</a>
+          <button type="button" class="btn tour-btn" data-tour="videos/lit-circles-hunger-games.mp4" data-title="Hunger Games Lit Circles"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
           <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles-hunger-games" target="_blank" rel="noopener">View code</a>
         </div>
         <details>
@@ -284,6 +309,7 @@
       <article class="app" style="--accent:#7a5c2e">
         <div class="art light" style="background-image:url('img/lit-circles-simplified.webp')">
           
+          <button type="button" class="art-play" data-tour="videos/lit-circles-simplified.mp4" data-title="Lit Circles (Simplified)" aria-label="Watch the Lit Circles (Simplified) tour"><span aria-hidden="true">▶</span></button>
           <div class="art-title">
             <h3>Lit Circles (Simplified)</h3>
             <p class="meta">Grades 9–12</p>
@@ -292,6 +318,7 @@
         <p class="blurb">Lit Circles without the Reader’s Journal: every week is two reading strategies. Set up one book for the class or different books by group, the same strategies for everyone or rotating roles, with shared reading quizzes, discussion, grading and Canvas.</p>
         <div class="actions">
           <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1YTp1JK25PvYBTpTagptmP9bbtUwtiNxbMWbUWsEpNXY/copy" target="_blank" rel="noopener">Make a copy</a>
+          <button type="button" class="btn tour-btn" data-tour="videos/lit-circles-simplified.mp4" data-title="Lit Circles (Simplified)"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
           <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles-simplified" target="_blank" rel="noopener">View code</a>
         </div>
         <details>
@@ -308,6 +335,7 @@
       <article class="app" style="--accent:#5b6c2f">
         <div class="art light" style="background-image:url('img/root-word-study.webp')">
           
+          <button type="button" class="art-play" data-tour="videos/root-word-study.mp4" data-title="Root Word Study" aria-label="Watch the Root Word Study tour"><span aria-hidden="true">▶</span></button>
           <div class="art-title">
             <h3>Root Word Study</h3>
             <p class="meta">Grades 9–12</p>
@@ -316,6 +344,7 @@
         <p class="blurb">Weekly Greek and Latin roots: sentences, flashcards, pretests and a self-scoring final quiz.</p>
         <div class="actions">
           <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1AMGLM_JQJK-AaJYkOygqCCQMv210a5Try5tVysW2Gvw/copy" target="_blank" rel="noopener">Make a copy</a>
+          <button type="button" class="btn tour-btn" data-tour="videos/root-word-study.mp4" data-title="Root Word Study"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
           <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/root-word-study" target="_blank" rel="noopener">View code</a>
         </div>
         <details>
@@ -332,6 +361,7 @@
       <article class="app" style="--accent:#a23b5a">
         <div class="art light" style="background-image:url('img/short-story-lab.webp')">
           
+          <button type="button" class="art-play" data-tour="videos/short-story-lab.mp4" data-title="Short Story Lab" aria-label="Watch the Short Story Lab tour"><span aria-hidden="true">▶</span></button>
           <div class="art-title">
             <h3>Short Story Lab</h3>
             <p class="meta">Grades 9–10</p>
@@ -340,6 +370,7 @@
         <p class="blurb">A short story unit: ten stories with reading support (three public-domain texts included; you paste in the rest), a writing workshop, grading and Canvas.</p>
         <div class="actions">
           <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1WRYRh2CFpuB5tdOzVdsA-0A23cWD3yC96QLUoemntbU/copy" target="_blank" rel="noopener">Make a copy</a>
+          <button type="button" class="btn tour-btn" data-tour="videos/short-story-lab.mp4" data-title="Short Story Lab"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
           <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/short-story-lab" target="_blank" rel="noopener">View code</a>
         </div>
         <details>
@@ -373,6 +404,16 @@
           <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">How to contribute</a>
         </div>
       </div>
+      <div class="panel wide" id="add-your-app">
+        <div>
+          <h3>Add your own app</h3>
+          <p>Built a classroom app your students use? Share it here. Every app on this site follows the same standard: students never lose work, grading works the same way, and nothing copyrighted is included. Read the standard, then send it in. Each app gets a Make a copy button, a tile picture and a one-minute tour.</p>
+        </div>
+        <div class="actions">
+          <a class="btn primary" href="https://github.com/jabens-pixel/classroom-apps/blob/main/APP-STANDARD.md" target="_blank" rel="noopener">Read the app standard</a>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/issues/new?template=submit-app.yml" target="_blank" rel="noopener">Submit an app</a>
+        </div>
+      </div>
     </div>
   </section>
 
@@ -402,5 +443,24 @@
     <p>Free for teachers, students and schools. Code: <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/LICENSE" target="_blank" rel="noopener">PolyForm Noncommercial 1.0.0</a>. Lesson content: <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/LICENSE-LESSONS.md" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a> (share and adapt with credit, not for sale). Selling it or building it into a paid product needs permission. Story and book texts included are in the public domain.</p>
   </div>
 </footer>
+<dialog class="tour" id="tourDialog" aria-label="App tour">
+  <video id="tourVideo" controls playsinline preload="none"></video>
+  <div class="bar"><span id="tourTitle"></span><button type="button" id="tourClose">Close</button></div>
+</dialog>
+<script>
+(function () {
+  var d = document.getElementById('tourDialog'), v = document.getElementById('tourVideo');
+  if (!d || typeof d.showModal !== 'function') return;   // very old browsers: the buttons do nothing
+  document.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-tour]'); if (!b) return;
+    v.src = b.getAttribute('data-tour'); document.getElementById('tourTitle').textContent = b.getAttribute('data-title') + ' · 1-minute tour';
+    d.showModal(); v.play().catch(function () {});
+  });
+  function close() { v.pause(); v.removeAttribute('src'); v.load(); if (d.open) d.close(); }
+  document.getElementById('tourClose').addEventListener('click', close);
+  d.addEventListener('close', function () { v.pause(); });
+  d.addEventListener('click', function (e) { if (e.target === d) close(); });
+})();
+</script>
 </body>
 </html>

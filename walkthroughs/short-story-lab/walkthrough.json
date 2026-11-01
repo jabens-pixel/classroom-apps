@@ -1,0 +1,27 @@
+{
+  "title": "Short Story Lab",
+  "summary": "A short story unit for grades 9–10: ten stories with reading support, quick checks and written responses, then a writing workshop where students build their own story.",
+  "steps": [
+    { "as": "student", "wait": 2500 },
+    { "caption": "The student view. Each story is a short, guided reading lesson.", "hold": 3400 },
+    { "click": ".showcase-cta", "after": 1800 },
+    { "caption": "Before reading: the essential question, the craft to notice, and a quick poll.", "hold": 3800 },
+    { "scrollTo": "button.focus-mode-btn", "block": "start" },
+    { "caption": "Public-domain stories are included. For the rest, the teacher pastes in their own copy.", "hold": 3800 },
+    { "scrollTo": "button.opt[data-answer=\"1\"]", "block": "center" },
+    { "caption": "A quick check scores itself.", "hold": 1000 },
+    { "click": "button.opt[data-answer=\"1\"]", "after": 1500 },
+    { "scrollTo": "#dok", "block": "center" },
+    { "caption": "Then a written response with evidence. It saves as they type.", "hold": 500 },
+    { "type": "#dok", "text": "The feud seems like the whole story, but the ending shows that nature does not care about it at all. The wolves make their argument meaningless.", "after": 1500 },
+    { "click": ".assignmentSubmitBtn, [data-submit-kind=\"story\"]", "after": 1600, "optional": true },
+    { "as": "teacher", "wait": 2500 },
+    { "caption": "The teacher dashboard. Every story and every workshop stage is a tile.", "hold": 3600 },
+    { "click": ".hub-open-btn >> nth=0", "after": 1800 },
+    { "caption": "Responses are graded with the rubric on screen.", "hold": 2600 },
+    { "scrollTo": "[data-email=\"{student}\"][data-score=\"6\"]", "block": "center" },
+    { "click": "[data-email=\"{student}\"][data-score=\"6\"]", "after": 900 },
+    { "type": "textarea.batchComment[data-email=\"{student}\"]", "text": "Strong claim about the ending. Add one detail from the opening to show the change.", "optional": true },
+    { "caption": "Scores and comments save on their own. Push grades to Canvas when you’re ready.", "hold": 4000 }
+  ]
+}

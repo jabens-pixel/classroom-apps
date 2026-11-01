@@ -1,0 +1,12 @@
+{
+  "name": "classroom-apps-tour-videos",
+  "private": true,
+  "description": "Records each app's one-minute tour video from walkthroughs/<app>/walkthrough.json.",
+  "scripts": {
+    "record": "node record.js",
+    "setup": "npx playwright install chromium"
+  },
+  "dependencies": {
+    "playwright": "1.48.2"
+  }
+}

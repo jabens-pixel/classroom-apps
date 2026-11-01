@@ -1,0 +1,30 @@
+{
+  "title": "Lit Circles (Simplified)",
+  "summary": "Literature circles without the journal: every week is two reading strategies. One book for the class or one per group, the same strategies or rotating roles.",
+  "reset": "LC_X_ = { ss: null, sheets: {}, headers: {}, users: null, classes: null, enroll: null };",
+  "steps": [
+    { "as": "teacher", "wait": 2200 },
+    { "caption": "Start with Unit setup: one book or different books, the same strategies or rotating roles.", "hold": 1200 },
+    { "click": "[data-lch=\"unit-setup\"]", "after": 1500 },
+    { "caption": "Start with Unit setup: one book or different books, the same strategies or rotating roles.", "hold": 3600 },
+    { "click": "#lcuCancel", "after": 1000, "optional": true },
+    { "as": "student", "wait": 2200 },
+    { "caption": "The student view. Each week starts with a question worth thinking about.", "hold": 3600 },
+    { "click": ".week-focus-card.week-1 .week-go-resume", "after": 1300 },
+    { "caption": "Two reading strategies every week. The rubric comes first.", "hold": 3000 },
+    { "click": "text=I Understand the Rubric", "after": 1400 },
+    { "caption": "One strategy at a time, with a checklist beside the writing. It saves as they type.", "hold": 600 },
+    { "type": "#f_summarizer__summary", "text": "Buck is stolen from his comfortable home in California and sold to men who take him north to the Yukon.", "after": 1600 },
+    { "caption": "Groups reading the same section share one reading quiz.", "hold": 1800 },
+    { "move": "#savePrepBtn", "after": 1500 },
+    { "as": "teacher", "wait": 2200 },
+    { "scrollTo": ".lch-open >> nth=0", "block": "center" },
+    { "caption": "Every step is a tile. Red numbers are work waiting for you.", "hold": 3800 },
+    { "click": ".lch-open >> nth=0", "after": 1500 },
+    { "scrollTo": "button.lch-band >> nth=0", "block": "center" },
+    { "caption": "Grade with the rubric on screen and one-click comments.", "hold": 1200 },
+    { "click": "button.lch-band >> nth=1", "after": 900 },
+    { "click": ".lch-bank-chip >> nth=0", "after": 1200, "optional": true },
+    { "caption": "Everything saves on its own. Push grades to Canvas when you’re ready.", "hold": 4000 }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "title": "Memoir",
+  "summary": "A personal narrative unit for grades 9–12: six stages from a flash-forward lead to the “so what”, with checklists, a share board, grading and a memoir poster.",
+  "steps": [
+    { "as": "student", "wait": 2500 },
+    { "caption": "The student view. A memoir is built in six stages, mapped like a story arc.", "hold": 4000 },
+    { "click": ".btn-lg", "after": 1600 },
+    { "caption": "Each stage explains the craft move, with a checklist beside the writing.", "hold": 3400 },
+    { "type": "#writerBox", "text": "My hands were shaking so hard the paper rattled. “Next up,” Ms. Rivera called, and every head in the room turned toward me. I thought about the first time I had stood up in front of people, when I was seven and forgot every word.", "delay": 26, "after": 1500 },
+    { "caption": "The checklist ticks itself as they write, and their work saves as they type.", "hold": 3200 },
+    { "click": "#turnInBtn", "after": 2000, "optional": true },
+    { "as": "teacher", "wait": 2500 },
+    { "caption": "The teacher dashboard. Every stage is a tile with its own rubric.", "hold": 3600 },
+    { "click": ".tile-open >> nth=0", "after": 1800 },
+    { "caption": "The rubric is on the grading screen, with each student’s writing beside it.", "hold": 3000 },
+    { "scrollTo": "[data-email=\"{student}\"][data-score=\"6\"]", "block": "center" },
+    { "click": "[data-email=\"{student}\"][data-score=\"6\"]", "after": 900 },
+    { "type": "textarea.pieceComment[data-email=\"{student}\"]", "text": "Great flash-forward. The shaking paper puts us right there.", "optional": true },
+    { "caption": "Scores and comments save on their own. Push grades to Canvas when you’re ready.", "hold": 4000 }
+  ]
+}

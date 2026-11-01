@@ -1,0 +1,26 @@
+{
+  "title": "Macbeth Curriculum",
+  "summary": "The whole play, act by act, for grades 9–12: Shakespeare’s text with a modern version beside it, quick checks, written responses and a final essay.",
+  "steps": [
+    { "as": "student", "wait": 2200 },
+    { "caption": "The student view. Five acts, a scene at a time, with grades shown as they go.", "hold": 3800 },
+    { "click": "button.navbtn:has-text(\"Scene 1\")", "after": 1500 },
+    { "caption": "Shakespeare’s original text, with line numbers.", "hold": 2800 },
+    { "click": "#supportBtn", "after": 900 },
+    { "caption": "One click puts a modern-English version beside it.", "hold": 3400 },
+    { "scrollTo": "button.opt[data-answer=\"0\"]", "block": "center" },
+    { "caption": "A quick check after every scene scores itself.", "hold": 1200 },
+    { "click": "button.opt[data-answer=\"0\"]", "after": 1600 },
+    { "scrollTo": "#dok", "block": "center" },
+    { "caption": "Then a written response with evidence. It saves as they type.", "hold": 600 },
+    { "type": "#dok", "text": "The witches meet in a storm, which tells us the play will be about chaos. They plan to meet Macbeth, so his fate seems decided before he even appears.", "after": 2500 },
+    { "as": "teacher", "wait": 2200 },
+    { "caption": "The teacher dashboard. Every act and every part of the essay is a tile.", "hold": 3800 },
+    { "click": ".hub-open-btn >> nth=0", "after": 1800 },
+    { "caption": "Written responses, scene by scene, with the rubric on screen.", "hold": 2800 },
+    { "scrollTo": "[data-email=\"{student}\"][data-score=\"6\"]", "block": "center" },
+    { "click": "[data-email=\"{student}\"][data-score=\"6\"]", "after": 900 },
+    { "type": "textarea.batchComment[data-email=\"{student}\"]", "text": "Good link between the storm and the chaos to come. Quote the line that shows it.", "optional": true },
+    { "caption": "Scores and comments save on their own. Push grades to Canvas when you’re ready.", "hold": 4000 }
+  ]
+}
