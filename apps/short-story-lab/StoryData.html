@@ -22,7 +22,8 @@ window.__MB = window.__MB || {}; __MB.StoryData = 'started';
 // wordCount / lexile: shown on each story's tile. wordCount is always an
 // approximation (~) -- a few (sound_of_thunder, wild_dog, veldt,
 // eraser_tattoo, marigolds, showdown) were computed directly from the
-// story's actual text/page count and are close; the rest (interlopers,
+// story's actual text/page count and are close (sniper and misery were
+// counted from the pasted text); the rest (interlopers,
 // monkeys_paw, twobr02b, tell_tale_heart) are secondary-source estimates
 // since no official count exists anywhere -- correct any of these freely,
 // it's just one number each. lexile is `null` unless an official score was
@@ -66,7 +67,7 @@ const STORIES = {
   },
   twobr02b: {
     id: "twobr02b",
-    order: 3,
+    order: 7,
     title: "2 B R 0 2 B",
     author: "Kurt Vonnegut",
     year: 1962,
@@ -80,7 +81,7 @@ const STORIES = {
   },
   tell_tale_heart: {
     id: "tell_tale_heart",
-    order: 4,
+    order: 3,
     title: "The Tell-Tale Heart",
     author: "Edgar Allan Poe",
     year: 1843,
@@ -94,7 +95,7 @@ const STORIES = {
   },
   sound_of_thunder: {
     id: "sound_of_thunder",
-    order: 5,
+    order: 8,
     title: "A Sound of Thunder",
     author: "Ray Bradbury",
     year: 1952,
@@ -108,7 +109,7 @@ const STORIES = {
   },
   wild_dog: {
     id: "wild_dog",
-    order: 6,
+    order: 4,
     title: "The Wild Dog of Caucomgomoc",
     author: "Charles Boardman Hawes",
     year: 1921,
@@ -122,7 +123,7 @@ const STORIES = {
   },
   veldt: {
     id: "veldt",
-    order: 7,
+    order: 9,
     title: "The Veldt",
     author: "Ray Bradbury",
     year: 1950,
@@ -136,7 +137,7 @@ const STORIES = {
   },
   eraser_tattoo: {
     id: "eraser_tattoo",
-    order: 8,
+    order: 10,
     title: "Eraser Tattoo",
     author: "Jason Reynolds",
     year: 2018,
@@ -150,7 +151,7 @@ const STORIES = {
   },
   marigolds: {
     id: "marigolds",
-    order: 9,
+    order: 11,
     title: "Marigolds",
     author: "Eugenia Collier",
     year: 1969,
@@ -164,7 +165,7 @@ const STORIES = {
   },
   showdown: {
     id: "showdown",
-    order: 10,
+    order: 12,
     title: "Showdown",
     author: "Shirley Jackson",
     year: 2015,
@@ -176,6 +177,35 @@ const STORIES = {
     lexile: 960,
     image: "https://commons.wikimedia.org/wiki/Special:FilePath/Main_Street_Fog.jpg",
   },
+  sniper: {
+    id: "sniper",
+    order: 5,
+    title: "The Sniper",
+    author: "Liam O'Flaherty",
+    year: 1923,
+    focus: "Suspense & situational irony",
+    blurb:
+      "During Ireland's civil war, a young sniper on a Dublin rooftop spends one long night in a duel with an enemy marksman across the street -- a duel he wins, until he goes down to see who he has killed.",
+    readLink: "",
+    wordCount: 1570,
+    lexile: null,
+    image: "",
+  },
+  misery: {
+    id: "misery",
+    order: 6,
+    title: "Misery",
+    author: "Anton Chekhov (translated by Constance Garnett)",
+    year: 1886,
+    focus: "Character, mood & grief",
+    blurb:
+      "On a snowy evening in St. Petersburg, an old cab driver whose son has just died looks for anyone -- passenger, stranger, fellow driver -- who will listen to him talk about it.",
+    readLink: "",
+    wordCount: 2090,
+    lexile: null,
+    image: "",
+  },
+
 };
 
 const STORY_ORDER = Object.keys(STORIES).sort((a, b) => STORIES[a].order - STORIES[b].order);
@@ -295,6 +325,29 @@ const QUESTIONS = {
     1,
     "Jackson never explains why Billy is reliving this day, and the story ends without confirming whether he succeeds in changing it. How does this open, repetitive structure shape what the reader is left wondering, compared to a story that explained the time loop directly? Use at least one specific detail about how the repetitions change over the course of the story.",
   ],
+  sniper: [
+    "How does the sniper trick the enemy sniper into showing himself?",
+    [
+      "He waits until sunrise, when the other roof is in full light",
+      "He raises his cap on his rifle, lets the cap and rifle fall, and lets his hand hang as if he has been shot",
+      "He fires at the armored car so the enemy will look down at the street",
+      "He lights a cigarette on purpose to draw the other man's fire",
+    ],
+    1,
+    "The story ends the instant the sniper turns the body over -- we never see what he does or feels next. Why do you think O'Flaherty stops there? Explain what that ending says about civil war, using at least one earlier detail that prepares for it.",
+  ],
+  misery: [
+    "Why does Iona keep trying to start conversations with the people around him?",
+    [
+      "He wants his passengers to pay him more",
+      "He wants to tell someone that his son died this week",
+      "He is lost and needs directions across the city",
+      "He is trying to find a buyer for his horse",
+    ],
+    1,
+    "Each person Iona tries to talk to cuts him off, and in the end he tells everything to his horse. What do Iona's attempts to be heard -- and the way the story ends -- reveal about him and about the people around him? Use at least two of his attempts as evidence.",
+  ],
+
 };
 
 // A short warm-up question shown BEFORE the reading on each story's page --
@@ -355,6 +408,17 @@ const LEAD_QUESTIONS = {
     prompt: "True or false: if you could relive the same day and try again as many times as you needed, you would eventually be able to fix any mistake.",
     options: ["True", "False"],
   },
+  sniper: {
+    type: "agree",
+    prompt: "Agree or disagree: soldiers on opposite sides of a war often have more in common with each other than with the people who sent them to fight.",
+    options: ["Strongly agree", "Agree", "Disagree", "Strongly disagree"],
+  },
+  misery: {
+    type: "poll",
+    prompt: "When something hard happens to you, who are you most likely to tell first?",
+    options: ["A friend", "Someone in my family", "A pet", "No one -- I keep it to myself"],
+  },
+
 };
 
 // Four Essential Questions about short-story craft. Each story's DOK
@@ -404,6 +468,9 @@ const STORY_EQ = {
   eraser_tattoo: "character",
   marigolds: "theme",
   showdown: "pov",
+  sniper: "theme",
+  misery: "character",
+
 };
 
 // A single original, one-sentence STATEMENT (not a question) connecting this
@@ -432,6 +499,11 @@ const EQ_CONNECTION = {
     "The marigolds themselves become the story's central symbol, and destroying them is what finally forces Lizabeth to understand what they meant.",
   showdown:
     "Told through Billy's point of view as he relives the same day again and again, the story's repeating structure is what lets him -- and the reader -- finally notice what's really happening.",
+  sniper:
+    "A single night of rooftop fighting shows what a civil war really costs, and the final discovery turns the sniper's victory into a loss.",
+  misery:
+    "Iona's grief shows less in what he manages to say than in how many times he tries to say it -- and in who finally listens.",
+
 };
 
 // NOTE: no longer rendered on the story page (removed per Jaben's request --
@@ -460,6 +532,11 @@ const GUIDING_QUESTIONS = {
     "As you read, watch for everything the marigolds are compared to or set against, and notice exactly when the narrator's feelings about them start to shift.",
   showdown:
     "As you read, track exactly what changes -- and what stays exactly the same -- each time Billy relives the day, and watch for what he learns from each attempt.",
+  sniper:
+    "As you read, notice how little the story tells you about either sniper -- no names, no families, no reasons -- and ask why the writer keeps them anonymous until the very end.",
+  misery:
+    "As you read, count how many times Iona tries to tell someone his news, and notice exactly how each listener stops him.",
+
 };
 
 // Reading-support glossary: 5-7 genuinely challenging words per story, with
@@ -619,6 +696,45 @@ const GLOSSARY = {
     { term: "commotion", def: "noisy confusion or disturbance." },
     { term: "subsequently", def: "happening afterward, as a result." },
   ],
+  sniper: [
+    { term: "beleaguered", def: "surrounded and under attack, with no easy way out." },
+    { term: "Four Courts", def: "Dublin's main courthouse; Republican fighters held it when the civil war began in 1922." },
+    { term: "Liffey", def: "the river that runs through the center of Dublin." },
+    { term: "spasmodically", def: "in sudden, irregular bursts, then stopping." },
+    { term: "Republicans", def: "in Ireland's civil war (1922-23), the fighters who rejected the treaty with Britain and kept fighting against the new Irish government." },
+    { term: "Republican", def: "one of the fighters who rejected the treaty with Britain and fought against the new Irish government." },
+    { term: "Free Staters", def: "supporters and soldiers of the new Irish Free State government, which accepted the treaty with Britain." },
+    { term: "field glasses", def: "binoculars." },
+    { term: "ascetic", def: "thin, plain and strict-looking, like someone who goes without comforts." },
+    { term: "fanatic", def: "someone whose devotion to a cause is extreme and unshakeable." },
+    { term: "parapet", def: "a low wall along the edge of a roof." },
+    { term: "turret", def: "the small armored tower on top of an armored car, where a gunner sits." },
+    { term: "informer", def: "someone who secretly passes information to the other side." },
+    { term: "paroxysm", def: "a sudden, violent attack of pain or emotion." },
+    { term: "ruse", def: "a trick meant to fool someone." },
+    { term: "silhouetted", def: "seen as a dark shape against a lighter background." },
+    { term: "remorse", def: "deep regret for something you have done." },
+    { term: "gibber", def: "to talk fast and without making sense." },
+    { term: "concussion", def: "here, the jolt and blast of a gun going off." },
+  ],
+  misery: [
+    { term: "sledge", def: "a sleigh; here, a horse-drawn sleigh used as a taxi in a snowy city." },
+    { term: "fare", def: "a passenger who pays for a ride (also the price of the ride)." },
+    { term: "Vyborgskaya", def: "a district of St. Petersburg, then Russia's capital." },
+    { term: "Petersburg", def: "St. Petersburg, then the capital of Russia." },
+    { term: "kopecks", def: "small Russian coins; one hundred kopecks make a rouble." },
+    { term: "rouble", def: "the main unit of Russian money." },
+    { term: "goloshes", def: "rubber overshoes worn over shoes to keep them dry." },
+    { term: "jocosely", def: "in a joking way." },
+    { term: "altercation", def: "a noisy argument." },
+    { term: "epithets", def: "insulting names or descriptions thrown at someone." },
+    { term: "revelers", def: "people out partying noisily." },
+    { term: "house-porter", def: "a building's doorkeeper and caretaker." },
+    { term: "anguish", def: "severe mental or emotional pain." },
+    { term: "deliberation", def: "slow, careful thought." },
+    { term: "insufferable", def: "too painful or unpleasant to bear." },
+  ],
+
 };
 
 // Plain-English "Plain-English Recap" per story -- a short, original retelling
@@ -813,6 +929,40 @@ const READING_SUPPORT = {
       "Don't skim the slow middle -- the ending only works because of how long the reputation takes to build.",
     ],
   },
+  misery: {
+    era: "Written in 1886, translated from Russian",
+    intro: "This is a very short story with very little action, which is exactly what makes it hard: almost everything happens inside one quiet man while the city rushes past him. The notes below help with the Russian setting and with the way Chekhov writes. Nothing below spoils the ending.",
+    styleNotes: [
+      { title: "It is told in the present tense", text: "Most stories say what happened. This one says what is happening, as if you are standing on the snowy street watching. Let it feel slow and close -- that is the point." },
+      { title: "The dots are silences", text: "Chekhov uses rows of dots constantly. Read each one as a pause: someone trailing off, failing to find words, or waiting for an answer that doesn't come. In this story the pauses matter as much as the talking." },
+      { title: "Read the line at the very top", text: "Before the story begins there is a single line set apart from it, called an epigraph -- a quotation an author places at the start to set the mood. Keep it in mind; it is the question the whole story is asking." },
+      { title: "Russian names have three parts", text: "Russians are often called by a first name plus a form of their father's name. When a character's name ends in -itch or -ovna, that ending means son of or daughter of. You only need to know who each name belongs to -- one of them is a name you will hear only once." },
+      { title: "Watch what people do, not just what they say", text: "Chekhov rarely tells you how someone feels. He shows a laugh at the wrong moment, a sniff, a turned head, a person who is already asleep. Those small gestures are where the feeling is." },
+    ],
+    phrases: [
+      { phrase: "sledge-driver", means: "a cab driver whose cab is a horse-drawn sleigh" },
+      { phrase: "the box", means: "the driver's seat at the front of the sledge" },
+      { phrase: "the yard", means: "the shared stable yard where cab drivers kept their horses and slept" },
+      { phrase: "cut along", means: "hurry up, get going" },
+      { phrase: "God give you health", means: "a polite blessing, something like \"God bless you\"" },
+    ],
+    beats: [
+      { title: "1. A man and a horse in the snow", text: "The story opens at dusk on a busy city street. An old cab driver and his small horse sit so still in the falling snow that they are turning white. He has had no passengers all day." },
+      { title: "2. The first passenger", text: "An officer hires him. Iona drives badly, gets shouted at by everyone on the road, and tries to share his news. Notice how the conversation goes -- and how it ends." },
+      { title: "3. Three young men", text: "A rowdy group of young men crowd into the sledge, argue, insult him and hurry him along. He keeps laughing along with them. Watch for the moment he tries again." },
+      { title: "4. Alone in the crowd", text: "Back on the street, Iona looks for anyone at all to talk to. The city is full of people, and none of them stop." },
+      { title: "5. The yard", text: "He goes home early to the stable yard where the drivers sleep, and tries once more with a young driver getting a drink of water." },
+      { title: "6. The last listener", text: "The story's final scene happens in the stable. Read it slowly -- it is very short, and it is where the whole story has been heading." },
+    ],
+    strategies: [
+      "Keep a simple tally in the margin: every time Iona tries to tell someone, mark who it was and what stopped him.",
+      "Tap any underlined word for its definition without leaving the page.",
+      "When people around Iona are rude or busy, ask whether they are cruel or just not paying attention -- the story leaves room for both.",
+      "Pay attention to the weather and the horse; they are doing emotional work too.",
+      "Reread the line at the top after you finish. Does it read differently now?",
+    ],
+  },
+
 };
 
 const RECAP = {
@@ -836,6 +986,11 @@ const RECAP = {
     "Looking back as an adult, the narrator Lizabeth remembers one reckless afternoon from her poor, Depression-era childhood in rural Maryland. One restless summer day, she and her younger brother lead a group of kids in throwing stones at the marigolds planted by their reclusive elderly neighbor, Miss Lottie -- the one beautiful, defiant thing in an otherwise crumbling, hopeless community. That same night, Lizabeth overhears her proud father breaking down in tears over his inability to provide for the family, and something in her shatters. Unable to sleep, she runs to Miss Lottie's yard before dawn and destroys the marigolds completely in a wild fit of grief and rage -- only to look up and see Miss Lottie watching her, and realize for the first time that the old woman is not someone to fear, but simply another person who has held onto beauty despite a hard life.",
   showdown:
     "In the small, seemingly peaceful town of Mansfield in 1932, fifteen-year-old Billy notices something is wrong, though he can't say what. Each day unfolds the same way: his father sends him on the same errands, a ragged stranger named Tom Harper returns to town to confront the man who ruined his life, and Tom is fatally stabbed on the store porch in front of everyone, including Billy. At first Billy doesn't realize he's reliving the exact same day over and over -- he can never remember what happened \"the day before\" -- but slowly he starts noticing he's said and done the same things again, and begins trying to move faster each time, arriving at the scene a little sooner with each repetition. By the point this excerpt ends, Billy has a plan forming: if he can get there fast enough, maybe he can step between Tom and his killer and grab the knife himself.",
+  sniper:
+    "In Dublin during Ireland's civil war, a young Republican sniper lies on a rooftop through a long June night, trading shots with an enemy sniper hidden on the roof across the street. When an armored car stops below and an old woman points out his position, he shoots the soldier in the turret and then the woman. The enemy sniper wounds him in the arm, and he realizes he must kill that man before morning. He tricks his enemy by raising his cap on his rifle, letting it fall, and pretending to be dead; when the other sniper stands up to look, he shoots him, and the body falls to the street. Sickened by what he has done, he climbs down, crosses the street out of curiosity to see who the dead man was, and turns the body over -- it is his own brother.",
+  misery:
+    "On a snowy evening in St. Petersburg, an old cab driver named Iona Potapov sits on his sledge, so still that he and his little horse are turning white. His son died in the hospital that week, and Iona badly needs to tell someone about it. He tries with an officer who hires him, then with three rowdy young men who insult him and hurry him along, then with a house-porter on the street, and finally with a young driver back in the stable yard -- and each time, the other person cuts him off, ignores him or falls asleep. Unable to bear thinking about his son alone, Iona goes out to the stable to check on his horse. Standing beside her as she eats, he finally tells her the whole story.",
+
 };
 
 // One built-in craft mini-activity per story (opened as a modal, same
@@ -912,6 +1067,21 @@ const ACTIVITY_DETAILS = {
     minRows: 3,
     presetRows: [["First time reliving the day"], ["A middle attempt"], ["The story's final attempt"]],
     reflection: "Does the story ever confirm whether Billy succeeds? Why might Jackson choose to leave that unresolved?",
+  },
+
+  "Foreshadowing Clue Chart": {
+    prompt: "The ending of The Sniper is a shock, but the story prepares for it. Find three details that tell you what kind of war this is and help make the ending possible.",
+    table: ["Detail from the story", "What it tells you about this war", "How it prepares the ending"],
+    minRows: 3,
+    presetRows: [["The opening paragraphs: who is fighting whom, and where"], ["A moment when the sniper thinks about his enemy"], ["A detail of your choice"]],
+    reflection: "Did the ending surprise you? Which clue should have warned you -- and why do you think O'Flaherty never gives either man a name?",
+  },
+  "Who Will Listen? Tracker": {
+    prompt: "Track each person Iona tries to tell about his son, how they respond, and what that moment shows.",
+    table: ["Who Iona tries to talk to", "How they respond", "What it reveals about Iona or about them"],
+    minRows: 4,
+    presetRows: [["The officer"], ["The three young men"], ["The young driver in the yard"], ["The mare"]],
+    reflection: "Why do you think Chekhov has Iona finally tell his story to his horse? Is the ending sad, comforting, or both? Explain.",
   },
 
   // --- Writing Workshop activities (Part 2: constructing an original short story) ---
@@ -1022,6 +1192,9 @@ const ACTIVITIES = {
   eraser_tattoo: [["Activity", "Subtext Decoder", "Find the moments where jokes and rituals are standing in for what these two friends really feel."]],
   marigolds: [["Activity", "Marigolds as Symbol Tracker", "Track how the marigolds' meaning shifts across the story."]],
   showdown: [["Activity", "Time Loop Tracker", "Track what changes -- and doesn't -- across Billy's repeated attempts."]],
+  sniper: [["Activity", "Foreshadowing Clue Chart", "Find the details that quietly prepare the story's final discovery."]],
+  misery: [["Activity", "Who Will Listen? Tracker", "Track everyone Iona tries to talk to and how each one responds."]],
+
 };
 
 // Capstone Craft Analysis Essay rubric -- same four criteria and five bands
@@ -1184,6 +1357,9 @@ const STORY_EXTENSION_ACTIVITY = {
   eraser_tattoo: { label: "Subtext Decoder", title: "Subtext Decoder" },
   marigolds: { label: "Marigolds as Symbol Tracker", title: "Marigolds as Symbol Tracker" },
   showdown: { label: "Time Loop Tracker", title: "Time Loop Tracker" },
+  sniper: { label: "Foreshadowing Clue Chart", title: "Foreshadowing Clue Chart" },
+  misery: { label: "Who Will Listen? Tracker", title: "Who Will Listen? Tracker" },
+
 };
 
 // The four Writing Workshop assignments a teacher can assign/hide from the
@@ -1198,7 +1374,7 @@ const WRITING_ASSIGN_LABELS = { prewriting: "Prewriting", drafting: "Drafting", 
 // ---- The teacher's own two general-purpose rubrics ----
 // Transcribed from the teacher's existing Canvas rubrics, and used in place
 // of bare 1-7 number buttons everywhere those two things are graded:
-//   WRITTEN_RESPONSE_RUBRIC -> the 10 stories' written/craft responses (dok)
+//   WRITTEN_RESPONSE_RUBRIC -> the 12 stories' written/craft responses (dok)
 //                              AND the Drafting/Revision stage grades
 //                              (writingStage)
 //   DISCUSSION_RUBRIC       -> all three discussion boards (discussion)

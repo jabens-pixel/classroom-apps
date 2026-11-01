@@ -1,6 +1,6 @@
 # Short Story Lab
 
-A short story unit: ten stories with reading support (three public-domain texts included; you paste in the rest), a writing workshop, grading and Canvas.
+A short story unit: twelve stories with reading support (six public-domain stories included in full; you paste in the rest), a writing workshop, grading and Canvas.
 
 Grades 9–10 · Google Apps Script · free for teachers and schools · works with any Google Workspace for Education school.
 

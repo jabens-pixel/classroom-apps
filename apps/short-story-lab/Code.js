@@ -5,7 +5,7 @@ const SHORTSTORY_DB_PROP = 'SHORTSTORY_DB_ID';
 // version returned by getBootstrap()/getAppVersion(). Bump this one value for
 // each classroom release; stale tabs safely reload with a cache-busting URL
 // and then show the one-time "App updated" confirmation.
-const SHORTSTORY_APP_VERSION = '2026.10.29.52';
+const SHORTSTORY_APP_VERSION = '2026.10.31.53';
 // Bumped on every build that ships. A student's browser remembers the value
 // it booted with and the server returns the current one on every save, so a
 // tab left open across a redeploy can notice and offer to reload -- it is
@@ -75,9 +75,11 @@ const STORY_META = {
   veldt: {correctIdx:1},
   eraser_tattoo: {correctIdx:1},
   marigolds: {correctIdx:1},
-  showdown: {correctIdx:1}
+  showdown: {correctIdx:1},
+  sniper: {correctIdx:1},
+  misery: {correctIdx:1}
 };
-const STORY_ORDER = ['interlopers','monkeys_paw','twobr02b','tell_tale_heart','sound_of_thunder','wild_dog','veldt','eraser_tattoo','marigolds','showdown'];
+const STORY_ORDER = ['interlopers','monkeys_paw','tell_tale_heart','wild_dog','sniper','misery','twobr02b','sound_of_thunder','veldt','eraser_tattoo','marigolds','showdown'];
 const STORY_LABELS = {
   interlopers:'The Interlopers',
   monkeys_paw:"The Monkey's Paw",
@@ -88,7 +90,9 @@ const STORY_LABELS = {
   veldt:'The Veldt',
   eraser_tattoo:'Eraser Tattoo',
   marigolds:'Marigolds',
-  showdown:'Showdown'
+  showdown:'Showdown',
+  sniper:'The Sniper',
+  misery:'Misery'
 };
 
 // Final Draft rubric (Plot / Character Development / Setting / Theme) for
@@ -212,7 +216,9 @@ const STORY_ACTIVITY_SPECS = {
   veldt:{label:'Nursery Warning Signs Tracker',title:'Nursery Warning Signs Tracker'},
   eraser_tattoo:{label:'Subtext Decoder',title:'Subtext Decoder'},
   marigolds:{label:'Marigolds as Symbol Tracker',title:'Marigolds as Symbol Tracker'},
-  showdown:{label:'Time Loop Tracker',title:'Time Loop Tracker'}
+  showdown:{label:'Time Loop Tracker',title:'Time Loop Tracker'},
+  sniper:{label:'Foreshadowing Clue Chart',title:'Foreshadowing Clue Chart'},
+  misery:{label:'Who Will Listen? Tracker',title:'Who Will Listen? Tracker'}
 };
 function activitySpec_(itemKey) {
   itemKey = String(itemKey || '');
@@ -4672,9 +4678,16 @@ function md5Hex_(text){
   var bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.MD5, text, Utilities.Charset.UTF_8);
   return bytes.map(function(b){ return ('0' + (b & 0xFF).toString(16)).slice(-2); }).join('');
 }
+// Index.html holds the teacher's own pasted story text (#storyTextStore). It is left out of the
+// fingerprint so pasting or editing a story never makes checkFiles report Index as different.
+function storyTextFree_(text){
+  var a = text.indexOf('<div id="storyTextStore" hidden>'), b = text.indexOf('<!-- end storyTextStore -->');
+  return (a === -1 || b === -1 || b < a) ? text : text.slice(0, a) + text.slice(b);
+}
 function fileFingerprint_(name){
   var raw = HtmlService.createTemplateFromFile(name).getRawContent();
   var text = String(raw).replace(/\r/g, '').replace(/^\s+|\s+$/g, '');
+  if (name === 'Index') text = storyTextFree_(text);
   return {chars: text.length, md5: md5Hex_(text), md5ws: md5Hex_(text.replace(/\s+/g, '')), head: text.slice(0, 120), tail: text.slice(-60)};
 }
 function checkFiles(){
@@ -4721,29 +4734,29 @@ function checkFiles(){
 var FILE_FINGERPRINTS = {
   "files": {
     "AppLogic": {
-      "chars": 199772,
-      "md5": "e8cd30ceda4fa26a44435da65ec28045",
-      "md5ws": "3387556eec1798075b493d004a2ad932"
+      "chars": 200505,
+      "md5": "d42a14104bca8f815f64d8f055059f05",
+      "md5ws": "101111588f4617fe04b80903bf608df1"
     },
     "BackendClient": {
-      "chars": 549585,
-      "md5": "6d1f5eb099139a07a07c5d97e66aa82b",
-      "md5ws": "13760712fdb7fbce3d0185e25c3e8ac3"
+      "chars": 549582,
+      "md5": "cfb73dc803ede59c8c186f8c9c1bb9bd",
+      "md5ws": "ac974ba9ecc9b0994a826d7ae05804b3"
     },
     "Images": {
-      "chars": 1029379,
-      "md5": "234729686e0a28d20e4cff88309a1875",
-      "md5ws": "87bef28320ffb28affd989a0e05eba5f"
+      "chars": 1469780,
+      "md5": "9c52e9583c74a01bb5ac8eb0619d1dda",
+      "md5ws": "ce295aea7113a87bd2fe262f6a9a79e8"
     },
     "Index": {
-      "chars": 319379,
-      "md5": "dc06f97cb48ed748e81c0c8ca5d321bd",
-      "md5ws": "5752a10ec0e09c873b387e2a327acc77"
+      "chars": 274806,
+      "md5": "36ce8face8a4c903cec8e091efb0a59b",
+      "md5ws": "a3274a0aeedfd36692df296eb7212eb3"
     },
     "StoryData": {
-      "chars": 112721,
-      "md5": "bf55fb79fc8de2c02a676c94baf91693",
-      "md5ws": "cfd49d76cd7496073ff1e2cc4c8f37a5"
+      "chars": 126120,
+      "md5": "952186a884551db8794502fb34ee896d",
+      "md5ws": "5a8ca3b83adacb9df55dca06b1a3afdc"
     },
     "WritingWorkshop": {
       "chars": 42467,

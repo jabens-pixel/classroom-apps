@@ -1,6 +1,6 @@
 {
   "title": "Short Story Lab",
-  "summary": "A short story unit for grades 9–10: ten stories with reading support, quick checks and written responses, then a writing workshop where students build their own story.",
+  "summary": "A short story unit for grades 9–10: twelve stories with reading support, quick checks and written responses, then a writing workshop where students build their own story.",
   "steps": [
     { "as": "student", "wait": 2500 },
     { "caption": "The student view. Each story is a short, guided reading lesson.", "hold": 3400 },

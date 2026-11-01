@@ -741,7 +741,7 @@ body.role-student .sidebar-footer-art p{font-size:17px!important;line-height:1.4
 body.role-student .library-page-card .tile{min-height:240px!important}
 body.role-student .library-page-card .tile img{height:132px!important}.library-page-card .tile::after{height:132px!important}.library-page-card .tile .tileeq{top:98px!important}
 body.role-student .home-shelf-grid .tile img{object-fit:cover!important}
-body.role-student .home-shelf-grid .tile[data-story="interlopers"] img,body.role-student .home-shelf-grid .tile[data-story="sound_of_thunder"] img,body.role-student .home-shelf-grid .tile[data-story="wild_dog"] img,body.role-student .home-shelf-grid .tile[data-story="eraser_tattoo"] img,body.role-student .home-shelf-grid .tile[data-story="marigolds"] img,body.role-student .home-shelf-grid .tile[data-story="showdown"] img{filter:none!important}
+body.role-student .home-shelf-grid .tile[data-story="interlopers"] img,body.role-student .home-shelf-grid .tile[data-story="sound_of_thunder"] img,body.role-student .home-shelf-grid .tile[data-story="wild_dog"] img,body.role-student .home-shelf-grid .tile[data-story="eraser_tattoo"] img,body.role-student .home-shelf-grid .tile[data-story="marigolds"] img,body.role-student .home-shelf-grid .tile[data-story="showdown"] img,body.role-student .home-shelf-grid .tile[data-story="sniper"] img,body.role-student .home-shelf-grid .tile[data-story="misery"] img{filter:none!important}
 body.role-student .showcase-copy{padding:5px 0}
 body.role-student .showcase-copy p{background:rgba(5,24,37,.34);display:inline-block;padding:7px 9px;border-radius:4px;backdrop-filter:blur(1px)}
 body.role-student .story-banner-focus{display:inline-block;background:rgba(5,24,37,.45);padding:5px 8px;border-radius:4px}
@@ -1134,6 +1134,12 @@ body.role-teacher .teacher-settings-card,body.role-admin .teacher-settings-card{
 .story-read-toolbar>div{display:flex;flex-direction:column;gap:3px}.story-read-toolbar-kicker{font-size:10px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--royal-garnet,#7d2944)}.story-read-toolbar strong{font-size:14px;color:var(--royal-ink,#25243a)}.story-read-toolbar .focus-mode-btn{margin-left:auto;white-space:nowrap;background:#0a3553!important;color:#fffaf0!important;border-color:#0a3553!important}.story-read-toolbar .focus-mode-btn:hover{border-color:#c6a04d!important;box-shadow:0 0 0 2px rgba(198,160,77,.18)}
 body.focus-story .story-banner{display:none!important}body.focus-story .story-read-toolbar{max-width:940px;margin:0 auto 18px!important;background:transparent!important;border:0!important;border-bottom:1px solid rgba(198,160,77,.36)!important;border-radius:0!important;padding:0 0 14px!important}body.focus-story .story-read-toolbar>div{display:none!important}body.focus-story .story-read-toolbar .focus-mode-btn{margin-left:auto!important;background:#c6a04d!important;color:#171629!important;border-color:#c6a04d!important}
 @media(max-width:700px){.story-read-toolbar{align-items:flex-start;flex-direction:column}.story-read-toolbar .focus-mode-btn{margin-left:0;width:100%}}
+/* 2026-10-31: "Full text" badge on stories whose text is in the app (shown only when some aren't). */
+.fulltext-badge{display:inline-flex;align-items:center;gap:4px;font:700 11px/1 "Source Sans 3",system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:#1f4d2e!important;background:#e3f1e4!important;border:1px solid #9cc7a3;border-radius:999px;padding:4px 9px;margin:0 6px 4px 0;white-space:nowrap}
+.story-banner .fulltext-badge{margin:0 0 0 8px;vertical-align:middle}
+/* 2026-10-31: the story pictures are one painted set now -- same crop and tone on every tile. */
+body .tile img{object-position:center 50%!important;filter:saturate(1) contrast(1.05) brightness(1.02)!important}
+.story-tile-hero{background-position:center 50%!important}
 </style>
 
 </head><body><header class="topbar"><div class="brand"><span class="brand-words">Short Story <small>Lab</small></span></div><div class="role-switch"><button data-role="student" class="active">Student</button><button data-role="teacher">Teacher</button><button data-role="admin">Admin</button></div></header><div class="layout"><aside id="sidebar"></aside><main class="main" id="app"><div class="card" id="bootCard"><h2>Loading unit...</h2><p>Connecting to the curriculum and your Google account.</p></div></main></div><div id="modalRoot"></div>
@@ -1151,7 +1157,6 @@ body.focus-story .story-banner{display:none!important}body.focus-story .story-re
   keep it as a read-link / outside-reading title.
 -->
 <div id="storyTextStore" hidden>
-  <div id="storyTextStore" hidden>
   <div data-story-text="interlopers">
 In a forest of mixed growth somewhere on the eastern spurs of the Carpathians, a man stood one winter night watching and listening, as though he waited for some beast of the woods to come within the range of his vision, and, later, of his rifle. But the game for whose presence he kept so keen an outlook was none that figured in the sportsman’s calendar as lawful and proper for the chase; Ulrich von Gradwitz patrolled the dark for- est in quest of a human enemy.
 
@@ -1600,7 +1605,95 @@ louder! louder! louder! – "Villains!" I shrieked, "dissemble no more! I admit 
 PASTE STORY TEXT HERE
 </div>
   <div data-story-text="wild_dog">
-PASTE STORY TEXT HERE
+Late on a dull day in November, old Gordon Low stumbled on the lonely cabin of the nameless trapper whose lines ran over the Caucomgomoc country; he found the man at the point of death, and cared for him all that long, dark night.
+
+Outside the door, from sunset to sunrise, crouched the dying man’s great, gaunt bloodhound. With the first light of morning, the creature whined, scratched the boards of the door, and slunk into the room. The dog thrust his cold nose into the old trapper’s fevered hand; he put his two paws on the side of the bunk, and raised himself so that he could look into the unseeing human eyes. For a long time he stared in dumb-brute agony of grief, understanding what it all meant as well as if he were human and Gordon Low turned to the window, with something akin to mist blurring his vision. After a long silence the gnarled, old, white-bearded man in the bunk rose on his trembling elbow, and flung a long arm round the dog’s neck, drew the beast’s face close to his own, and held him a full minute with the failing strength of a great love.
+
+Afterward, Low tried to feed the dog. He sought to win the animal’s confidence, but the bloodhound was afraid of him. With bared teeth he crouched before Gordon’s extended hand, and growled deep in his throat. He stood by the door, and whined. When Low crossed the cabin to open the door, the bloodhound sank on his haunches in the corner, ready to fight to the last gasp. When he found that the man did not attack him, he darted into the open, turned for one brief glance at the dark windows, and leaving behind him the silent cabin with its dead, swung into a long lope that carried him swiftly over the birch-clad hill until he became a mere moving speck in the leafless forest. Thus the masterless dog passed into the wilderness.
+
+Two days later they carried the trapper’s body up the hill, above the banks of Caucomgomoc Stream, and buried it, with a prayer and a verse from the Scriptures. Human mourners were few; there were the minister from the distant village, three men from the lumber camp, who came in the name of a brief friendship, and old Gordon Low; but a silent shadow, slipping through the silver birches and the spruces, watched it all, with dark, deep eyes. When the preacher was starting down the trail to the village in the gloaming, he looked back at the solitary grave, and saw a tall, lank hound standing in mute and sorrowful guardianship over the new-turned earth.
+
+Time and again in the winter that followed, men from the towns or the logging camps caught sight of the hound in underbrush or distant thicket, usually silent and far away. They held him in the same awe in which they had held his master; for there was something sombre and threatening in the creature’s attitude when, with drooping lips, and great head hung forward, and staring eyes deep as night, he gazed down from the high hills at some passer-by on the long, snow-covered roads below. Once three men traveling on foot heard behind them in the forest that never-to-be-forgotten voice, resonant, vibrant, like a great bell booming up from the valley, a voice that drew nearer and ever nearer. The men knew that the dog of Caucomgomoc was on their track. They ran from him as if a fiend were at their heels; but always that voice trailed them over the ridges, through the valleys, until, looking back, they saw the lean bloodhound, with his nose to the ground, rapidly drawing nearer. When the men, who had no weapons, began searching frantically under the dead leaves for clubs, a deathly silence came over the woods. But the dog did not attack them. The men, looking up at the hill above them, saw him standing there, fixing them with malevolent gaze; they fled again, in a strange fear.
+
+No one knew a reason for fearing the dog. So far as was known, he never had attacked a human being. Perhaps it was his expression — his fearless, challenging stare —that frightened men. Perhaps it was the mystery that attaches itself to the name of bloodhound. They had feared the rangy, bell-throated beast from the day when first he came to Caucomgomoc, but when his master died they feared him more; he had gone wild, he was a menace to the entire countryside, they said—all except Gordon Low.
+
+At midnight, men in the distant camps heard the creature’s hunting cry, and, turning restlessly in their blankets, told one another that the hound of Caucomgomoc was out that night. Sometimes, at high noon, scattered choppers in the mountains shuddered and drew closer together, when, from over waste stretches of land, rang the hollow baying of the bloodhound, faint, and small, and far away. Some said he was hunting with the spirit of his lost master; some, that he was a devil incarnate.
+
+Gray-haired Amos Nieben, the Indian, tapping his forehead with unmistakable meaning, quoted an ancient tale of the Abnaki, about a hound of supernatural powers, in days long past, that had tracked a man forsworn across the wilderness to the very gates of Quebec.
+
+While the winter passed, and spring came in with the rush of white water in the rips, the fame of the lost hound spread, and he became known from the Abol to the Allagash as the wild dog of Caucomgomoc.
+
+One May afternoon, in the village store, where half a dozen men were loafing in their accustomed places on meal sacks and nail kegs, Gordon Low laughed at the stories they were telling, and declared, impulsively, that he would like to own the dog.
+
+“Own him!” chuckled a French trapper, who had come down for provisions. “Ho, ho, that is a ver’ good joke! Listen,”— his voice dropped to a whisper, — “that is no real dog. No! That dog has a demon in him. He would eat you in the night. He would eat children in the village. It is not safe to talk so of a demon dog. Once he followed me down Caucomgomoc Stream. I heard him yowling high in the hills. I ran, I ran faster, still came that yowling fiend of a brute, wo-o-a-ow, so! Sacre! I ran — behind me the dog, before me my cabin. I reach the cabin, I slam the door, with my rifle in hand I open the window — he is gone. Always he is gone when there is a gun; therefore he is a demon dog, else he would be shot.”
+
+Gordon Low flared up angrily. “Yes, it’s mighty glad I’d be to own that hound!” he repeated. “There’s no such other dog in all the country!”
+
+“Thanks be for that!” cried another speaker. “If there was such another dog, it would be no place for men!”
+
+A woman was hurrying up the road. Gordon Low watched her quick steps, saw her blue apron blown back by the wind, her brown hair tossed in wisps about her face, and recognized his son’s wife. She was coming to the store.
+
+As she stood on the threshold the men turned, and Low felt himself unaccountably frightened by the unnatural pallor in the woman’s face. She looked quickly round the little group, into the shadows behind the meal sacks, and cried, “Where’s my little Ned?”
+
+Gordon’s heart thumped, and he rose slowly to his feet, but Austin, the storekeeper, stepped forward. “Ned’s all right; he rode up to the camps with Bill Nichols early this afternoon — Bill’s toting in Johnston’s supplies.”
+
+“Bill Nichols, that rattle-brained scamp!” the mother exclaimed. “Here I’ve hunted the house over for the boy!”
+
+“Well, here’s Bill. He can speak for himself,” Austin said, and pointed at a jolting wagon sled that was coming down from the woods. The driver sat, calm as Buddha, in a flour-barrel chair, with the reins over his knees; he was sound asleep.
+
+Bill Nichols woke from his dream to find Mrs. Low shaking his arm
+
+“Neddy?” he said, with a gasp, and stared at the empty sled. “Neddy? Why — why — he must have fell off!”
+
+Night was approaching. The sun barely peered over the top of Russell Mountain. Johnston’s camps were ten miles away, in the Caucomgomoc country, and eight-year old Ned Low was alone in the wilderness. They told his mother that he could not be lost on the road. They told her that a child of his age could not travel far enough from the road to escape a searching party, if he tried. They told her that the boy would find his way home unaided, and they almost calmed her fears. But Gordon Low knew, better than anyone else, the devious windings of the tote road through grassy meadows and thick alder growths, the pathless wastes of marsh, and bog, and beaver dam that lay through all the Caucomgomoc country. And he knew his little grandson’s determined spirit, the dogged will, so like his own, that had led the boy, young as he was, to roam over hills and valleys round the village. The old man’s cheeks were gray, and his brows were knotted in a dark frown.
+
+Assuring the woman that the child was probably not a mile from the village and would soon be found, twenty men, armed with guns, horns, and lanterns, set out on the long road under the darkening pines; but ahead of them all, at the swift stride for which he was famous, marched Gordon Low. Two hours later, the grandfather, trailworn and weary, stumbled into Johnston’s camps. But not a person in Johnston’s camps had seen Ned Low. What Bill Nichols had been too much afraid, or too much bewildered, to confess, was revealed now — Ned had been lost on the outward trip.
+
+At that moment, although the grandfather did not know it, the boy’s father had just reached home, and, frightened by the news that met him at his door, was starting, supperless, on the winding trail. When the other men, with swinging lanterns and gleaming gun barrels, came up through the alders into the camp yard, Gordon Low was turning back on the road.
+
+The searching parties gathered in the moonlight, which was just beginning to sift through the pines, and looked across the dark waste of evergreen, over the swampy, marshy lowlands through which they had passed. The boy had been lost, Bill Nichols admitted in tearful contrition, before the team had reached Johnston’s camps. For at least five hours Ned had been wandering in the maze of slashings and roads, and streams, and bogs. As they stared into the night, despair settled over the group, for there seemed to be very little that they could do. They turned back, calling, calling, calling; they wound in and out of old clearings and forgotten roads, plunged into swamps, and spread into a great net of swinging lanterns and shouting men. Slowly the hunt wound toward the town, hopelessly, doggedly persevering. An hour passed, an hour and a half. The father came up into the circle of swinging lanterns, and knew, without asking, the sad truth. The net grew wider and wider. It spread into marsh and bog hole, cedar tangle and spruce barrens, all without avail.
+
+For another weary hour they worked back through the wilderness, searching every thicket, and calling, without answer.
+
+Suddenly Ed Low, the father, held up his hand. “Stop!” he cried. “What’s that?”
+
+To left and right ran the command for silence. The shouting died away; the men stood, with stifled breath. They glanced, wild-eyed, at each other, and at the darkness round them.
+
+“What is it—for heaven’s sake, what is it?” Ed Low fairly hurled the words into the night.
+
+From far away in the dark forest came the answering cry of Gordon Low, who called without knowing that they had stopped: “Can — you — hear — the — hound?” The voice echoed, and was still.
+
+Men, leaning wearily against cedars, paled with a terrible dread; stout hearts shook with horror. At last they heard the dreadful sound.
+
+From across miles and miles of tangled thicket and open marsh, came the clear, faint call of a bloodhound on the trail. As regular as a tolling knell, deep, mournful, and unutterably wild, came the call. With throbbing hearts, the searchers splashed through the swamp water, ankle-deep, knee-deep, waist-deep. They pressed on, shoulder to shoulder, drawn together by an unconfessed fear.
+
+They gathered on the road, and listened to the call of the hound. It came from the south.
+
+They ran, with bobbing lanterns; they jostled down the road, stumbling and tripping.
+
+“The wild dog of Caucomgomoc!” they cried. “God help the boy!”
+
+Strangely enough, they had no doubt whom the beast was tracking. They swung their guns forward, they felt the cartridges in their pockets. Ahead of all of them, at the unfailing pace of a racer trained and tried, old Gordon Low ran down the road.
+
+The cry of the hound grew louder. They were nearing the end of the hunt, they knew, for the howling of the dog was nearer, sharper, and continued without pausing. The dog had swung to the right. The men hurried down a hauling road, stumbling over roots, stumps, and crisscrossed logs. For ten minutes they straggled on; then, with Gordon Low still ahead, they dashed from the road into the swamp. Floundering, splashing, plunging, they thrust themselves through alders and willows, leaped into a dead stream, knee-deep in mud and waist-deep in water, surged through tall grass, crossed a beaver dam, partly by moonlight, partly by lantern light — and then stopped.
+
+It had been a night of terror, and this was the culminating moment. The shapes of trees and of men were ghostly in the wan light of the moon. The lantern bearers stood like wraiths in the sultry swamp. They were close to the dog, so close that cold fear enshrouded them! But the dog’s cry had changed! With difficulty they forced a passage through the brush, and struggled to the edge of a black bog, and stopped again. Ahead of them lay an impassable morass.
+
+For a moment they stared across the treacherous plain; then, with a low, quivering cry, Amos Nieben threw his gun to his shoulder. As the Indian’s gun barrel rose, Gordon Low swung the butt of his own rifle against it, and knocked up the muzzle, so that the bullet whined into the trees beyond the bog.
+
+“Fool!” Low cried. “Look there!”
+
+“But it is the demon beast!” shrieked the Indian.
+
+There, out in the marsh, was the wild dog of Caucomgomoc struggling toward firm earth. The light was dim, and they could not see distinctly, but as he approached, they gradually distinguished something hanging from his jaws; Picking his way over the mud and through the tufted grasses, the dog came slowly nearer. The thing hanging from his mouth was a small boy, a frightened, silent child that was clinging to the neck of the bloodhound with both arms. As the bewildered men stared, not believing their own eyes, they saw the boy’s arms drop, and his body sink. Plainly, he had not the strength to call; he was too far gone even to know in what place he was. But the tall, lean dog seized the child’s coat between his teeth, dragged the little body through the water, ploughed on, floundered, splashed, and sank to his belly in bog mud. The hound’s large eyes looked up at the searchers in pitiful appeal. Without letting go his hold on the boy’s coat, he whined.
+
+Linking themselves together in one long chain, hand and wrist, the men waded out through the mud and tufted grass.
+
+Then Gordon Low leaped far out into the bog, caught up the boy, and passed him back to waiting hands; and then, even while he was sinking himself, lifted the bloodhound bodily from the trap; he fought against the sucking, clinging masses, fell, rose, and, helped by all who could reach him, stepped on solid earth.
+
+The boy was faint, desperately tired, frightened, and hungry — but unharmed. The good news, borne by the swiftest runners, preceded him to the village a full hour. His father carried him through the swamps and down the tote road into the waiting town, where lamplighted windows and clustered groups of women waited; but close beside him marched the grandfather, and at his heels followed the wild dog of Caucomgomoc.
+
+That night the bloodhound seemed to recognize a new bond between himself and mankind; he seemed no longer to fear the man who had raised him from the bog. That night he followed Gordon Low to his door. At first he was afraid to enter the house, but when Gordon called him in a low, gentle voice, he crossed the threshold in perfect confidence. And from that memorable night until the dog himself died, at the time of the great storm, years later, he loved Gordon Low as once he had loved the lonely trapper of Caucomgomoc.
 </div>
 <div data-story-text="veldt">
 PASTE STORY TEXT HERE
@@ -1614,6 +1707,184 @@ PASTE STORY TEXT HERE
   <div data-story-text="showdown">
 PASTE STORY TEXT HERE
 </div>
+  <div data-story-text="sniper">
+The long June twilight faded into night. Dublin lay enveloped in darkness but for the dim light of the moon that shone through fleecy clouds, casting a pale light as of approaching dawn over the streets and the dark waters of the Liffey. Around the beleaguered Four Courts the heavy guns roared. Here and there through the city, machine guns and rifles broke the silence of the night, spasmodically, like dogs barking on lone farms. Republicans and Free Staters were waging civil war.
+
+On a rooftop near O’Connell Bridge, a Republican sniper lay watching. Beside him lay his rifle and over his shoulders was slung a pair of field glasses. His face was the face of a student, thin and ascetic, but his eyes had the cold gleam of the fanatic. They were deep and thoughtful, the eyes of a man who is used to looking at death.
+
+He was eating a sandwich hungrily. He had eaten nothing since morning. He had been too excited to eat. He finished the sandwich, and, taking a flask of whiskey from his pocket, he took a short drought. Then he returned the flask to his pocket. He paused for a moment, considering whether he should risk a smoke. It was dangerous. The flash might be seen in the darkness, and there were enemies watching. He decided to take the risk.
+
+Placing a cigarette between his lips, he struck a match, inhaled the smoke hurriedly and put out the light. Almost immediately, a bullet flattened itself against the parapet of the roof. The sniper took another whiff and put out the cigarette. Then he swore softly and crawled away to the left.
+
+Cautiously he raised himself and peered over the parapet. There was a flash and a bullet whizzed over his head. He dropped immediately. He had seen the flash. It came from the opposite side of the street.
+
+He rolled over the roof to a chimney stack in the rear, and slowly drew himself up behind it, until his eyes were level with the top of the parapet. There was nothing to be seen—just the dim outline of the opposite housetop against the blue sky. His enemy was under cover.
+
+Just then an armored car came across the bridge and advanced slowly up the street. It stopped on the opposite side of the street, fifty yards ahead. The sniper could hear the dull panting of the motor. His heart beat faster. It was an enemy car. He wanted to fire, but he knew it was useless. His bullets would never pierce the steel that covered the gray monster.
+
+Then round the corner of a side street came an old woman, her head covered by a tattered shawl. She began to talk to the man in the turret of the car. She was pointing to the roof where the sniper lay. An informer.
+
+The turret opened. A man’s head and shoulders appeared, looking toward the sniper. The sniper raised his rifle and fired. The head fell heavily on the turret wall. The woman darted toward the side street. The sniper fired again. The woman whirled round and fell with a shriek into the gutter.
+
+Suddenly from the opposite roof a shot rang out and the sniper dropped his rifle with a curse. The rifle clattered to the roof. The sniper thought the noise would wake the dead. He stooped to pick the rifle up. He couldn’t lift it. His forearm was dead. “I’m hit,” he muttered.
+
+Dropping flat onto the roof, he crawled back to the parapet. With his left hand he felt the injured right forearm. The blood was oozing through the sleeve of his coat. There was no pain—just a deadened sensation, as if the arm had been cut off.
+
+Quickly he drew his knife from his pocket, opened it on the breastwork of the parapet, and ripped open the sleeve. There was a small hole where the bullet had entered. On the other side there was no hole. The bullet had lodged in the bone. It must have fractured it. He bent the arm below the wound. the arm bent back easily. He ground his teeth to overcome the pain.
+
+Then taking out his field dressing, he ripped open the packet with his knife. He broke the neck of the iodine bottle and let the bitter fluid drip into the wound. A paroxysm of pain swept through him. He placed the cotton wadding over the wound and wrapped the dressing over it. He tied the ends with his teeth.
+
+Then he lay still against the parapet, and, closing his eyes, he made an effort of will to overcome the pain.
+
+In the street beneath all was still. The armored car had retired speedily over the bridge, with the machine gunner’s head hanging lifeless over the turret. The woman’s corpse lay still in the gutter.
+
+The sniper lay still for a long time nursing his wounded arm and planning escape. Morning must not find him wounded on the roof. The enemy on the opposite roof coverd his escape. He must kill that enemy and he could not use his rifle. He had only a revolver to do it. Then he thought of a plan.
+
+Taking off his cap, he placed it over the muzzle of his rifle. Then he pushed the rifle slowly upward over the parapet, until the cap was visible from the opposite side of the street. Almost immediately there was a report, and a bullet pierced the center of the cap. The sniper slanted the rifle forward. The cap clipped down into the street. Then catching the rifle in the middle, the sniper dropped his left hand over the roof and let it hang, lifelessly. After a few moments he let the rifle drop to the street. Then he sank to the roof, dragging his hand with him.
+
+Crawling quickly to his feet, he peered up at the corner of the roof. His ruse had succeeded. The other sniper, seeing the cap and rifle fall, thought that he had killed his man. He was now standing before a row of chimney pots, looking across, with his head clearly silhouetted against the western sky.
+
+The Republican sniper smiled and lifted his revolver above the edge of the parapet. The distance was about fifty yards—a hard shot in the dim light, and his right arm was paining him like a thousand devils. He took a steady aim. His hand trembled with eagerness. Pressing his lips together, he took a deep breath through his nostrils and fired. He was almost deafened with the report and his arm shook with the recoil.
+
+Then when the smoke cleared, he peered across and uttered a cry of joy. His enemy had been hit. He was reeling over the parapet in his death agony. He struggled to keep his feet, but he was slowly falling forward as if in a dream. The rifle fell from his grasp, hit the parapet, fell over, bounded off the pole of a barber’s shop beneath and then clattered on the pavement.
+
+Then the dying man on the roof crumpled up and fell forward. The body turned over and over in space and hit the ground with a dull thud. Then it lay still.
+
+The sniper looked at his enemy falling and he shuddered. The lust of battle died in him. He became bitten by remorse. The sweat stood out in beads on his forehead. Weakened by his wound and the long summer day of fasting and watching on the roof, he revolted from the sight of the shattered mass of his dead enemy. His teeth chattered, he began to gibber to himself, cursing the war, cursing himself, cursing everybody.
+
+He looked at the smoking revolver in his hand, and with an oath he hurled it to the roof at his feet. The revolver went off with a concussion and the bullet whizzed past the sniper’s head. He was frightened back to his senses by the shock. His nerves steadied. The cloud of fear scattered from his mind and he laughed.
+
+Taking the whiskey flask from his pocket, he emptied it a drought. He felt reckless under the influence of the spirit. He decided to leave the roof now and look for his company commander, to report. Everywhere around was quiet. There was not much danger in going through the streets. He picked up his revolver and put it in his pocket. Then he crawled down through the skylight to the house underneath.
+
+When the sniper reached the laneway on the street level, he felt a sudden curiosity as to the identity of the enemy sniper whom he had killed. He decided that he was a good shot, whoever he was. He wondered did he know him. Perhaps he had been in his own company before the split in the army. He decided to risk going over to have a look at him. He peered around the corner into O’Connell Street. In the upper part of the street there was heavy firing, but around here all was quiet.
+
+The sniper darted across the street. A machine gun tore up the ground around him with a hail of bullets, but he escaped. He threw himself face downward beside the corpse. The machine gun stopped.
+
+Then the sniper turned over the dead body and looked into his brother’s face.
+</div>
+  <div data-story-text="misery">“To whom shall I tell my grief?”
+
+The twilight of evening. Big flakes of wet snow are whirling lazily about the street lamps, which have just been lighted, and lying in a thin soft layer on roofs, horses’ backs, shoulders, caps. Iona Potapov, the sledge-driver, is all white like a ghost. He sits on the box without stirring, bent as double as the living body can be bent. If a regular snowdrift fell on him it seems as though even then he would not think it necessary to shake it off. . . . His little mare is white and motionless too. Her stillness, the angularity of her lines, and the stick-like straightness of her legs make her look like a halfpenny gingerbread horse. She is probably lost in thought. Anyone who has been torn away from the plough, from the familiar gray landscapes, and cast into this slough, full of monstrous lights, of unceasing uproar and hurrying people, is bound to think.
+
+It is a long time since Iona and his nag have budged. They came out of the yard before dinnertime and not a single fare yet. But now the shades of evening are falling on the town. The pale light of the street lamps changes to a vivid color, and the bustle of the street grows noisier.
+
+“Sledge to Vyborgskaya!” Iona hears. “Sledge!”
+
+Iona starts, and through his snow-plastered eyelashes sees an officer in a military overcoat with a hood over his head.
+
+“To Vyborgskaya,” repeats the officer. “Are you asleep? To Vyborgskaya!”
+
+In token of assent Iona gives a tug at the reins which sends cakes of snow flying from the horse’s back and shoulders. The officer gets into the sledge. The sledge-driver clicks to the horse, cranes his neck like a swan, rises in his seat, and more from habit than necessity brandishes his whip. The mare cranes her neck, too, crooks her stick-like legs, and hesitatingly sets of. . . .
+
+“Where are you shoving, you devil?” Iona immediately hears shouts from the dark mass shifting to and fro before him. “Where the devil are you going? Keep to the r-right!”
+
+“You don’t know how to drive! Keep to the right,” says the officer angrily.
+
+A coachman driving a carriage swears at him; a pedestrian crossing the road and brushing the horse’s nose with his shoulder looks at him angrily and shakes the snow off his sleeve. Iona fidgets on the box as though he were sitting on thorns, jerks his elbows, and turns his eyes about like one possessed as though he did not know where he was or why he was there.
+
+“What rascals they all are!” says the officer jocosely. “They are simply doing their best to run up against you or fall under the horse’s feet. They must be doing it on purpose.”
+
+Iona looks as his fare and moves his lips. . . . Apparently he means to say something, but nothing comes but a sniff.
+
+“What?” inquires the officer.
+
+Iona gives a wry smile, and straining his throat, brings out huskily: “My son . . . er . . . my son died this week, sir.”
+
+“H’m! What did he die of?”
+
+Iona turns his whole body round to his fare, and says:
+
+“Who can tell! It must have been from fever. . . . He lay three days in the hospital and then he died. . . . God’s will.”
+
+“Turn round, you devil!” comes out of the darkness. “Have you gone cracked, you old dog? Look where you are going!”
+
+“Drive on! drive on! . . .” says the officer. “We shan’t get there till to-morrow going on like this. Hurry up!”
+
+The sledge-driver cranes his neck again, rises in his seat, and with heavy grace swings his whip. Several times he looks round at the officer, but the latter keeps his eyes shut and is apparently disinclined to listen. Putting his fare down at Vyborgskaya, Iona stops by a restaurant, and again sits huddled up on the box. . . . Again the wet snow paints him and his horse white. One hour passes, and then another. . . .
+
+Three young men, two tall and thin, one short and hunchbacked, come up, railing at each other and loudly stamping on the pavement with their goloshes.
+
+“Cabby, to the Police Bridge!” the hunchback cries in a cracked voice. “The three of us, . . . twenty kopecks!”
+
+Iona tugs at the reins and clicks to his horse. Twenty kopecks is not a fair price, but he has no thoughts for that. Whether it is a rouble or whether it is five kopecks does not matter to him now so long as he has a fare. . . . The three young men, shoving each other and using bad language, go up to the sledge, and all three try to sit down at once. The question remains to be settled: Which are to sit down and which one is to stand? After a long altercation, ill-temper, and abuse, they come to the conclusion that the hunchback must stand because he is the shortest.
+
+“Well, drive on,” says the hunchback in his cracked voice, settling himself and breathing down Iona’s neck. “Cut along! What a cap you’ve got, my friend! You wouldn’t find a worse one in all Petersburg. . . .”
+
+“He-he! . . . he-he! . . .” laughs Iona. “It’s nothing to boast of!”
+
+“Well, then, nothing to boast of, drive on! Are you going to drive like this all the way? Eh? Shall I give you one in the neck?”
+
+“My head aches,” says one of the tall ones. “At the Dukmasovs’ yesterday Vaska and I drank four bottles of brandy between us.”
+
+“I can’t make out why you talk such stuff,” says the other tall one angrily. “You lie like a brute.”
+
+“Strike me dead, it’s the truth! . . .”
+
+“It’s about as true as that a louse coughs.”
+
+“He-he!” grins Iona. “Me-er-ry gentlemen!”
+
+“Tfoo! the devil take you!” cries the hunchback indignantly. “Will you get on, you old plague, or won’t you? Is that the way to drive? Give her one with the whip. Hang it all, give it her well.”
+
+Iona feels behind his back the jolting person and quivering voice of the hunchback. He hears abuse addressed to him, he sees people, and the feeling of loneliness begins little by little to be less heavy on his heart. The hunchback swears at him, till he chokes over some elaborately whimsical string of epithets and is overpowered by his cough. His tall companions begin talking of a certain Nadyezhda Petrovna. Iona looks round at them. Waiting till there is a brief pause, he looks round once more and says:
+
+“This week . . . er. . . my. . . er. . . son died!”
+
+“We shall all die, . . .” says the hunchback with a sigh, wiping his lips after coughing. “Come, drive on! drive on! My friends, I simply cannot stand crawling like this! When will he get us there?”
+
+“Well, you give him a little encouragement . . . one in the neck!”
+
+“Do you hear, you old plague? I’ll make you smart. If one stands on ceremony with fellows like you one may as well walk. Do you hear, you old dragon? Or don’t you care a hang what we say? ”
+
+And Iona hears rather than feels a slap on the back of his neck.
+
+“He-he! . . . ” he laughs. “Merry gentlemen . . . . God give you health!”
+
+“Cabman, are you married?” asks one of the tall ones.
+
+“I? He he! Me-er-ry gentlemen. The only wife for me now is the damp earth. . . . He-ho-ho!. . . .The grave that is! . . . Here my son’s dead and I am alive. . . . It’s a strange thing, death has come in at the wrong door. . . . Instead of coming for me it went for my son. . . .”
+
+And Iona turns round to tell them how his son died, but at that point the hunchback gives a faint sigh and announces that, thank God! they have arrived at last. After taking his twenty kopecks, Iona gazes for a long while after the revelers, who disappear into a dark entry. Again he is alone and again there is silence for him. . . . The misery which has been for a brief space eased comes back again and tears his heart more cruelly than ever. With a look of anxiety and suffering Iona’s eyes stray restlessly among the crowds moving to and fro on both sides of the street: can he not find among those thousands someone who will listen to him? But the crowds flit by heedless of him and his misery. . . . His misery is immense, beyond all bounds. If Iona’s heart were to burst and his misery to flow out, it would flood the whole world, it seems, but yet it is not seen. It has found a hiding-place in such an insignificant shell that one would not have found it with a candle by daylight. . . .
+
+Iona sees a house-porter with a parcel and makes up his mind to address him.
+
+“What time will it be, friend?” he asks.
+
+“Going on for ten. . . . Why have you stopped here? Drive on!”
+
+Iona drives a few paces away, bends himself double, and gives himself up to his misery. He feels it is no good to appeal to people. But before five minutes have passed he draws himself up, shakes his head as though he feels a sharp pain, and tugs at the reins. . . . He can bear it no longer.
+
+“Back to the yard!” he thinks. “To the yard!”
+
+And his little mare, as though she knew his thoughts, falls to trotting. An hour and a half later Iona is sitting by a big dirty stove. On the stove, on the floor, and on the benches are people snoring. The air is full of smells and stuffiness. Iona looks at the sleeping figures, scratches himself, and regrets that he has come home so early. . . .
+
+“I have not earned enough to pay for the oats, even,” he thinks. “That’s why I am so miserable. A man who knows how to do his work, . . . who has had enough to eat, and whose horse has had enough to eat, is always at ease. . . .”
+
+In one of the corners a young cabman gets up, clears his throat sleepily, and makes for the water-bucket.
+
+“Want a drink?” Iona asks him.
+
+“Seems so.”
+
+“May it do you good. . . . But my son is dead, mate. . . . Do you hear? This week in the hospital. . . . It’s a queer business. . . .”
+
+Iona looks to see the effect produced by his words, but he sees nothing. The young man has covered his head over and is already asleep. The old man sighs and scratches himself. . . . Just as the young man had been thirsty for water, he thirsts for speech. His son will soon have been dead a week, and he has not really talked to anybody yet . . . . He wants to talk of it properly, with deliberation. . . . He wants to tell how his son was taken ill, how he suffered, what he said before he died, how he died. . . . He wants to describe the funeral, and how he went to the hospital to get his son’s clothes. He still has his daughter Anisya in the country. . . . And he wants to talk about her too. . . . Yes, he has plenty to talk about now. His listener ought to sigh and exclaim and lament. . . . It would be even better to talk to women. Though they are silly creatures, they blubber at the first word.
+
+“Let’s go out and have a look at the mare,” Iona thinks. “There is always time for sleep. . . . You’ll have sleep enough, no fear. . . .”
+
+He puts on his coat and goes into the stables where his mare is standing. He thinks about oats, about hay, about the weather. . . . He cannot think about his son when he is alone. . . . To talk about him with someone is possible, but to think of him and picture him is insufferable anguish. . . .
+
+“Are you munching?” Iona asks his mare, seeing her shining eyes. “There, munch away, munch away. . . . Since we have not earned enough for oats, we will eat hay. . . . Yes, . . . I have grown too old to drive. . . . My son ought to be driving, not I. . . . He was a real cabman. . . . He ought to have lived. . . .”
+
+Iona is silent for a while, and then he goes on:
+
+“That’s how it is, old girl. . . . Kuzma Ionitch is gone. . . . He said good-by to me. . . . He went and died for no reason. . . . Now, suppose you had a little colt, and you were own mother to that little colt. . . . And all at once that same little colt went and died. . . . You’d be sorry, wouldn’t you? . . .”
+
+The little mare munches, listens, and breathes on her master’s hands. Iona is carried away and tells her all about it.
+
+</div>
+</div>
+<!-- end storyTextStore -->
 <script>
 window.addEventListener('error', function(event){
   try {

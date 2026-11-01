@@ -782,10 +782,9 @@ function studioAsset_(name) {
 }
 
 function studioStoryImage_(id) {
-  // Keep the original story artwork set that established the visual identity.
-  // Only the four teacher-selected embedded images override the story catalog art.
-  let override = { monkeys_paw: "monkeyPaw", twobr02b: "phone", tell_tale_heart: "tellTale", veldt: "lion" }[id];
-  return (override && studioAsset_(override)) || (STORIES[id] && STORIES[id].image) || "";
+  // 2026-10-31: every story has its own painted picture (Images.html art_<id>, made in Canva).
+  // STORIES[id].image is only a fallback for a story added later without one.
+  return studioAsset_("art_" + id) || (STORIES[id] && STORIES[id].image) || "";
 }
 
 function focusButtonHtml_(mode, label) {
@@ -832,7 +831,9 @@ const STUDIO_CRAFT_NOTES = {
   veldt: "Setting becomes powerful when it starts acting like a character.",
   eraser_tattoo: "Symbols matter when they carry history.",
   marigolds: "A single object can hold an entire turning point.",
-  showdown: "Tension rises when characters want incompatible things."
+  showdown: "Tension rises when characters want incompatible things.",
+  sniper: "A last line can change the meaning of everything before it.",
+  misery: "Grief can hide inside the most ordinary moments."
 };
 
 function studioHomeRail_() {
@@ -1087,7 +1088,7 @@ function studentHomeHero_() {
   let nextId = pendingId || releasedIds[0] || STORY_ORDER[0];
   let story = STORIES[nextId];
   let progress = storyProgressInfo_(nextId);
-  let art = studioStoryImage_(nextId) || studioAsset_("monkeyPaw") || studioAsset_("tellTale");
+  let art = studioStoryImage_(nextId) || studioAsset_("art_monkeys_paw");
   let style = art ? ` style="--showcase-art:url('${esc(art)}')"` : "";
   let kicker = progress.started ? "Continue your work" : "Up next";
   let detail = progress.mcDone && !progress.dokDone
@@ -1226,6 +1227,20 @@ function assignmentStatusChipHtml_(kind, key, opts) {
   return `<span data-assignment-kind="${esc(kind)}" data-assignment-key="${esc(key)}" class="assignment-status-chip is-todo">● Not started yet</span>`;
 }
 
+// "Full text" badge (2026-10-31): marks the stories whose own text is pasted into this copy
+// (#storyTextStore) -- but only when some stories don't have it. In a copy where every story has
+// its text, a badge on all of them would say nothing, so none is shown.
+function fullTextBadges_() {
+  if (fullTextBadges_.v == null) {
+    let have = STORY_ORDER.map((x) => !!storyRawText(x));
+    fullTextBadges_.v = have.some(Boolean) && !have.every(Boolean);
+  }
+  return fullTextBadges_.v;
+}
+function fullTextBadgeHtml_(id) {
+  return fullTextBadges_() && storyRawText(id) ? `<span class="fulltext-badge" title="The whole story is right here in the app">📖 Full text</span>` : "";
+}
+
 function storyTile(id) {
   let s = STORIES[id];
   let eq = EQ.find((e) => e.id === STORY_EQ[id]);
@@ -1241,7 +1256,7 @@ function storyTile(id) {
   let statusClass = locked ? "is-locked" : progress.done ? "is-done" : progress.started ? "is-progress" : "is-ready";
   let tileSrc = studioStoryImage_(id);
   let img = tileSrc ? `<img src="${esc(tileSrc)}" alt="" loading="lazy" onerror="this.style.opacity=0">` : "";
-  return `<button class="tile openStoryFromCard ${statusClass}" data-story="${id}" ${locked ? "disabled" : ""}><div class="tile-art">${img}<div class="tilenum">${s.order}</div><div class="tile-status">${status === "Submitted" ? "✓ " : status === "In progress" ? "◐ " : status === "Locked" ? "🔒 " : ""}${status}</div>${eq ? `<div class="tileeq" style="--tile-accent:${eq.color}">${esc(eq.label)}</div>` : ""}${locked ? `<div class="tilelock"><span>🔒</span><small>Not released yet</small></div>` : ""}</div><div class="tilebody"><h4>${esc(s.title)}</h4><div class="tilemeta">${meta.map((m) => `<span>${esc(m)}</span>`).join("")}${due}</div></div></button>`;
+  return `<button class="tile openStoryFromCard ${statusClass}" data-story="${id}" ${locked ? "disabled" : ""}><div class="tile-art">${img}<div class="tilenum">${s.order}</div><div class="tile-status">${status === "Submitted" ? "✓ " : status === "In progress" ? "◐ " : status === "Locked" ? "🔒 " : ""}${status}</div>${eq ? `<div class="tileeq" style="--tile-accent:${eq.color}">${esc(eq.label)}</div>` : ""}${locked ? `<div class="tilelock"><span>🔒</span><small>Not released yet</small></div>` : ""}</div><div class="tilebody"><h4>${esc(s.title)}</h4><div class="tilemeta">${fullTextBadgeHtml_(id)}${meta.map((m) => `<span>${esc(m)}</span>`).join("")}${due}</div></div></button>`;
 }
 
 function myGradesCard() {
@@ -1585,7 +1600,7 @@ function story(id) {
   let eqConnection = EQ_CONNECTION[id] || "Keep this question in mind while you read. You will return to it after the story.";
   let storyPrelude = `<div class="story-prelude-grid" aria-label="Before reading"><section class="story-prelude-card prelude-essential"><div class="prelude-icon">✦</div><div><span class="prelude-kicker">Essential Question</span><h3>${eqTag ? esc(eqTag.label) : "Reading Focus"}</h3><p>${eqTag ? esc(eqTag.q) : "What craft choices shape the way this story works?"}</p><small>${esc(eqConnection)}</small></div></section><section class="story-prelude-card prelude-lab"><div class="prelude-icon">✎</div><div><span class="prelude-kicker">Reading Lab</span><h3>Notice the craft</h3><p>${esc(studioNote)}</p><small>Track one moment where the writer's choice changes the mood, tension, or meaning.</small></div></section><section class="story-prelude-card prelude-before"><div class="prelude-icon">◫</div><div><span class="prelude-kicker">Before You Read</span><h3>${esc(s.focus)}</h3><p>${esc(s.blurb)}</p>${readBtn}</div></section></div>`;
   let afterReading = `<section class="story-after-reading" aria-label="Questions and assignments after reading"><div class="after-reading-head"><div><span>After Reading</span><h3>Questions &amp; Assignments</h3></div><p>Finish the story first, then work through these in order.</p></div>${qbox}<div class="story-assignment-stack"><h3 class="assignments-heading"><span class="assignments-heading-mark">✦</span>Assignments to turn in</h3><div class="question dok assignment-card compact-assignment"><div class="assignment-flags"><span class="assignment-kicker">Graded Assignment</span>${assignmentStatusChipHtml_("story", id, {started:!!(state.dok[id]||"").trim(), done:isSubmitted_("story", id)})}${assignmentDueChipHtml_("story", id)}</div><div class="assignment-title-row"><strong>End-of-Story Craft Response (DOK)</strong>${rubricButtonHtml("written", "View Rubric", "dok:" + id)}</div><p>${esc(qa[3])}</p><textarea id="dok" placeholder="Make a claim and use specific evidence from the story...">${esc(state.dok[id] || "")}</textarea>${typeof writingProcessStripHtml_ === "function" ? writingProcessStripHtml_(storyResponseProcessKey_(id), { words: wordCount(state.dok[id] || "") }) : ""}${submitButtonHtml_("story", id)}</div>${typeof storyAnnotationCardHtml_ === "function" ? storyAnnotationCardHtml_(id) : ""}${res || `<p class="toolbar-note">No extension activity is assigned for this story.</p>`}</div></section>`;
-  return `<div class="sectionhead story-page-head story-banner" data-story="${id}"${bannerStyle}><div class="story-title-block"><div class="pill">Story ${s.order} of ${STORY_ORDER.length}</div><h2>${esc(s.title)}</h2><p class="story-byline">${esc(s.author)}${s.year ? `, ${s.year}` : ""}</p><p class="story-banner-focus">${esc(s.focus)}</p></div></div><div class="story-page-grid ${hasText ? "has-inline-story-text" : "external-story"}"><div class="story-reading-column">${storyPrelude}${readingSupportBox(id)}${leadPollBox(id)}${textPanel}${recapBox(id)}${afterReading}</div></div>${storyPager(id)}`;
+  return `<div class="sectionhead story-page-head story-banner" data-story="${id}"${bannerStyle}><div class="story-title-block"><div class="pill">Story ${s.order} of ${STORY_ORDER.length}</div>${fullTextBadgeHtml_(id)}<h2>${esc(s.title)}</h2><p class="story-byline">${esc(s.author)}${s.year ? `, ${s.year}` : ""}</p><p class="story-banner-focus">${esc(s.focus)}</p></div></div><div class="story-page-grid ${hasText ? "has-inline-story-text" : "external-story"}"><div class="story-reading-column">${storyPrelude}${readingSupportBox(id)}${leadPollBox(id)}${textPanel}${recapBox(id)}${afterReading}</div></div>${storyPager(id)}`;
 }
 
 // Reading-support glossary tooltip: wraps every GLOSSARY[id] term found in
@@ -2032,7 +2047,7 @@ function bind() {
       b.disabled = true;
       let prev = b.textContent;
       b.textContent = "Checking\u2026";
-      // Indexing ten stories takes a beat on a Chromebook; let the label paint.
+      // Indexing twelve stories takes a beat on a Chromebook; let the label paint.
       setTimeout(() => {
         try { out.innerHTML = sourceCheckResultHtml_(kind, key, sourceCheckTextFor_(kind, key)); }
         catch (err) { out.innerHTML = `<p class="source-check-empty">The check could not run: ${esc(err && err.message ? err.message : err)}</p>`; }
