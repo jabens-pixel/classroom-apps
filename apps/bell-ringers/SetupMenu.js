@@ -9,7 +9,8 @@
  *   2. shows 5 short steps to publish the app as a web app (Google only lets the owner do this), and
  *   3. saves the student link the teacher pastes back, so it can be found again.
  * Until a copy is set up, opening the Sheet shows a note (bottom right) that explains Google's
- * "hasn't verified this app" screen before the teacher meets it (2026-10-29).
+ * "hasn't verified this app" screen before the teacher meets it (2026-10-29). School accounts often
+ * skip that screen (seen 2026-10-31), so the note says "if". Setup replaces the note when it finishes.
  * Running it again is safe: the setup keeps the existing data.
  */
 var CAS_APP = {"title":"Bell Ringers","setup":"setupSchEnglishBellRingers","dbProp":"SCHENGLISH_BR_DB_ID"};
@@ -27,7 +28,7 @@ function onOpen() {
     if (PropertiesService.getScriptProperties().getProperty(CAS_PROP_FOR) !== ScriptApp.getScriptId()) {
       SpreadsheetApp.getActiveSpreadsheet().toast(
         // Keep it this short: Sheets cuts a longer note off at the bottom of the window (checked 2026-10-29).
-        'Google will warn it “hasn’t verified this app.” That’s normal for your copy: Advanced ▸ Go to … (unsafe) ▸ Allow.',
+        'If Google says it “hasn’t verified this app,” that’s normal for your copy: Advanced ▸ Go to … (unsafe) ▸ Allow.',
         'Next: Classroom App ▸ Set up my app', -1);
     }
   } catch (e) {}
@@ -48,6 +49,8 @@ function classroomAppSetup() {
     if (CAS_APP.dbProp && ss && !props.getProperty(CAS_APP.dbProp)) props.setProperty(CAS_APP.dbProp, ss.getId());
     if (CAS_APP.setup && typeof globalThis[CAS_APP.setup] === 'function') globalThis[CAS_APP.setup]();
     props.setProperty(CAS_PROP_FOR, ScriptApp.getScriptId());
+    // Replace the "Next: Set up my app" note: it never closes on its own and covers the side panel's Save button.
+    if (ss) try { ss.toast('Now publish it: follow the steps in the side panel.', 'Setup done', 5); } catch (e) {}
   } catch (err) {
     Logger.log('Set up my app: ' + (err && err.message));
     casShow_(casProblemHtml_(err), 'Setup needs a hand');
@@ -103,7 +106,7 @@ function casPublishHtml_() {
     '<ol><li>In this Sheet’s menu, click <span class="k">Extensions</span> ▸ <span class="k">Apps Script</span>. The app’s code page opens in a new tab. ' +
     '<span class="small">(Or <a href="' + casEsc_(editor) + '" target="_blank">open it here</a>.)</span></li>' +
     '<li>Click the blue <span class="k">Deploy</span> button (top right) ▸ <span class="k">New deployment</span>.</li>' +
-    '<li>Click the gear ⚙ next to “Select type” ▸ <span class="k">Web app</span>.</li>' +
+    '<li><span class="k">Web app</span> is usually chosen already. If not, click the gear ⚙ next to “Select type” ▸ <span class="k">Web app</span>.</li>' +
     '<li>Set <b>Execute as</b> to <span class="k">Me</span> and <b>Who has access</b> to <span class="k">Anyone within your school</span>. Click <span class="k">Deploy</span> (approve again if Google asks).</li>' +
     '<li>Copy the <b>Web app</b> link (it ends in <b>/exec</b>) and paste it here:</li></ol>' +
     '<input id="u" placeholder="https://script.google.com/…/exec">' +

@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Set Up Your Copy</title>
-<meta name="description" content="Step-by-step pictures for setting up your own copy of a classroom app, including Google's 'hasn't verified this app' screen.">
+<meta name="description" content="A 1½-minute video and step-by-step pictures for setting up your own copy of a classroom app.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
@@ -32,6 +32,10 @@
   figure img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
   code { background: var(--bg); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 15px; }
   footer { color: var(--muted); font-size: 15px; padding: 0 0 48px; }
+  .video { margin: 28px 0 0; }
+  .video h2 { font-size: 22px; margin-bottom: 12px; }
+  .video video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; border-radius: 12px; border: 1px solid var(--line); background: #1f1b16; }
+  .small { color: var(--muted); font-size: 15px; margin: 10px 0 0; }
 </style>
 </head>
 <body>
@@ -39,19 +43,24 @@
   <a class="back" href="../">← All classroom apps</a>
   <h1>Set up your copy</h1>
   <p class="lede">About 5 minutes, once. The same steps for every app with a <strong>Make a copy</strong> button. You need a school Google account; your students sign in with theirs.</p>
-  <p class="calm"><strong>About the warning:</strong> Google will say <em>“Google hasn’t verified this app.”</em> That is normal for your own copy (step 5). Only you see it, once, and your students never do.</p>
+  <p class="calm"><strong>About a warning:</strong> Google may say <em>“Google hasn’t verified this app.”</em> That is normal for your own copy (step 6). Only you see it, once, and your students never do.</p>
 </div></header>
 <main class="wrap">
+  <section id="video" class="video"><h2>Watch it done (1½ minutes)</h2><video controls preload="none" playsinline poster="setup-your-copy.jpg" src="setup-your-copy.mp4">Your browser can’t play this video. The steps below show the same thing.</video><p class="small">Every click, from <strong>Make a copy</strong> to your first class. Then the same steps with pictures:</p></section>
   <ol class="guide">
     <li><h2>Make your copy</h2><p>Click <strong>Make a copy</strong> on the app’s card, then <strong>Make a copy</strong> again in Google’s box. Google says the attached Apps Script will be copied too: that’s the app. The copy is a Google Sheet in <em>your</em> Drive, and your students’ work saves there. Nobody else can see it.</p><figure><img src="step-1-copy.png" alt="Google’s “Copy document” page with the Make a copy button" loading="lazy"></figure></li>
     <li><h2>Find the Classroom App menu</h2><p>A few seconds after your copy opens, a <strong>Classroom App</strong> menu appears at the top, and a note in the bottom-right corner tells you what comes next. Click <strong>Classroom App ▸ Set up my app</strong>.</p><figure><img src="step-2-menu.png" alt="The Classroom App menu open, showing Set up my app and Show my student link" loading="lazy"></figure></li>
-    <li><h2>A note warns you what Google will say</h2><p>Until your copy is set up, this note appears each time you open it. It explains Google’s warning a few steps on, before you meet it.</p><figure><img src="step-2b-note.png" alt="The note in the corner of the Sheet: Next, Classroom App, Set up my app" loading="lazy"></figure></li>
-    <li><h2>Give the app permission</h2><p>Google asks for permission the first time. Click <strong>OK</strong>, then choose <strong>your school Google account</strong>.</p><figure><img src="step-3-authreq.png" alt="Google’s Authorization required box with OK and Cancel" loading="lazy"></figure></li>
-    <li><h2>“Google hasn’t verified this app” — this is expected</h2><p>Google shows this for every app it hasn’t reviewed itself, and your copy is a brand-new app that only you own. Nothing is sent to anyone else. Only you see this screen, once; your students never do. Click <strong>Advanced</strong> (small, bottom left).</p></li>
-    <li><h2>Go to the app</h2><p>Under Advanced, click <strong>Go to … (unsafe)</strong>. Google uses the word “unsafe” for any app it hasn’t reviewed.</p></li>
-    <li><h2>Allow</h2><p>Google lists what the app may do: keep its data in your Sheets, make Google Docs you export, send you email and connect to Canvas if you use it. Click <strong>Allow</strong> (on some screens, tick <strong>Select all</strong> first). If the setup box doesn’t appear afterwards, click <strong>Classroom App ▸ Set up my app</strong> once more.</p></li>
-    <li><h2>Publish it for your students (about a minute)</h2><p>A side panel walks you through it: <strong>Extensions ▸ Apps Script ▸ Deploy ▸ New deployment ▸ ⚙ Web app</strong>, Execute as <strong>Me</strong>, Who has access <strong>Anyone within your school</strong>, then <strong>Deploy</strong>. Google may ask for permission once more; it’s the same as before.</p></li>
-    <li><h2>Save your student link</h2><p>Copy the <strong>Web app</strong> link (it ends in <code>/exec</code>), paste it into the side panel and click <strong>Save my student link</strong>. Open it yourself first, choose <strong>Teacher</strong> and make your class, then share the link in Canvas, Google Classroom or your class page. You can find it again under <strong>Classroom App ▸ Show my student link</strong>.</p></li>
+    <li><h2>A note tells you what’s next</h2><p>Until your copy is set up, this note appears each time you open it. It also explains a warning Google sometimes shows, before you meet it.</p><figure><img src="step-2b-note.png" alt="The note in the corner of the Sheet: Next, Classroom App, Set up my app" loading="lazy"></figure></li>
+    <li><h2>Give the app permission</h2><p>Google asks for permission the first time. Click <strong>OK</strong>.</p><figure><img src="step-3-authreq.png" alt="Google’s Authorization required box with OK and Cancel" loading="lazy"></figure></li>
+    <li><h2>Sign in and continue</h2><p>A Google window opens. Check that it shows <strong>your school Google account</strong> and click <strong>Continue</strong>. If Google lists what the app may do (keep its data in your Sheets, make Google Docs you export, send you email, connect to Canvas if you use it), tick <strong>Select all</strong> and click <strong>Continue</strong>.</p><figure><img src="step-4-signin.png" alt="Google’s Sign in window for the copied app, with Cancel and Continue" loading="lazy"></figure></li>
+    <li><h2>If Google says “hasn’t verified this app”</h2><p>Some accounts see this, often personal Gmail accounts. Google says it about any app it hasn’t reviewed itself, and your copy is a brand-new app that only you own. Click <strong>Advanced</strong> (small, bottom left), then <strong>Go to … (unsafe)</strong>, then <strong>Allow</strong>. Only you see it, once; your students never do. If the side panel doesn’t appear afterwards, click <strong>Classroom App ▸ Set up my app</strong> once more.</p></li>
+    <li><h2>A side panel opens</h2><p>Setup is done. The panel on the right walks you through publishing the app for your students (about a minute). Keep it open.</p><figure><img src="step-7-panel.png" alt="The Publish it for students side panel next to the Sheet" loading="lazy"></figure></li>
+    <li><h2>Open the app’s code page</h2><p>Click <strong>Extensions ▸ Apps Script</strong>. The app’s code page opens in a new tab. You don’t need to change any code. If Google shows which account you’re signed in with, click <strong>OK</strong>.</p><figure><img src="step-8-extensions.png" alt="The Extensions menu with Apps Script" loading="lazy"></figure></li>
+    <li><h2>Deploy ▸ New deployment</h2><p>Click the blue <strong>Deploy</strong> button (top right), then <strong>New deployment</strong>.</p><figure><img src="step-9-deploymenu.png" alt="The Deploy menu with New deployment" loading="lazy"></figure></li>
+    <li><h2>Publish it as a web app</h2><p><strong>Web app</strong> is usually chosen already (if not, click the gear ⚙ next to “Select type” ▸ <strong>Web app</strong>). Check <strong>Execute as: Me</strong> and <strong>Who has access: Anyone within your school</strong>, then click <strong>Deploy</strong>. Google asks for permission once more: click <strong>Authorize access</strong>, then <strong>Continue</strong>, same as before.</p><figure><img src="step-10-deploy.png" alt="The New deployment box: Web app, Execute as Me, access for anyone within the school" loading="lazy"></figure></li>
+    <li><h2>Copy your link</h2><p>Under <strong>Web app</strong>, click <strong>Copy</strong>. The link ends in <code>/exec</code>. Then click <strong>Done</strong>.</p><figure><img src="step-11-copylink.png" alt="Deployment successfully updated, with the Web app link and its Copy button" loading="lazy"></figure></li>
+    <li><h2>Save your student link</h2><p>Back in your Sheet, paste the link into the side panel and click <strong>Save my student link</strong>. You can find it again any time under <strong>Classroom App ▸ Show my student link</strong>.</p><figure><img src="step-12-saved.png" alt="The side panel saying the student link is saved" loading="lazy"></figure></li>
+    <li><h2>Open it and make your class</h2><p>Open your link. You own the copy, so it opens the <strong>Teacher dashboard</strong>. Name your class and click <strong>Create Class</strong>. Then share the link in Canvas, Google Classroom or your class page; students join with the class code.</p><figure><img src="step-13-class.png" alt="The teacher dashboard with a new class and its class code" loading="lazy"></figure></li>
   </ol>
 </main>
 <footer><div class="wrap">Stuck? <a href="https://github.com/jabens-pixel/classroom-apps/issues/new?title=Setup%20question" target="_blank" rel="noopener">Ask a question</a> and include which step you’re on.</div></footer>
