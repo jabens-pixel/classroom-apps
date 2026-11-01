@@ -38,24 +38,25 @@ def clap():
     return 0.5 * n * env
 def hat(open_=False):
     t = t_(.18 if open_ else .05)
-    return hp(rng.standard_normal(len(t)), 7000) * np.exp(-t * (14 if open_ else 70)) * 0.35
+    return lp(hp(rng.standard_normal(len(t)), 6000), 11000) * np.exp(-t * (14 if open_ else 70)) * 0.25
 def bass(m, dur):
     t = t_(dur); f = hz(m)
     x = 0.6 * saw(f, t) + 0.4 * sq(f / 2, t)
     env = np.minimum(1, t * 300) * np.exp(-t * 3.5)
     return lp(x, 900) * env
-def pluck(ms, dur):
+def pluck(ms, dur):   # soft electric-piano-like stab: mostly sine, a little bell partial, darker filter
     t = t_(dur); x = np.zeros(len(t))
     for m in ms:
-        for d in (-0.08, 0.08): x += saw(hz(m) * 2 ** (d / 12), t)
-    env = np.minimum(1, t * 400) * np.exp(-t * 9)
-    return lp(x / (2 * len(ms)), 3200) * env
-def lead(m, dur):
-    t = t_(dur); f = hz(m) * (1 + 0.004 * np.sin(2 * np.pi * 5.5 * t) * np.minimum(1, t * 4))
+        f = hz(m - 12)
+        x += np.sin(2 * np.pi * f * t) + 0.25 * np.sin(2 * np.pi * 2 * f * t) * np.exp(-t * 14)
+    env = np.minimum(1, t * 250) * np.exp(-t * 7)
+    return lp(x / len(ms), 1600) * env
+def lead(m, dur):    # mellow lead an octave lower: triangle-ish, gentle vibrato, rounded attack
+    t = t_(dur); f = hz(m - 12) * (1 + 0.003 * np.sin(2 * np.pi * 5 * t) * np.minimum(1, t * 3))
     ph = 2 * np.pi * np.cumsum(f) / SR
-    x = np.sign(np.sin(ph)) * 0.5 + 0.5 * np.sin(2 * ph)
-    env = np.minimum(1, t * 200) * np.exp(-t * 2.2)
-    return lp(x, 4500) * env
+    x = (2 / np.pi) * np.arcsin(np.sin(ph)) * 0.7 + 0.3 * np.sin(ph)
+    env = np.minimum(1, t * 60) * np.exp(-t * 1.8)
+    return lp(x, 1800) * env
 
 # I – V – vi – IV in G major, one chord per bar
 PROG = [(43, [67, 71, 74]), (38, [66, 69, 74]), (40, [67, 71, 76]), (36, [67, 72, 76])]
@@ -84,13 +85,13 @@ for b in range(BARS):
             put(chords, pluck(ch, BEAT * .45), bar0 + q * BEAT + BEAT / 2)
     if (8 <= b < 28 or 32 <= b < 46) and b % 2 == 0:
         for off, m, ln in HOOK:
-            put(mel, lead(m + (12 if b >= 36 else 0) - (0 if b >= 36 else 0), ln * BEAT), bar0 + off * BEAT)
+            put(mel, lead(m, ln * BEAT), bar0 + off * BEAT)
 
 # riser into the drop after the breakdown
-t = t_(4 * BAR); rise = hp(rng.standard_normal(len(t)), 2000) * (t / t[-1]) ** 2 * 0.25
+t = t_(4 * BAR); rise = lp(hp(rng.standard_normal(len(t)), 1500), 6000) * (t / t[-1]) ** 2 * 0.18
 put(drums, rise, 28 * BAR)
 
-mix = 0.95 * drums + 0.75 * bas + 0.45 * chords + 0.32 * mel
+mix = 0.95 * drums + 0.75 * bas + 0.40 * chords + 0.34 * mel
 # light stereo: chords and hats slightly wide
 L = mix + 0.05 * np.roll(chords, 300); R = mix + 0.05 * np.roll(chords, -300)
 st = np.stack([L, R], 1)
