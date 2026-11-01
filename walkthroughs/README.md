@@ -30,6 +30,14 @@ The video is saved as `walkthroughs/out/<app>.mp4`. Nothing is sent to Google: t
 runs on your computer against an in-memory stand-in for Google Sheets (`tool/gas.js`), so the video
 only ever shows the pretend class.
 
+## Music
+
+Every tour gets the same short, upbeat background track: `tool/music/upbeat.mp3`, an original piece
+synthesized from scratch by `tool/music/make-music.py`, so it is free to use anywhere. In a tour script,
+`"music": false` turns it off, `"music": "other.mp3"` uses another file from `tool/music/` (only music
+you made or are licensed to share), and `"musicVolume": 0.45` sets the level.
+`node walkthroughs/tool/music.js <app>` puts the music on an existing video again without re-recording.
+
 ## The pretend class (`seed.js`)
 
 `seed.js` sets the app up the way a teacher would, by calling the app's own server functions, and

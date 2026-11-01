@@ -2,7 +2,7 @@
 //   node walkthroughs/tool/record.js <app-folder-name>      (run from the repo root)
 // Reads  walkthroughs/<app>/walkthrough.json  (captions and clicks)  and  walkthroughs/<app>/seed.js  (pretend class)
 // Uses   apps/<app>/  (the app's real code)  and  docs/img/<app>.webp  (tile picture for the title card)
-// Writes walkthroughs/out/<app>.mp4
+// Writes walkthroughs/out/<app>.mp4 (with the background music from tool/music.js)
 // Needs Node 18+, Playwright with Chromium (npm i playwright && npx playwright install chromium) and ffmpeg.
 'use strict';
 const fs = require('fs');
@@ -128,5 +128,6 @@ const OVERLAY = `(() => {
   execFileSync('ffmpeg', ['-v', 'error', '-y', '-i', webm, '-vf', `fps=30,format=yuv420p,fade=t=in:st=0:d=0.6,fade=t=out:st=${(dur - 0.8).toFixed(2)}:d=0.8`,
     '-c:v', 'libx264', '-preset', 'slow', '-crf', '23', '-movflags', '+faststart', '-an', mp4]);
   fs.rmSync(raw, { recursive: true, force: true });
-  console.log(`${APP}: ${mp4} (${dur.toFixed(0)} s)` + (errors.length ? `\nPage errors:\n  ${errors.slice(0, 5).join('\n  ')}` : ''));
+  const withMusic = require('./music').addMusic(mp4, SCRIPT);
+  console.log(`${APP}: ${mp4} (${dur.toFixed(0)} s${withMusic ? ', with music' : ''})` + (errors.length ? `\nPage errors:\n  ${errors.slice(0, 5).join('\n  ')}` : ''));
 })().catch(e => { console.error(e.message || e); process.exit(1); });
