@@ -7,17 +7,17 @@
 <meta name="description" content="A 1½-minute video and step-by-step pictures for setting up your own copy of a classroom app.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..900,0..100,0..1&family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>
-  :root { --bg: #f7f3ec; --surface: #fffdf9; --ink: #1f1b16; --muted: #5d554b; --line: #e3dacb; --brand: #8c2f39; --brand-ink: #fff; --note: #fbf3d9; --focus: #1f5f74; }
+  :root { --bg: #f5eedf; --surface: #fffdf9; --ink: #1f1b16; --muted: #5d554b; --line: #e3dacb; --brand: #c8432f; --brand-ink: #fff; --note: #fbf3d9; --focus: #1f5f74; }
   @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bg: #17140f; --surface: #211d17; --ink: #f1ebe1; --muted: #b8ad9d; --line: #3a332a; --brand: #d9707b; --brand-ink: #1b0d0f; --note: #2e2717; --focus: #7cc3d8; } }
   :root[data-theme="dark"] { --bg: #17140f; --surface: #211d17; --ink: #f1ebe1; --muted: #b8ad9d; --line: #3a332a; --brand: #d9707b; --brand-ink: #1b0d0f; --note: #2e2717; --focus: #7cc3d8; }
   * { box-sizing: border-box; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif; }
   a { color: inherit; text-underline-offset: 3px; }
   a:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 4px; }
   .wrap { max-width: 820px; margin: 0 auto; padding: 0 16px; }
-  h1, h2 { font-family: Literata, Georgia, serif; line-height: 1.2; margin: 0; }
+  h1, h2 { font-family: Fraunces, Georgia, serif; font-variation-settings: "SOFT" 60, "WONK" 1; line-height: 1.2; margin: 0; }
   header { padding: 48px 0 24px; border-bottom: 1px solid var(--line); }
   .back { font-size: 15px; color: var(--muted); }
   h1 { font-size: clamp(32px, 5vw, 46px); margin: 14px 0 10px; }
@@ -26,7 +26,7 @@
   ol.guide { list-style: none; counter-reset: s; padding: 0; margin: 28px 0 56px; }
   ol.guide > li { counter-increment: s; background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 22px; margin-bottom: 18px; }
   ol.guide h2 { font-size: 21px; display: flex; gap: 12px; align-items: baseline; }
-  ol.guide h2::before { content: counter(s); flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font: 700 15px/1 "Source Sans 3", sans-serif; }
+  ol.guide h2::before { content: counter(s); flex: none; display: inline-grid; place-items: center; width: 30px; height: 30px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font: 700 15px/1 "Atkinson Hyperlegible", sans-serif; }
   ol.guide p { margin: 8px 0 0; }
   figure { margin: 16px 0 0; }
   figure img { display: block; max-width: 100%; height: auto; border: 1px solid var(--line); border-radius: 8px; background: #fff; }
@@ -40,7 +40,7 @@
 </head>
 <body>
 <header><div class="wrap">
-  <a class="back" href="../">← All classroom apps</a>
+  <a class="back" href="../">← Curriculum Vibes</a>
   <h1>Set up your copy</h1>
   <p class="lede">About 5 minutes, once. The same steps for every app with a <strong>Make a copy</strong> button. You need a school Google account; your students sign in with theirs.</p>
   <p class="calm"><strong>About a warning:</strong> Google may say <em>“Google hasn’t verified this app.”</em> That is normal for your own copy (step 6). Only you see it, once, and your students never do.</p>

@@ -4,7 +4,7 @@ Thank you for helping! Two ways to contribute:
 
 **Not a coder?** Open an [issue](../../issues) to report a problem, suggest an idea, or share how you adapted an app for your class.
 
-**Have your own app to share?** Read the [Classroom Apps standard](APP-STANDARD.md) and open a *Submit an app* issue. Every listed app follows the same rules, so teachers can count on all of them.
+**Have your own app to share?** Read the [Curriculum Vibes app standard](APP-STANDARD.md) and open a *Submit an app* issue. Every listed app follows the same rules, so teachers can count on all of them.
 
 **Comfortable with code?**
 1. Fork this repo and make your change in one app's folder under `apps/`.

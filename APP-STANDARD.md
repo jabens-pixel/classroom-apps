@@ -1,4 +1,4 @@
-# The Classroom Apps standard
+# The Curriculum Vibes app standard
 
 Every app on this site works the same way, so a teacher who knows one knows them all. These are
 the rules an app follows before it is listed, whoever wrote it. They come from real classrooms:

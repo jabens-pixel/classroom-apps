@@ -3,544 +3,665 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Classroom Apps</title>
-<meta name="description" content="Free Google Apps Script apps for high-school English. Make your own copy, or change the code however you like.">
+<title>Curriculum Vibes</title>
+<meta name="description" content="Complete, free units and classroom tools made by teachers and taught with real students. Copy one into your Google account and teach it tomorrow.">
+<meta property="og:title" content="Curriculum Vibes">
+<meta property="og:description" content="Curriculum students love, made by teachers. Free, classroom-tested, ready to teach tomorrow.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Literata:opsz,wght@7..72,500;7..72,700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..900,0..100,0..1&family=Atkinson+Hyperlegible:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f7f3ec; --surface: #fffdf9; --ink: #1f1b16; --muted: #5d554b; --line: #e3dacb;
-    --brand: #8c2f39; --brand-ink: #ffffff; --chip: #efe7da; --focus: #1f5f74;
+    --paper: #f5eedf; --card: #fffaf0; --ink: #1d1b16; --muted: #5a5348; --line: #1d1b16;
+    --tomato: #c8432f; --mustard: #e9a92b; --green: #2f5a3a; --navy: #1f3a5f;
+    --on-dark: #fbf4e4; --shadow: #1d1b16; --focus: #1f3a5f;
+    --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 0.11 0 0 0 0 0.1 0 0 0 0 0.08 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
-      --bg: #17140f; --surface: #211d17; --ink: #f1ebe1; --muted: #b8ad9d; --line: #3a332a;
-      --brand: #d9707b; --brand-ink: #1b0d0f; --chip: #2c261e; --focus: #7cc3d8;
+      --paper: #16140f; --card: #211e17; --ink: #f3ead8; --muted: #c4b9a5; --line: #f3ead8;
+      --tomato: #e0604b; --mustard: #efb544; --green: #4f8a5e; --navy: #7aa6d8; --shadow: #000; --focus: #efb544;
     }
   }
   :root[data-theme="dark"] {
-    --bg: #17140f; --surface: #211d17; --ink: #f1ebe1; --muted: #b8ad9d; --line: #3a332a;
-    --brand: #d9707b; --brand-ink: #1b0d0f; --chip: #2c261e; --focus: #7cc3d8;
+    --paper: #16140f; --card: #211e17; --ink: #f3ead8; --muted: #c4b9a5; --line: #f3ead8;
+    --tomato: #e0604b; --mustard: #efb544; --green: #4f8a5e; --navy: #7aa6d8; --shadow: #000; --focus: #efb544;
   }
   * { box-sizing: border-box; }
-  html { -webkit-text-size-adjust: 100%; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.6 "Source Sans 3", system-ui, -apple-system, "Segoe UI", sans-serif; }
-  a { color: inherit; text-underline-offset: 3px; }
-  a:focus-visible, summary:focus-visible, .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
-  .wrap { max-width: 1120px; margin: 0 auto; padding: 0 24px; }
-  h1, h2, h3 { font-family: Literata, Georgia, "Times New Roman", serif; line-height: 1.2; margin: 0; }
+  html { -webkit-text-size-adjust: 100%; scroll-behavior: smooth; overflow-x: clip; }
+  body { margin: 0; background: var(--paper) var(--grain); color: var(--ink); font: 18px/1.6 "Atkinson Hyperlegible", system-ui, -apple-system, "Segoe UI", sans-serif; overflow-x: clip; }
+  a { color: inherit; text-underline-offset: 3px; text-decoration-thickness: 2px; }
+  a:focus-visible, summary:focus-visible, button:focus-visible, .btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; border-radius: 6px; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 0 28px; }
+  h1, h2, h3 { font-family: Fraunces, Georgia, serif; font-variation-settings: "SOFT" 60, "WONK" 1; line-height: 1.05; margin: 0; letter-spacing: -.01em; }
+  .hand { font-family: Caveat, "Comic Sans MS", cursive; font-weight: 700; }
 
-  header.hero { padding: 72px 0 40px; border-bottom: 1px solid var(--line); }
-  .kicker { font-size: 13px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brand); margin: 0 0 14px; }
-  .hero h1 { font-size: clamp(38px, 6vw, 60px); font-weight: 700; max-width: 20ch; }
-  .hero .lede { font-size: 20px; color: var(--muted); max-width: 46ch; margin: 18px 0 28px; }
-  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  /* ---------- top bar ---------- */
+  .top { padding: 20px 0; }
+  .top .wrap { display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+  .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font: 800 24px/1 Fraunces, Georgia, serif; font-variation-settings: "SOFT" 100, "WONK" 1; }
+  .brand .dot { width: 34px; height: 34px; border-radius: 50%; background: var(--tomato); border: 2px solid var(--line); display: grid; place-items: center; color: var(--on-dark); font-size: 18px; transform: rotate(-12deg); }
+  .top nav { display: flex; gap: 22px; font-weight: 700; font-size: 16px; }
+  .top nav a { text-decoration: none; }
+  .top nav a:hover { text-decoration: underline; text-decoration-color: var(--tomato); }
 
-  .btn { display: inline-flex; align-items: center; justify-content: center; min-height: 44px; padding: 0 18px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); font-weight: 700; font-size: 16px; text-decoration: none; color: var(--ink); white-space: nowrap; }
-  .btn:hover { border-color: var(--muted); }
-  .btn.primary { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
-  .btn.primary:hover { filter: brightness(1.08); }
-  .btn.is-off { background: var(--chip); border-color: var(--line); color: var(--muted); cursor: default; filter: none; }
+  /* ---------- buttons: printed, not glossy ---------- */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 0 20px; border: 2px solid var(--line); border-radius: 10px; background: var(--card); color: var(--ink); font: 700 17px/1 "Atkinson Hyperlegible", system-ui, sans-serif; text-decoration: none; white-space: nowrap; cursor: pointer; box-shadow: 4px 4px 0 var(--shadow); transition: transform .12s ease, box-shadow .12s ease; }
+  .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--shadow); }
+  .btn:active { transform: translate(3px, 3px); box-shadow: 1px 1px 0 var(--shadow); }
+  .btn.primary { background: var(--mustard); color: #1d1b16; }
+  .btn.ink { background: var(--ink); color: var(--paper); }
+  .btn.is-off { background: transparent; color: var(--muted); box-shadow: none; cursor: default; border-style: dashed; }
+  .textlink { font-weight: 700; padding: 10px 4px; text-decoration: underline; text-decoration-color: var(--tomato); }
 
-  section { padding: 56px 0; }
-  section + section { border-top: 1px solid var(--line); }
-  h2 { font-size: 30px; margin-bottom: 8px; }
-  .section-note { color: var(--muted); margin: 0 0 28px; max-width: 60ch; }
+  /* ---------- hero ---------- */
+  .hero { padding: 36px 0 70px; }
+  .hero .wrap { display: grid; grid-template-columns: 1.05fr 1fr; gap: 40px; align-items: center; }
+  .stamp { display: inline-block; font: 700 13px/1 "Atkinson Hyperlegible", sans-serif; letter-spacing: .14em; text-transform: uppercase; padding: 8px 12px; border: 2px solid var(--tomato); color: var(--tomato); border-radius: 6px; transform: rotate(-2deg); margin-bottom: 22px; }
+  .hero h1 { font-size: clamp(44px, 6.4vw, 84px); font-weight: 850; }
+  .hero h1 .mark { position: relative; white-space: nowrap; z-index: 0; }
+  .hero h1 .mark::before { content: ""; position: absolute; left: -.08em; right: -.1em; bottom: .04em; height: .42em; background: var(--mustard); z-index: -1; transform: rotate(-1.5deg); border-radius: 3px 10px 4px 12px; }
+  .hero h1 .soft { font-style: italic; font-weight: 500; }
+  .lede { font-size: 21px; max-width: 40ch; margin: 24px 0 30px; color: var(--muted); }
+  .lede strong { color: var(--ink); }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
 
-  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; counter-reset: step; list-style: none; padding: 0; margin: 0; }
-  .steps li { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 22px; }
-  .steps li::before { counter-increment: step; content: counter(step); display: inline-grid; place-items: center; width: 32px; height: 32px; border-radius: 50%; background: var(--brand); color: var(--brand-ink); font-weight: 700; margin-bottom: 12px; }
-  .steps h3 { font-size: 20px; margin-bottom: 6px; }
-  .steps p { margin: 0; color: var(--muted); }
+  .collage { position: relative; height: 520px; }
+  .sticker { position: absolute; width: 190px; height: 190px; border: 2px solid var(--line); border-radius: 18px; background: #f6f0e1; box-shadow: 6px 6px 0 var(--shadow); transition: transform .25s cubic-bezier(.3,1.6,.5,1); text-decoration: none; perspective: 600px; }
+  .sticker .face { position: absolute; inset: 0; border-radius: 16px; background-color: #f6f0e1; background-size: auto 100%; background-position: 96% 50%; background-repeat: no-repeat; transition: transform .32s ease-in, opacity .32s ease-in; }
+  .sticker.flip .face { transform: rotateY(90deg) scale(.92); opacity: .3; }
+  .sticker .lbl { position: absolute; left: 10px; bottom: -14px; font: 700 13px/1.1 "Atkinson Hyperlegible", sans-serif; background: var(--ink); color: var(--paper); padding: 5px 9px; border-radius: 6px; opacity: 0; transform: translateY(4px); transition: .2s; white-space: nowrap; }
+  .sticker:hover, .sticker:focus-visible { transform: rotate(0deg) scale(1.06) !important; z-index: 9; }
+  .sticker:hover .lbl, .sticker:focus-visible .lbl { opacity: 1; transform: none; }
+  .s1 { left: 2%;  top: 4%;   transform: rotate(-7deg); width: 180px; height: 180px; }
+  .s2 { left: 35%; top: 0%;   transform: rotate(4deg);  width: 200px; height: 200px; }
+  .s3 { left: 72%; top: 14%;  transform: rotate(-5deg); width: 160px; height: 160px; }
+  .s4 { left: 6%;  top: 45%;  transform: rotate(5deg);  width: 165px; height: 165px; }
+  .s5 { left: 38%; top: 44%;  transform: rotate(-3deg); width: 190px; height: 190px; }
+  .s6 { left: 72%; top: 52%;  transform: rotate(8deg);  width: 160px; height: 160px; }
+  .s7 { left: 22%; top: 80%;  transform: rotate(-9deg); width: 120px; height: 120px; }
+  .tape { position: absolute; width: 90px; height: 26px; background: rgba(233,169,43,.55); border-left: 2px dashed rgba(29,27,22,.15); border-right: 2px dashed rgba(29,27,22,.15); z-index: 10; pointer-events: none; }
+  .tape.t1 { left: 42%; top: -3%; transform: rotate(-8deg); }
+  .tape.t2 { left: 78%; top: 50%; transform: rotate(12deg); background: rgba(200,67,47,.4); }
+  .note { position: absolute; font-size: 30px; line-height: 1; color: var(--tomato); z-index: 11; pointer-events: none; }
+  .note.n1 { right: 2%; bottom: 0; transform: rotate(-5deg); text-align: right; }
+  .note.n1 svg { display: block; margin: 0 0 6px auto; }
 
-  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
-  .app { display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 12px; padding: 22px; }
-  .app-head { display: flex; gap: 14px; align-items: center; margin-bottom: 12px; }
-  .art { position: relative; margin: -22px -22px 18px; aspect-ratio: 2 / 1; border-radius: 8px 8px 0 0; overflow: hidden;
-    background: #1b1814 center / cover no-repeat; display: flex; align-items: flex-end; }
-  .art::after { content: ""; position: absolute; inset: 0; background: linear-gradient(to top, rgba(10,8,6,.86) 0%, rgba(10,8,6,.45) 38%, rgba(10,8,6,0) 70%); }
-  .art.plain { background: radial-gradient(120% 90% at 85% 10%, rgba(255,255,255,.16), transparent 60%), var(--accent); }
-  .art.plain::after { background: linear-gradient(to top, rgba(10,8,6,.45), rgba(10,8,6,0) 65%); }
-  .art.light { background-color: #f5efe0; }
-  .art.light::after { display: none; }
-  .art.light .art-title { color: #1f3d27; max-width: 58%; }
-  .art.light .art-title h3 { text-shadow: none; }
-  .art.light .art-title .meta { color: #5d554b; }
-  .art-initials { position: absolute; right: 18px; top: 6px; font: 700 96px/1 Literata, Georgia, serif; color: rgba(255,255,255,.18); letter-spacing: .02em; }
-  .art-title { position: relative; z-index: 1; padding: 0 22px 16px; color: #fff; }
-  .art-title h3 { font-size: 24px; text-shadow: 0 1px 12px rgba(0,0,0,.5); }
-  .art-title .meta { color: rgba(255,255,255,.86); margin: 2px 0 0; }
-  .tile { flex: none; width: 48px; height: 48px; border-radius: 10px; display: grid; place-items: center; background: var(--accent); color: #fff; font: 700 18px/1 Literata, Georgia, serif; letter-spacing: .02em; }
-  .app h3 { font-size: 22px; }
-  .meta { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
-  .blurb { margin: 0 0 18px; flex: 1; }
-  .actions { display: flex; flex-wrap: wrap; gap: 10px; }
-  details { margin-top: 16px; border-top: 1px solid var(--line); padding-top: 12px; }
-  summary { cursor: pointer; font-weight: 700; min-height: 32px; display: flex; align-items: center; gap: 8px; list-style: none; }
+  /* ---------- ticker ---------- */
+  .ticker { background: var(--tomato); color: #fbf4e4; border-top: 2px solid var(--line); border-bottom: 2px solid var(--line); overflow: hidden; transform: rotate(-1.2deg); margin: 0 -20px; }
+  .ticker-track { display: flex; gap: 26px; width: max-content; padding: 14px 0; font: 800 26px/1 Fraunces, Georgia, serif; font-variation-settings: "SOFT" 100, "WONK" 1; animation: tick 40s linear infinite; }
+  .ticker-track i { font-style: normal; color: var(--mustard); }
+  @keyframes tick { to { transform: translateX(-50%); } }
+  @media (prefers-reduced-motion: reduce) { .ticker-track { animation: none; } .sticker, .btn { transition: none; } html { scroll-behavior: auto; } }
+
+  /* ---------- sections ---------- */
+  section { padding: 96px 0; }
+  .sec-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap; margin-bottom: 36px; }
+  h2 { font-size: clamp(38px, 5vw, 64px); font-weight: 850; }
+  .sec-head .hand { font-size: 28px; color: var(--tomato); transform: rotate(-3deg); }
+  .section-note { color: var(--muted); max-width: 58ch; margin: 14px 0 0; }
+
+  .steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; list-style: none; padding: 0; margin: 0; }
+  .steps li { position: relative; border: 2px solid var(--line); border-radius: 18px; padding: 30px 26px 28px; box-shadow: 6px 6px 0 var(--shadow); color: #fbf4e4; }
+  .steps li:nth-child(1) { background: var(--green); transform: rotate(-1deg); }
+  .steps li:nth-child(2) { background: var(--navy); transform: rotate(.8deg); }
+  .steps li:nth-child(3) { background: var(--mustard); color: #1d1b16; transform: rotate(-.6deg); }
+  .steps .num { font: 900 76px/.8 Fraunces, Georgia, serif; font-variation-settings: "SOFT" 100, "WONK" 1; display: block; margin-bottom: 14px; opacity: .95; }
+  .steps h3 { font-size: 28px; margin-bottom: 8px; }
+  .steps p { margin: 0; font-size: 17px; opacity: .92; }
+  .facts { display: flex; flex-wrap: wrap; gap: 12px 28px; margin: 40px 0 0; padding: 0; list-style: none; font-weight: 700; }
+  .facts li::before { content: "✓ "; color: var(--tomato); }
+
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); gap: 34px 30px; }
+  .app { display: flex; flex-direction: column; background: var(--card); border: 2px solid var(--line); border-radius: 18px; box-shadow: 7px 7px 0 var(--accent); transform: rotate(var(--tilt)); transition: transform .2s ease, box-shadow .2s ease; scroll-margin-top: 30px; }
+  .app:hover { transform: rotate(0deg) translateY(-3px); box-shadow: 10px 10px 0 var(--accent); }
+  .art { position: relative; aspect-ratio: 2 / 1; border-bottom: 2px solid var(--line); border-radius: 16px 16px 0 0; background: #f6f0e1 center / cover no-repeat; overflow: hidden; }
+  .art.plain { background: var(--accent); }
+  .art-initials { position: absolute; right: 18px; top: 10px; font: 900 96px/1 Fraunces, Georgia, serif; color: rgba(255,255,255,.3); }
+  .grade-tag { position: absolute; left: 14px; bottom: 12px; font: 700 13px/1 "Atkinson Hyperlegible", sans-serif; letter-spacing: .06em; text-transform: uppercase; background: var(--card); color: var(--ink); border: 2px solid var(--line); border-radius: 999px; padding: 6px 10px; }
+  .art-play { position: absolute; left: 14px; top: 14px; width: 48px; height: 48px; border-radius: 50%; border: 2px solid #1d1b16; background: var(--mustard); color: #1d1b16; font-size: 16px; cursor: pointer; display: grid; place-items: center; padding-left: 3px; box-shadow: 3px 3px 0 #1d1b16; transition: transform .15s; }
+  .art-play:hover { transform: scale(1.08) rotate(-6deg); }
+  .app-body { padding: 22px 24px 20px; display: flex; flex-direction: column; flex: 1; }
+  .app h3 { font-size: 30px; font-weight: 800; margin-bottom: 8px; }
+  .blurb { margin: 0 0 20px; flex: 1; font-size: 17px; color: var(--muted); }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+  .actions .btn { min-height: 44px; padding: 0 16px; font-size: 16px; }
+  details { margin-top: 18px; border-top: 2px dashed color-mix(in srgb, var(--line) 35%, transparent); padding-top: 12px; }
+  summary { cursor: pointer; font-weight: 700; min-height: 34px; display: flex; align-items: center; gap: 10px; list-style: none; }
   summary::-webkit-details-marker { display: none; }
-  summary::before { content: "+"; display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); font-weight: 700; line-height: 1; }
-  details[open] summary::before { content: "−"; }
-  details ol { padding-left: 22px; margin: 10px 0; }
+  summary::before { content: "+"; flex: none; display: inline-grid; place-items: center; width: 24px; height: 24px; border-radius: 50%; border: 2px solid var(--line); font-weight: 700; line-height: 1; }
+  details[open] > summary::before { content: "−"; background: var(--mustard); color: #1d1b16; }
+  details ol { padding-left: 22px; margin: 10px 0; font-size: 16px; }
   details li { margin-bottom: 6px; }
-  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; background: var(--chip); padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 14px; background: color-mix(in srgb, var(--mustard) 25%, transparent); padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
   .small { font-size: 15px; color: var(--muted); margin: 0; }
 
-  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .faq { max-width: 820px; display: grid; gap: 10px; margin-top: 12px; }
-  .faq-group { font-size: 15px; font-family: "Source Sans 3", system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; color: var(--brand); margin: 30px 0 0; }
-  .faq-table { display: grid; grid-template-columns: auto auto 1fr; gap: 2px 18px; margin: 12px 0; padding: 10px 14px; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; font-variant-numeric: tabular-nums; color: var(--ink); max-width: 420px; }
+  /* ---------- FAQ ---------- */
+  .faq-wrap { display: grid; grid-template-columns: 300px 1fr; gap: 48px; align-items: start; }
+  .faq-side { position: sticky; top: 24px; }
+  .faq-side .hand { font-size: 30px; color: var(--tomato); display: block; margin-top: 16px; transform: rotate(-2deg); }
+  .faq-group { font: 700 14px/1 "Atkinson Hyperlegible", sans-serif; letter-spacing: .16em; text-transform: uppercase; color: var(--tomato); margin: 34px 0 12px; }
+  .faq-group:first-child { margin-top: 0; }
+  .faq { display: grid; gap: 12px; }
+  .faq-item { margin: 0; padding: 0; border: 2px solid var(--line); border-radius: 14px; background: var(--card); }
+  .faq-item[open] { box-shadow: 5px 5px 0 var(--mustard); }
+  .faq-item summary { padding: 14px 18px; min-height: 56px; font-size: 18px; }
+  .faq-item p { margin: 0; padding: 0 20px 18px 54px; color: var(--muted); max-width: 70ch; font-size: 17px; }
+  .faq-item p a { color: var(--ink); }
+  .faq-table { display: grid; grid-template-columns: auto auto 1fr; gap: 2px 18px; margin: 12px 0; padding: 10px 14px; background: var(--paper); border: 2px solid var(--line); border-radius: 10px; font-variant-numeric: tabular-nums; color: var(--ink); max-width: 420px; }
   .faq-table > span { display: contents; }
   .faq-table [role="cell"]:first-child { font-weight: 700; }
-  .faq-item { margin: 0; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
-  .faq-item summary { padding: 14px 18px; min-height: 52px; font-size: 18px; }
-  .faq-item[open] summary::before { content: "−"; }
-  .faq-item p { margin: 0; padding: 0 18px 16px 48px; color: var(--muted); max-width: 70ch; }
-  .faq-item p a { color: var(--ink); }
-  @media (max-width: 520px) { .faq-item p { padding-left: 18px; } }
-  .panel.wide { margin-top: 20px; display: flex; gap: 24px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
-  .panel.wide p { margin: 6px 0 0; max-width: 62ch; }
-  .panel.wide .actions { flex: 0 1 auto; min-width: 0; }
-  @media (max-width: 520px) { .panel.wide .actions .btn { flex: 1 1 100%; } }
-  .art-play { position: absolute; left: 18px; top: 16px; z-index: 2; width: 46px; height: 46px; border-radius: 50%; border: 0; background: rgba(31,27,22,.82); color: #fff; font-size: 16px; cursor: pointer; display: grid; place-items: center; padding-left: 3px; box-shadow: 0 4px 14px rgba(0,0,0,.25); }
-  .art-play:hover { background: var(--brand); }
-  .art-play:focus-visible, .tour-btn:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
-  .tour-btn { cursor: pointer; font-family: inherit; }
-  dialog.tour { border: 0; padding: 0; border-radius: 14px; width: min(1000px, calc(100vw - 32px)); background: #111; color: #fff; box-shadow: 0 20px 60px rgba(0,0,0,.5); }
-  dialog.tour::backdrop { background: rgba(10,8,6,.72); }
-  dialog.tour video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; }
+
+  /* ---------- share / support ---------- */
+  .band { background: var(--green); color: #fbf4e4; border-top: 2px solid var(--line); border-bottom: 2px solid var(--line); }
+  .band h2 { color: #fbf4e4; }
+  .band .section-note { color: #e3eadf; }
+  .band .hand { color: var(--mustard); }
+  .cards3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 8px; }
+  .panel { background: var(--card); color: var(--ink); border: 2px solid var(--line); border-radius: 18px; padding: 26px; box-shadow: 6px 6px 0 var(--shadow); display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+  .panel h3 { font-size: 26px; }
+  .panel p { margin: 0 0 8px; color: var(--muted); font-size: 17px; flex: 1; }
+  .band .panel { box-shadow: 6px 6px 0 #10241a; }
+  .support { display: grid; grid-template-columns: 1.2fr 1fr; gap: 24px; align-items: stretch; }
+  .support .panel.big { background: var(--mustard); color: #1d1b16; }
+  .support .panel.big p { color: #3b3326; }
+
+  footer { background: #1d1b16; color: #e9e0cd; padding: 64px 0 56px; }
+  footer .wordmark { font: 900 clamp(48px, 9vw, 120px)/.9 Fraunces, Georgia, serif; font-variation-settings: "SOFT" 100, "WONK" 1; color: #fbf4e4; margin: 0 0 24px; }
+  footer .wordmark span { color: var(--mustard); }
+  footer p { margin: 0 0 8px; max-width: 80ch; font-size: 16px; }
+  footer a { color: #fbf4e4; }
+
+  dialog.tour { border: 2px solid #1d1b16; padding: 0; border-radius: 16px; width: min(1000px, calc(100vw - 32px)); background: #111; color: #fff; box-shadow: 10px 10px 0 var(--mustard); }
+  dialog.tour::backdrop { background: rgba(20,18,14,.78); }
+  dialog.tour video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; border-radius: 14px 14px 0 0; }
   dialog.tour .bar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 14px; font-weight: 700; }
-  dialog.tour .bar button { min-height: 40px; padding: 0 14px; border-radius: 8px; border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff; font: inherit; cursor: pointer; }
-  .panel { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 24px; }
-  .panel h3 { font-size: 21px; margin-bottom: 8px; }
-  .panel p { margin: 0 0 16px; color: var(--muted); }
-  .panel ul { margin: 0; padding-left: 20px; }
-  .panel li { margin-bottom: 6px; }
+  dialog.tour .bar button { min-height: 40px; padding: 0 14px; border-radius: 8px; border: 2px solid #fbf4e4; background: transparent; color: #fff; font: inherit; cursor: pointer; }
 
-  footer { padding: 32px 0 48px; color: var(--muted); font-size: 15px; border-top: 1px solid var(--line); }
-  footer p { margin: 0 0 6px; }
-
-  @media (max-width: 860px) { .steps, .two { grid-template-columns: 1fr; } }
-  @media (max-width: 480px) {
+  @media (max-width: 980px) {
+    .hero .wrap { grid-template-columns: 1fr; }
+    .collage { height: 380px; max-width: 560px; }
+    .sticker { width: 140px !important; height: 140px !important; }
+    .faq-wrap { grid-template-columns: 1fr; gap: 20px; }
+    .faq-side { position: static; }
+    .cards3, .support { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 860px) { .steps { grid-template-columns: 1fr; } .top nav { display: none; } }
+  @media (max-width: 520px) {
     .wrap { padding: 0 16px; }
-    header.hero { padding: 48px 0 32px; }
-    .hero .lede { font-size: 18px; }
+    body { font-size: 17px; }
+    section { padding: 64px 0; }
+    .lede { font-size: 19px; }
+    .collage { height: 300px; }
+    .sticker { width: 108px !important; height: 108px !important; border-radius: 14px; box-shadow: 4px 4px 0 var(--shadow); }
+    .s3 { left: 68%; } .s6 { left: 66%; }
+    .note { font-size: 24px; }
     .grid { grid-template-columns: 1fr; }
+    .app, .steps li { transform: none; }
     .actions .btn { flex: 1 1 auto; }
+    .faq-item p { padding-left: 20px; }
+    .ticker-track { font-size: 20px; }
   }
 </style>
 </head>
 <body>
+<div class="top">
+  <div class="wrap">
+    <a class="brand" href="#"><span class="dot" aria-hidden="true">✺</span>Curriculum Vibes</a>
+    <nav aria-label="Sections">
+      <a href="#apps">The apps</a>
+      <a href="#how">How it works</a>
+      <a href="#faq">Questions</a>
+      <a href="#share">Share yours</a>
+      <a href="https://github.com/jabens-pixel/classroom-apps" target="_blank" rel="noopener">GitHub</a>
+    </nav>
+  </div>
+</div>
+
 <header class="hero">
   <div class="wrap">
-    <p class="kicker">Free for teachers · Google Apps Script</p>
-    <h1>Classroom apps for English teachers</h1>
-    <p class="lede">Units and tools built and used in a real high-school English classroom. Make your own copy and use it tomorrow, or change the code however you like.</p>
-    <div class="hero-actions">
-      <a class="btn primary" href="#apps">Browse the apps</a>
-      <a class="btn" href="#faq">Questions</a>
-      <a class="btn" href="https://github.com/jabens-pixel/classroom-apps" target="_blank" rel="noopener">All the code on GitHub</a>
+    <div>
+      <span class="stamp">Free · made by teachers · taught with real students</span>
+      <h1>Curriculum students <span class="mark">love</span>, <span class="soft">made by teachers.</span></h1>
+      <p class="lede">Complete units and classroom routines, from Macbeth to making a podcast, where students <strong>read, write, discuss and create</strong> in one place, with their work saved as they go. Every one has been taught in a real classroom. Copy one into your Google account and teach it tomorrow.</p>
+      <div class="hero-actions">
+        <a class="btn primary" href="#apps">Browse the apps ↓</a>
+        <a class="btn" href="setup/#video"><span aria-hidden="true">▶</span>&nbsp;Watch the 90-second setup</a>
+      </div>
+    </div>
+    <div class="collage" aria-label="Some of the apps">
+      <a class="sticker s1" href="#app-macbeth-curriculum" data-app="macbeth-curriculum" aria-label="Macbeth Curriculum"><span class="face" style="background-image:url('img/macbeth-curriculum.webp')"></span><span class="lbl">Macbeth Curriculum</span></a><a class="sticker s2" href="#app-memoir" data-app="memoir" aria-label="Memoir"><span class="face" style="background-image:url('img/memoir.webp')"></span><span class="lbl">Memoir</span></a><a class="sticker s3" href="#app-podcast-studio" data-app="podcast-studio" aria-label="Podcast Studio"><span class="face" style="background-image:url('img/podcast-studio.webp')"></span><span class="lbl">Podcast Studio</span></a><a class="sticker s4" href="#app-bell-ringers" data-app="bell-ringers" aria-label="Bell Ringers"><span class="face" style="background-image:url('img/bell-ringers.webp')"></span><span class="lbl">Bell Ringers</span></a><a class="sticker s5" href="#app-lit-circles" data-app="lit-circles" aria-label="Lit Circles"><span class="face" style="background-image:url('img/lit-circles.webp')"></span><span class="lbl">Lit Circles</span></a><a class="sticker s6" href="#app-lit-circles-hunger-games" data-app="lit-circles-hunger-games" aria-label="Hunger Games Lit Circles"><span class="face" style="background-image:url('img/lit-circles-hunger-games.webp')"></span><span class="lbl">Hunger Games Lit Circles</span></a><a class="sticker s7" href="#app-lit-circles-simplified" data-app="lit-circles-simplified" aria-label="Lit Circles (Simplified)"><span class="face" style="background-image:url('img/lit-circles-simplified.webp')"></span><span class="lbl">Lit Circles (Simplified)</span></a>
+      <span class="tape t1" aria-hidden="true"></span><span class="tape t2" aria-hidden="true"></span>
+      <span class="note n1 hand" aria-hidden="true"><svg width="70" height="46" viewBox="0 0 70 46" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M64 42 C 50 30, 34 14, 8 8"/><path d="M8 8 l 12 -4 M8 8 l 6 11"/></svg>tap one to jump to it</span>
     </div>
   </div>
 </header>
 
+<div class="ticker" aria-hidden="true"><div class="ticker-track"><span>Macbeth Curriculum</span><i aria-hidden="true">✺</i><span>Memoir</span><i aria-hidden="true">✺</i><span>Podcast Studio</span><i aria-hidden="true">✺</i><span>Bell Ringers</span><i aria-hidden="true">✺</i><span>Lit Circles</span><i aria-hidden="true">✺</i><span>Hunger Games Lit Circles</span><i aria-hidden="true">✺</i><span>Lit Circles (Simplified)</span><i aria-hidden="true">✺</i><span>Root Word Study</span><i aria-hidden="true">✺</i><span>Short Story Lab</span><i aria-hidden="true">✺</i><span>Macbeth Curriculum</span><i aria-hidden="true">✺</i><span>Memoir</span><i aria-hidden="true">✺</i><span>Podcast Studio</span><i aria-hidden="true">✺</i><span>Bell Ringers</span><i aria-hidden="true">✺</i><span>Lit Circles</span><i aria-hidden="true">✺</i><span>Hunger Games Lit Circles</span><i aria-hidden="true">✺</i><span>Lit Circles (Simplified)</span><i aria-hidden="true">✺</i><span>Root Word Study</span><i aria-hidden="true">✺</i><span>Short Story Lab</span><i aria-hidden="true">✺</i></div></div>
+
 <main>
-  <section>
+  <section id="apps">
     <div class="wrap">
-      <h2>How it works</h2>
-      <p class="section-note">Each app runs in your own Google account. Your students’ work saves to your Drive. Nothing is shared with anyone else.</p>
-      <ol class="steps">
-        <li><h3>Make a copy</h3><p>One click copies the app into your Google account.</p></li>
-        <li><h3>Run setup once</h3><p>It builds the app’s Sheet and makes you the admin. Add other teachers at your school from inside the app.</p></li>
-        <li><h3>Share your link</h3><p>Deploy it as a web app and post the link for students. Connect Canvas if you like.</p></li>
-      </ol>
+      <div class="sec-head">
+        <div>
+          <h2>The apps</h2>
+          <p class="section-note">Each one is a full unit or routine: readings with built-in support, discussion, writing with feedback at every step, and a gradebook for you. Right now it’s English for grades 9–12. Teach another subject? <a href="#share">Add yours.</a></p>
+        </div>
+        <span class="hand">tested on actual teenagers ✓</span>
+      </div>
+      <div class="grid">
+      <article id="app-macbeth-curriculum" class="app" style="--accent:var(--tomato);--tilt:-0.6deg">
+        <div class="art" style="background-image:url('img/macbeth-curriculum.webp')">
+          
+          <span class="grade-tag">Grades 9–12</span>
+          <button type="button" class="art-play" data-tour="videos/macbeth-curriculum.mp4" data-title="Macbeth Curriculum" aria-label="Watch the Macbeth Curriculum tour"><span aria-hidden="true">▶</span></button>
+        </div>
+        <div class="app-body">
+          <h3>Macbeth Curriculum</h3>
+          <p class="blurb">A full Macbeth unit: the play act by act with side-by-side support, activities, discussion, grading and Canvas.</p>
+          <div class="actions">
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/18axTT492SozC-Hm58W3Wlxhltz1P3ra3SV2lPbupo-M/copy" target="_blank" rel="noopener">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/macbeth-curriculum.mp4" data-title="Macbeth Curriculum"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/macbeth-curriculum" target="_blank" rel="noopener">Code&nbsp;→</a>
+          </div>
+          <details>
+            <summary>How to set it up</summary>
+            <ol>
+              <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
+              <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
+              <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
+              <li>The side panel walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
+            </ol>
+            <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/">Step-by-step with pictures</a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/macbeth-curriculum/README.md" target="_blank" rel="noopener">Full guide</a> · Canvas and AI are optional.</p>
+          </details>
+        </div>
+      </article>
+      <article id="app-memoir" class="app" style="--accent:var(--green);--tilt:0.5deg">
+        <div class="art" style="background-image:url('img/memoir.webp')">
+          
+          <span class="grade-tag">Grades 9–12</span>
+          <button type="button" class="art-play" data-tour="videos/memoir.mp4" data-title="Memoir" aria-label="Watch the Memoir tour"><span aria-hidden="true">▶</span></button>
+        </div>
+        <div class="app-body">
+          <h3>Memoir</h3>
+          <p class="blurb">A memoir writing unit: mentor ideas, drafting, revision, grading and Canvas.</p>
+          <div class="actions">
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1hoW5dByuvNmlzMB_HR_uWdXudnwVgdX35bU-r1DEcdc/copy" target="_blank" rel="noopener">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/memoir.mp4" data-title="Memoir"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/memoir" target="_blank" rel="noopener">Code&nbsp;→</a>
+          </div>
+          <details>
+            <summary>How to set it up</summary>
+            <ol>
+              <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
+              <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
+              <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
+              <li>The side panel walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
+            </ol>
+            <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/">Step-by-step with pictures</a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/memoir/README.md" target="_blank" rel="noopener">Full guide</a> · Canvas and AI are optional.</p>
+          </details>
+        </div>
+      </article>
+      <article id="app-podcast-studio" class="app" style="--accent:var(--mustard);--tilt:-0.3deg">
+        <div class="art" style="background-image:url('img/podcast-studio.webp')">
+          
+          <span class="grade-tag">Grades 9–12</span>
+          <button type="button" class="art-play" data-tour="videos/podcast-studio.mp4" data-title="Podcast Studio" aria-label="Watch the Podcast Studio tour"><span aria-hidden="true">▶</span></button>
+        </div>
+        <div class="app-body">
+          <h3>Podcast Studio</h3>
+          <p class="blurb">A podcast unit: planning, scripting, read-aloud practice, grading and Canvas.</p>
+          <div class="actions">
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1228gIdrr4K0K-xtpQ0x423oD4A6lKycMXOr84WNGUy0/copy" target="_blank" rel="noopener">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/podcast-studio.mp4" data-title="Podcast Studio"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/podcast-studio" target="_blank" rel="noopener">Code&nbsp;→</a>
+          </div>
+          <details>
+            <summary>How to set it up</summary>
+            <ol>
+              <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
+              <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
+              <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
+              <li>The side panel walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
+            </ol>
+            <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/">Step-by-step with pictures</a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/podcast-studio/README.md" target="_blank" rel="noopener">Full guide</a> · Canvas and AI are optional.</p>
+          </details>
+        </div>
+      </article>
+      <article id="app-bell-ringers" class="app" style="--accent:var(--navy);--tilt:0.7deg">
+        <div class="art" style="background-image:url('img/bell-ringers.webp')">
+          
+          <span class="grade-tag">Grades 9–12</span>
+          <button type="button" class="art-play" data-tour="videos/bell-ringers.mp4" data-title="Bell Ringers" aria-label="Watch the Bell Ringers tour"><span aria-hidden="true">▶</span></button>
+        </div>
+        <div class="app-body">
+          <h3>Bell Ringers</h3>
+          <p class="blurb">Daily writing warm-ups with a built-in library of craft lessons, scoring and Canvas.</p>
+          <div class="actions">
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1GVgqIBrLinbX3YQQ_lhyy3tEDe5FC-e-0Hj2YFQA8uc/copy" target="_blank" rel="noopener">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/bell-ringers.mp4" data-title="Bell Ringers"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/bell-ringers" target="_blank" rel="noopener">Code&nbsp;→</a>
+          </div>
+          <details>
+            <summary>How to set it up</summary>
+            <ol>
+              <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
+              <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
+              <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
+              <li>The side panel walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
+            </ol>
+            <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/">Step-by-step with pictures</a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/bell-ringers/README.md" target="_blank" rel="noopener">Full guide</a> · Canvas and AI are optional.</p>
+          </details>
+        </div>
+      </article>
+      <article id="app-lit-circles" class="app" style="--accent:var(--tomato);--tilt:-0.5deg">
+        <div class="art" style="background-image:url('img/lit-circles.webp')">
+          
+          <span class="grade-tag">Grades 9–12</span>
+          <button type="button" class="art-play" data-tour="videos/lit-circles.mp4" data-title="Lit Circles" aria-label="Watch the Lit Circles tour"><span aria-hidden="true">▶</span></button>
+        </div>
+        <div class="app-body">
+          <h3>Lit Circles</h3>
+          <p class="blurb">Literature circles: weekly roles and steps, discussion, peer and self assessment, grading and Canvas.</p>
+          <div class="actions">
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1BmsksuPD6p4CSNcVy2Q8BojVah01oZi2bB-y-DfecAU/copy" target="_blank" rel="noopener">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/lit-circles.mp4" data-title="Lit Circles"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles" target="_blank" rel="noopener">Code&nbsp;→</a>
+          </div>
+          <details>
+            <summary>How to set it up</summary>
+            <ol>
+              <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
+              <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
+              <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
+              <li>The side panel walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
+            </ol>
+            <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/">Step-by-step with pictures</a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles/README.md" target="_blank" rel="noopener">Full guide</a> · Canvas and AI are optional.</p>
+          </details>
+        </div>
+      </article>
+      <article id="app-lit-circles-hunger-games" class="app" style="--accent:var(--green);--tilt:-0.6deg">
+        <div class="art" style="background-image:url('img/lit-circles-hunger-games.webp')">
+          
+          <span class="grade-tag">Grades 9</span>
+          <button type="button" class="art-play" data-tour="videos/lit-circles-hunger-games.mp4" data-title="Hunger Games Lit Circles" aria-label="Watch the Hunger Games Lit Circles tour"><span aria-hidden="true">▶</span></button>
+        </div>
+        <div class="app-body">
+          <h3>Hunger Games Lit Circles</h3>
+          <p class="blurb">A four-week literature circle unit on The Hunger Games (Suzanne Collins): two assigned reading strategies a week, built-in reading quizzes, discussion, peer and self assessment, grading and Canvas. Students need their own copy of the book.</p>
+          <div class="actions">
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1OA1mHfE8VGhnNCJ32zScy0zA1e_iPfd9gNGQSC2OQ8I/copy" target="_blank" rel="noopener">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/lit-circles-hunger-games.mp4" data-title="Hunger Games Lit Circles"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles-hunger-games" target="_blank" rel="noopener">Code&nbsp;→</a>
+          </div>
+          <details>
+            <summary>How to set it up</summary>
+            <ol>
+              <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
+              <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
+              <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
+              <li>The side panel walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
+            </ol>
+            <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/">Step-by-step with pictures</a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles-hunger-games/README.md" target="_blank" rel="noopener">Full guide</a> · Canvas and AI are optional.</p>
+          </details>
+        </div>
+      </article>
+      <article id="app-lit-circles-simplified" class="app" style="--accent:var(--mustard);--tilt:0.5deg">
+        <div class="art" style="background-image:url('img/lit-circles-simplified.webp')">
+          
+          <span class="grade-tag">Grades 9–12</span>
+          <button type="button" class="art-play" data-tour="videos/lit-circles-simplified.mp4" data-title="Lit Circles (Simplified)" aria-label="Watch the Lit Circles (Simplified) tour"><span aria-hidden="true">▶</span></button>
+        </div>
+        <div class="app-body">
+          <h3>Lit Circles (Simplified)</h3>
+          <p class="blurb">Lit Circles without the Reader’s Journal: every week is two reading strategies. Set up one book for the class or different books by group, the same strategies for everyone or rotating roles, with shared reading quizzes, discussion, grading and Canvas.</p>
+          <div class="actions">
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1YTp1JK25PvYBTpTagptmP9bbtUwtiNxbMWbUWsEpNXY/copy" target="_blank" rel="noopener">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/lit-circles-simplified.mp4" data-title="Lit Circles (Simplified)"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles-simplified" target="_blank" rel="noopener">Code&nbsp;→</a>
+          </div>
+          <details>
+            <summary>How to set it up</summary>
+            <ol>
+              <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
+              <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
+              <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
+              <li>The side panel walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
+            </ol>
+            <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/">Step-by-step with pictures</a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles-simplified/README.md" target="_blank" rel="noopener">Full guide</a> · Canvas and AI are optional.</p>
+          </details>
+        </div>
+      </article>
+      <article id="app-root-word-study" class="app" style="--accent:var(--navy);--tilt:-0.3deg">
+        <div class="art" style="background-image:url('img/root-word-study.webp')">
+          
+          <span class="grade-tag">Grades 9–12</span>
+          <button type="button" class="art-play" data-tour="videos/root-word-study.mp4" data-title="Root Word Study" aria-label="Watch the Root Word Study tour"><span aria-hidden="true">▶</span></button>
+        </div>
+        <div class="app-body">
+          <h3>Root Word Study</h3>
+          <p class="blurb">Weekly Greek and Latin roots: sentences, flashcards, pretests and a self-scoring final quiz.</p>
+          <div class="actions">
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1AMGLM_JQJK-AaJYkOygqCCQMv210a5Try5tVysW2Gvw/copy" target="_blank" rel="noopener">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/root-word-study.mp4" data-title="Root Word Study"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/root-word-study" target="_blank" rel="noopener">Code&nbsp;→</a>
+          </div>
+          <details>
+            <summary>How to set it up</summary>
+            <ol>
+              <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
+              <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
+              <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
+              <li>The side panel walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
+            </ol>
+            <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/">Step-by-step with pictures</a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/root-word-study/README.md" target="_blank" rel="noopener">Full guide</a> · Canvas and AI are optional.</p>
+          </details>
+        </div>
+      </article>
+      <article id="app-short-story-lab" class="app" style="--accent:var(--tomato);--tilt:0.7deg">
+        <div class="art" style="background-image:url('img/short-story-lab.webp')">
+          
+          <span class="grade-tag">Grades 9–10</span>
+          <button type="button" class="art-play" data-tour="videos/short-story-lab.mp4" data-title="Short Story Lab" aria-label="Watch the Short Story Lab tour"><span aria-hidden="true">▶</span></button>
+        </div>
+        <div class="app-body">
+          <h3>Short Story Lab</h3>
+          <p class="blurb">A short story unit: twelve stories with reading support (six public-domain stories included in full; you paste in the rest), a writing workshop, grading and Canvas.</p>
+          <div class="actions">
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1WRYRh2CFpuB5tdOzVdsA-0A23cWD3yC96QLUoemntbU/copy" target="_blank" rel="noopener">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/short-story-lab.mp4" data-title="Short Story Lab"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/short-story-lab" target="_blank" rel="noopener">Code&nbsp;→</a>
+          </div>
+          <details>
+            <summary>How to set it up</summary>
+            <ol>
+              <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
+              <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
+              <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
+              <li>The side panel walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
+            </ol>
+            <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/">Step-by-step with pictures</a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/short-story-lab/README.md" target="_blank" rel="noopener">Full guide</a> · Canvas and AI are optional.</p>
+          </details>
+        </div>
+      </article>
+      </div>
     </div>
   </section>
 
-  <section id="apps">
+  <section id="how" style="padding-top:20px">
     <div class="wrap">
-      <h2>The apps</h2>
-      <p class="section-note">You’ll need a Google Workspace for Education account, so students sign in with their school Google account. Canvas and AI feedback are optional.</p>
-      <div class="grid">
-      <article class="app" style="--accent:#8c2f39">
-        <div class="art light" style="background-image:url('img/macbeth-curriculum.webp')">
-          
-          <button type="button" class="art-play" data-tour="videos/macbeth-curriculum.mp4" data-title="Macbeth Curriculum" aria-label="Watch the Macbeth Curriculum tour"><span aria-hidden="true">▶</span></button>
-          <div class="art-title">
-            <h3>Macbeth Curriculum</h3>
-            <p class="meta">Grades 9–12</p>
-          </div>
+      <div class="sec-head">
+        <div>
+          <h2>How it works</h2>
+          <p class="section-note">Each app runs in your own Google account. Your students’ work saves to your Drive. Nothing is shared with anyone else.</p>
         </div>
-        <p class="blurb">A full Macbeth unit: the play act by act with side-by-side support, activities, discussion, grading and Canvas.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/18axTT492SozC-Hm58W3Wlxhltz1P3ra3SV2lPbupo-M/copy" target="_blank" rel="noopener">Make a copy</a>
-          <button type="button" class="btn tour-btn" data-tour="videos/macbeth-curriculum.mp4" data-title="Macbeth Curriculum"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/macbeth-curriculum" target="_blank" rel="noopener">View code</a>
+        <span class="hand">teach it tomorrow</span>
+      </div>
+      <ol class="steps">
+        <li><span class="num">1</span><h3>Make a copy</h3><p>One click copies the app into your Google account.</p></li>
+        <li><span class="num">2</span><h3>Set it up</h3><p>Click Classroom App ▸ Set up my app. About five minutes, once.</p></li>
+        <li><span class="num">3</span><h3>Teach it</h3><p>Post your link. Students sign in with their school account and get to work.</p></li>
+      </ol>
+      <ul class="facts">
+        <li>Reading support built in</li>
+        <li>Feedback on every step of the writing</li>
+        <li>Students never lose work</li>
+        <li>Grades go to Canvas if you use it</li>
+      </ul>
+    </div>
+  </section>
+
+  <section id="share" class="band">
+    <div class="wrap">
+      <div class="sec-head">
+        <div>
+          <h2>Made something your students love? Share it.</h2>
+          <p class="section-note">Curriculum Vibes grows when teachers share what works in their classrooms. Every unit here meets one standard: students never lose work, grading works the same way, and nothing copyrighted is included. Each one gets a Make a copy button, a picture and a one-minute tour.</p>
         </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/macbeth-curriculum/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
-        </details>
-      </article>
-      <article class="app" style="--accent:#1f5f74">
-        <div class="art light" style="background-image:url('img/memoir.webp')">
-          
-          <button type="button" class="art-play" data-tour="videos/memoir.mp4" data-title="Memoir" aria-label="Watch the Memoir tour"><span aria-hidden="true">▶</span></button>
-          <div class="art-title">
-            <h3>Memoir</h3>
-            <p class="meta">Grades 9–12</p>
-          </div>
+        <span class="hand">no coding degree required</span>
+      </div>
+      <div class="cards3">
+        <div class="panel">
+          <h3>Add your unit</h3>
+          <p>Read the standard, then send it in. Every submission is reviewed before it goes on the site.</p>
+          <a class="btn primary" href="https://github.com/jabens-pixel/classroom-apps/issues/new?template=submit-app.yml" target="_blank" rel="noopener">Submit an app</a>
+          <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/blob/main/APP-STANDARD.md" target="_blank" rel="noopener">Read the app standard →</a>
         </div>
-        <p class="blurb">A memoir writing unit: mentor ideas, drafting, revision, grading and Canvas.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1hoW5dByuvNmlzMB_HR_uWdXudnwVgdX35bU-r1DEcdc/copy" target="_blank" rel="noopener">Make a copy</a>
-          <button type="button" class="btn tour-btn" data-tour="videos/memoir.mp4" data-title="Memoir"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/memoir" target="_blank" rel="noopener">View code</a>
+        <div class="panel">
+          <h3>Share an idea or a problem</h3>
+          <p>Tell us what broke, what your students needed, or how you adapted an app for your class.</p>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/issues/new" target="_blank" rel="noopener">Send a suggestion</a>
         </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/memoir/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
-        </details>
-      </article>
-      <article class="app" style="--accent:#6a4c93">
-        <div class="art light" style="background-image:url('img/podcast-studio.webp')">
-          
-          <button type="button" class="art-play" data-tour="videos/podcast-studio.mp4" data-title="Podcast Studio" aria-label="Watch the Podcast Studio tour"><span aria-hidden="true">▶</span></button>
-          <div class="art-title">
-            <h3>Podcast Studio</h3>
-            <p class="meta">Grades 9–12</p>
-          </div>
+        <div class="panel">
+          <h3>Improve the code</h3>
+          <p>Fork the project, change one app’s folder, and open a pull request. Every change is reviewed.</p>
+          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">How to contribute</a>
         </div>
-        <p class="blurb">A podcast unit: planning, scripting, read-aloud practice, grading and Canvas.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1228gIdrr4K0K-xtpQ0x423oD4A6lKycMXOr84WNGUy0/copy" target="_blank" rel="noopener">Make a copy</a>
-          <button type="button" class="btn tour-btn" data-tour="videos/podcast-studio.mp4" data-title="Podcast Studio"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/podcast-studio" target="_blank" rel="noopener">View code</a>
-        </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/podcast-studio/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
-        </details>
-      </article>
-      <article class="app" style="--accent:#2e6b4f">
-        <div class="art light" style="background-image:url('img/bell-ringers.webp')">
-          
-          <button type="button" class="art-play" data-tour="videos/bell-ringers.mp4" data-title="Bell Ringers" aria-label="Watch the Bell Ringers tour"><span aria-hidden="true">▶</span></button>
-          <div class="art-title">
-            <h3>Bell Ringers</h3>
-            <p class="meta">Grades 9–12</p>
-          </div>
-        </div>
-        <p class="blurb">Daily writing warm-ups with a built-in library of craft lessons, scoring and Canvas.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1GVgqIBrLinbX3YQQ_lhyy3tEDe5FC-e-0Hj2YFQA8uc/copy" target="_blank" rel="noopener">Make a copy</a>
-          <button type="button" class="btn tour-btn" data-tour="videos/bell-ringers.mp4" data-title="Bell Ringers"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/bell-ringers" target="_blank" rel="noopener">View code</a>
-        </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/bell-ringers/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
-        </details>
-      </article>
-      <article class="app" style="--accent:#b5651d">
-        <div class="art light" style="background-image:url('img/lit-circles.webp')">
-          
-          <button type="button" class="art-play" data-tour="videos/lit-circles.mp4" data-title="Lit Circles" aria-label="Watch the Lit Circles tour"><span aria-hidden="true">▶</span></button>
-          <div class="art-title">
-            <h3>Lit Circles</h3>
-            <p class="meta">Grades 9–12</p>
-          </div>
-        </div>
-        <p class="blurb">Literature circles: weekly roles and steps, discussion, peer and self assessment, grading and Canvas.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1BmsksuPD6p4CSNcVy2Q8BojVah01oZi2bB-y-DfecAU/copy" target="_blank" rel="noopener">Make a copy</a>
-          <button type="button" class="btn tour-btn" data-tour="videos/lit-circles.mp4" data-title="Lit Circles"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles" target="_blank" rel="noopener">View code</a>
-        </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
-        </details>
-      </article>
-      <article class="app" style="--accent:#3d5a80">
-        <div class="art light" style="background-image:url('img/lit-circles-hunger-games.webp')">
-          
-          <button type="button" class="art-play" data-tour="videos/lit-circles-hunger-games.mp4" data-title="Hunger Games Lit Circles" aria-label="Watch the Hunger Games Lit Circles tour"><span aria-hidden="true">▶</span></button>
-          <div class="art-title">
-            <h3>Hunger Games Lit Circles</h3>
-            <p class="meta">Grades 9</p>
-          </div>
-        </div>
-        <p class="blurb">A four-week literature circle unit on The Hunger Games (Suzanne Collins): two assigned reading strategies a week, built-in reading quizzes, discussion, peer and self assessment, grading and Canvas. Students need their own copy of the book.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1OA1mHfE8VGhnNCJ32zScy0zA1e_iPfd9gNGQSC2OQ8I/copy" target="_blank" rel="noopener">Make a copy</a>
-          <button type="button" class="btn tour-btn" data-tour="videos/lit-circles-hunger-games.mp4" data-title="Hunger Games Lit Circles"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles-hunger-games" target="_blank" rel="noopener">View code</a>
-        </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles-hunger-games/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
-        </details>
-      </article>
-      <article class="app" style="--accent:#7a5c2e">
-        <div class="art light" style="background-image:url('img/lit-circles-simplified.webp')">
-          
-          <button type="button" class="art-play" data-tour="videos/lit-circles-simplified.mp4" data-title="Lit Circles (Simplified)" aria-label="Watch the Lit Circles (Simplified) tour"><span aria-hidden="true">▶</span></button>
-          <div class="art-title">
-            <h3>Lit Circles (Simplified)</h3>
-            <p class="meta">Grades 9–12</p>
-          </div>
-        </div>
-        <p class="blurb">Lit Circles without the Reader’s Journal: every week is two reading strategies. Set up one book for the class or different books by group, the same strategies for everyone or rotating roles, with shared reading quizzes, discussion, grading and Canvas.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1YTp1JK25PvYBTpTagptmP9bbtUwtiNxbMWbUWsEpNXY/copy" target="_blank" rel="noopener">Make a copy</a>
-          <button type="button" class="btn tour-btn" data-tour="videos/lit-circles-simplified.mp4" data-title="Lit Circles (Simplified)"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles-simplified" target="_blank" rel="noopener">View code</a>
-        </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/lit-circles-simplified/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
-        </details>
-      </article>
-      <article class="app" style="--accent:#5b6c2f">
-        <div class="art light" style="background-image:url('img/root-word-study.webp')">
-          
-          <button type="button" class="art-play" data-tour="videos/root-word-study.mp4" data-title="Root Word Study" aria-label="Watch the Root Word Study tour"><span aria-hidden="true">▶</span></button>
-          <div class="art-title">
-            <h3>Root Word Study</h3>
-            <p class="meta">Grades 9–12</p>
-          </div>
-        </div>
-        <p class="blurb">Weekly Greek and Latin roots: sentences, flashcards, pretests and a self-scoring final quiz.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1AMGLM_JQJK-AaJYkOygqCCQMv210a5Try5tVysW2Gvw/copy" target="_blank" rel="noopener">Make a copy</a>
-          <button type="button" class="btn tour-btn" data-tour="videos/root-word-study.mp4" data-title="Root Word Study"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/root-word-study" target="_blank" rel="noopener">View code</a>
-        </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/root-word-study/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
-        </details>
-      </article>
-      <article class="app" style="--accent:#a23b5a">
-        <div class="art light" style="background-image:url('img/short-story-lab.webp')">
-          
-          <button type="button" class="art-play" data-tour="videos/short-story-lab.mp4" data-title="Short Story Lab" aria-label="Watch the Short Story Lab tour"><span aria-hidden="true">▶</span></button>
-          <div class="art-title">
-            <h3>Short Story Lab</h3>
-            <p class="meta">Grades 9–10</p>
-          </div>
-        </div>
-        <p class="blurb">A short story unit: twelve stories with reading support (six public-domain stories included in full; you paste in the rest), a writing workshop, grading and Canvas.</p>
-        <div class="actions">
-          <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1WRYRh2CFpuB5tdOzVdsA-0A23cWD3yC96QLUoemntbU/copy" target="_blank" rel="noopener">Make a copy</a>
-          <button type="button" class="btn tour-btn" data-tour="videos/short-story-lab.mp4" data-title="Short Story Lab"><span aria-hidden="true">▶</span>&nbsp;1-minute tour</button>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/short-story-lab" target="_blank" rel="noopener">View code</a>
-        </div>
-        <details>
-          <summary>Set it up</summary>
-          <ol>
-            <li>Click <strong>Make a copy</strong>, then <strong>Make a copy</strong> again in Google’s box.</li>
-            <li>In your copy, click <strong>Classroom App ▸ Set up my app</strong>.</li>
-            <li>Approve Google’s permission screen: choose your school account and click <strong>Continue</strong>. If it says <em>“Google hasn’t verified this app”</em>, that’s normal for your own copy: click <strong>Advanced ▸ Go to … (unsafe)</strong>, then <strong>Allow</strong>.</li>
-            <li>The box walks you through publishing it (one minute: <strong>Deploy ▸ New deployment ▸ Web app</strong>). Paste the link back in and it’s saved as your <strong>student link</strong>.</li>
-          </ol>
-          <p class="small"><a href="setup/#video"><strong>Watch the setup (1½ min)</strong></a> · <a href="setup/"><strong>Step-by-step with pictures</strong></a> · <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/apps/short-story-lab/README.md" target="_blank" rel="noopener">Full setup guide</a> · About 5 minutes · Canvas and AI are optional.</p>
-        </details>
-      </article>
       </div>
     </div>
   </section>
 
   <section id="faq">
-    <div class="wrap">
-      <h2>Questions teachers ask</h2>
+    <div class="wrap faq-wrap">
+      <div class="faq-side">
+        <h2>Questions teachers ask</h2>
+        <span class="hand">the honest answers</span>
+      </div>
+      <div>
       
-      <h3 class="faq-group">Getting started</h3>
-      <div class="faq">
-        <details class="faq-item">
-          <summary>Is it really free?</summary>
-          <p>Yes, for every teacher and school. Each app runs in your own Google account, so there is no subscription and nothing to pay. AI feedback is optional and uses your own Gemini key if you turn it on.</p>
-        </details>
-        <details class="faq-item">
-          <summary>What do I need?</summary>
-          <p>A Google Workspace for Education account (the kind your school gives you). Students sign in with their school Google accounts. It works on Chromebooks, laptops, tablets and phones.</p>
-        </details>
-        <details class="faq-item">
-          <summary>How long does setup take?</summary>
-          <p>About five minutes, once per app: make a copy, click <strong>Classroom App ▸ Set up my app</strong>, publish, and paste your student link. After that, students just open the link. The <a href="setup/">setup guide</a> shows every screen, with a 1½-minute video of the whole thing.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Google says “this app hasn’t been verified.” Is that safe?</summary>
-          <p>Yes. Google says that about any app it hasn’t reviewed itself, and your copy is a brand-new app that only you own. Many school accounts never see it; personal Gmail accounts usually do. If you do, it’s once, during setup; your students never see it.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Are the books included?</summary>
-          <p>Public-domain texts are, like Shakespeare’s Macbeth and several classic short stories. For books still under copyright, students use their own copies; the apps never include that text, and some leave a space where you can paste in your own.</p>
-        </details>
-      </div>
-      <h3 class="faq-group">How it works</h3>
-      <div class="faq">
-        <details class="faq-item">
-          <summary>What is it built on?</summary>
-          <p>Each app is a <strong>Google Apps Script web app</strong> with a <strong>Google Sheet</strong> as its database. It runs as you, inside your Google account, and students sign in with their school accounts, so there are no extra servers, passwords or rosters to manage. Your copy’s Sheet holds every class, student and piece of work, and you can open it any time.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Where does my students’ work go?</summary>
-          <p>Into your copy’s Google Sheet, in <em>your</em> Drive. Nobody else can see it, including the person who made the app. Nothing is sent anywhere else unless you connect Canvas or turn on AI feedback.</p>
-        </details>
-        <details class="faq-item">
-          <summary>How does it keep students from losing work?</summary>
-          <p>Writing saves itself a few seconds after a student stops typing, and a copy stays in the browser until the save is confirmed. Two tabs or two devices can’t overwrite each other: the older one is asked which version to keep, and the other is backed up. Submit can’t be sent twice, and earlier versions are kept as backups. When you open a student’s page as the teacher, you can read it but not change it.</p>
-        </details>
-        <details class="faq-item">
-          <summary>What permissions does it ask for, and why?</summary>
-          <p>To keep work in your Sheet (Google Sheets), to make files it exports (Google Drive, only the files it creates), to know who is signed in (your email address), and to reach Canvas or AI feedback if you use them (connect to an external service). A few apps also make Google Docs or send you an email notice; they say so when you approve.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Can I open the Sheet and change things?</summary>
-          <p>You can read it any time and fix a typo in a cell. Don’t sort, delete or move rows in the student tabs: the app finds each student’s work by its row. To remove a student or start over, use the buttons in the app.</p>
-        </details>
-        <details class="faq-item">
-          <summary>How do updates work?</summary>
-          <p>New versions are posted here with notes on what changed. Paste the new files into your copy (Extensions ▸ Apps Script), then <strong>Deploy ▸ Manage deployments ▸ ✎ ▸ New version</strong>. Your student link stays the same, and your students’ work is never touched.</p>
-        </details>
-      </div>
-      <h3 class="faq-group">Grading and your LMS</h3>
-      <div class="faq">
-        <details class="faq-item">
-          <summary>Why are rubrics scored out of 7?</summary>
-          <p>Because 7 points lines up with percentages and letter grades. Each step is about 14%, close to the 10-point gap between letter grades, and half points fill in between:<span class="faq-table" role="table" aria-label="7-point rubric as percentages"><span role="row"><span role="cell">7 / 7</span><span role="cell">100%</span><span role="cell">A</span></span><span role="row"><span role="cell">6.5 / 7</span><span role="cell">93%</span><span role="cell">A</span></span><span role="row"><span role="cell">6 / 7</span><span role="cell">86%</span><span role="cell">B</span></span><span role="row"><span role="cell">5.5 / 7</span><span role="cell">79%</span><span role="cell">C+</span></span><span role="row"><span role="cell">5 / 7</span><span role="cell">71%</span><span role="cell">C</span></span><span role="row"><span role="cell">4.5 / 7</span><span role="cell">64%</span><span role="cell">D</span></span><span role="row"><span role="cell">4 / 7</span><span role="cell">57%</span><span role="cell">below a D on most scales</span></span></span>On a 4-point rubric, “meets the standard” (3 out of 4) becomes 75%, a C, and 2 out of 4 is a failing 50%. Seven points lets solid work land on a B, strong work on an A, and partial work somewhere fair.</p>
-        </details>
-        <details class="faq-item">
-          <summary>How does grading work?</summary>
-          <p>Every graded assignment is a tile on your dashboard showing <em>To grade · Graded · Not submitted</em>. Open it to grade each student with the rubric on screen, or use Focused grading for one student at a time. If a student changes work after you graded it, it comes back marked ↻ to regrade. Ungraded work is left blank, never counted as a zero, and you can leave any assignment out of the grade for one student or the whole class.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Does it connect to Canvas?</summary>
-          <p>Yes, if you want it to. Each teacher connects with their own Canvas access token. The app then creates the assignments in your course and pushes scores and comments with one click (in most apps, the whole gradebook at once). Work you leave out of the grade goes to Canvas as <em>Excused</em>, so it never counts against a student. You can also download a CSV for any gradebook that takes imports.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Can I connect it through LTI?</summary>
-          <p>Not yet. Today you add your student link to Canvas, Schoology or Google Classroom as a link that opens in a new tab, and students sign in with Google. Grades reach Canvas through Canvas’s own connection (above), not through LTI. A full LTI 1.3 connection, where the app opens inside your LMS and knows the class and student from the launch, needs your LMS administrator to register the tool and a small secure service to handle the LTI sign-in handshake, which Apps Script can’t do well on its own. Several apps already include an optional connector for that service, switched off by default. If your school or district wants LTI, email <strong>jabens@gmail.com</strong>.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Do I need Canvas at all?</summary>
-          <p>No. Every app keeps its own gradebook. If you use Google Classroom or a class website, share your student link there and enter grades however you like.</p>
-        </details>
-      </div>
-      <h3 class="faq-group">Sharing and changing the apps</h3>
-      <div class="faq">
-        <details class="faq-item">
-          <summary>Can other teachers at my school use my copy?</summary>
-          <p>Yes. As the admin, you can give other teachers access inside the app, and each one gets their own classes. Or each teacher can make their own copy.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Can I change an app?</summary>
-          <p>Yes. Your copy is yours: open <strong>Extensions ▸ Apps Script</strong> and change anything. If you improve something, consider sharing it back so every teacher gets it.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Can I share an app I made?</summary>
-          <p>Please do. Read the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/APP-STANDARD.md" target="_blank" rel="noopener">app standard</a> and send it in. Every app on this site follows the same rules, so teachers can count on all of them.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Who made these?</summary>
-          <p>Jaben Schalk, a high-school English teacher, built them for his own classes and uses them with his students. Teachers are welcome to help improve them.</p>
-        </details>
-        <details class="faq-item">
-          <summary>Can a company or district use them?</summary>
-          <p>Schools and districts can use them free. Companies that want to sell or bundle them need permission first: email <strong>jabens@gmail.com</strong>.</p>
-        </details>
+        <h3 class="faq-group">Getting started</h3>
+        <div class="faq">
+          <details class="faq-item">
+            <summary>Is it really free?</summary>
+            <p>Yes, for every teacher and school. Each app runs in your own Google account, so there is no subscription and nothing to pay. AI feedback is optional and uses your own Gemini key if you turn it on.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What do I need?</summary>
+            <p>A Google Workspace for Education account (the kind your school gives you). Students sign in with their school Google accounts. It works on Chromebooks, laptops, tablets and phones.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How long does setup take?</summary>
+            <p>About five minutes, once per app: make a copy, click <strong>Classroom App ▸ Set up my app</strong>, publish, and paste your student link. After that, students just open the link. The <a href="setup/">setup guide</a> shows every screen, with a 1½-minute video of the whole thing.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Google says “this app hasn’t been verified.” Is that safe?</summary>
+            <p>Yes. Google says that about any app it hasn’t reviewed itself, and your copy is a brand-new app that only you own. Many school accounts never see it; personal Gmail accounts usually do. If you do, it’s once, during setup; your students never see it.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Are the books included?</summary>
+            <p>Public-domain texts are, like Shakespeare’s Macbeth and several classic short stories. For books still under copyright, students use their own copies; the apps never include that text, and some leave a space where you can paste in your own.</p>
+          </details>
+        </div>
+        <h3 class="faq-group">How it works</h3>
+        <div class="faq">
+          <details class="faq-item">
+            <summary>What is it built on?</summary>
+            <p>Each app is a <strong>Google Apps Script web app</strong> with a <strong>Google Sheet</strong> as its database. It runs as you, inside your Google account, and students sign in with their school accounts, so there are no extra servers, passwords or rosters to manage. Your copy’s Sheet holds every class, student and piece of work, and you can open it any time.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Where does my students’ work go?</summary>
+            <p>Into your copy’s Google Sheet, in <em>your</em> Drive. Nobody else can see it, including the person who made the app. Nothing is sent anywhere else unless you connect Canvas or turn on AI feedback.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How does it keep students from losing work?</summary>
+            <p>Writing saves itself a few seconds after a student stops typing, and a copy stays in the browser until the save is confirmed. Two tabs or two devices can’t overwrite each other: the older one is asked which version to keep, and the other is backed up. Submit can’t be sent twice, and earlier versions are kept as backups. When you open a student’s page as the teacher, you can read it but not change it.</p>
+          </details>
+          <details class="faq-item">
+            <summary>What permissions does it ask for, and why?</summary>
+            <p>To keep work in your Sheet (Google Sheets), to make files it exports (Google Drive, only the files it creates), to know who is signed in (your email address), and to reach Canvas or AI feedback if you use them (connect to an external service). A few apps also make Google Docs or send you an email notice; they say so when you approve.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can I open the Sheet and change things?</summary>
+            <p>You can read it any time and fix a typo in a cell. Don’t sort, delete or move rows in the student tabs: the app finds each student’s work by its row. To remove a student or start over, use the buttons in the app.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How do updates work?</summary>
+            <p>New versions are posted here with notes on what changed. Paste the new files into your copy (Extensions ▸ Apps Script), then <strong>Deploy ▸ Manage deployments ▸ ✎ ▸ New version</strong>. Your student link stays the same, and your students’ work is never touched.</p>
+          </details>
+        </div>
+        <h3 class="faq-group">Grading and your LMS</h3>
+        <div class="faq">
+          <details class="faq-item">
+            <summary>Why are rubrics scored out of 7?</summary>
+            <p>Because 7 points lines up with percentages and letter grades. Each step is about 14%, close to the 10-point gap between letter grades, and half points fill in between:<span class="faq-table" role="table" aria-label="7-point rubric as percentages"><span role="row"><span role="cell">7 / 7</span><span role="cell">100%</span><span role="cell">A</span></span><span role="row"><span role="cell">6.5 / 7</span><span role="cell">93%</span><span role="cell">A</span></span><span role="row"><span role="cell">6 / 7</span><span role="cell">86%</span><span role="cell">B</span></span><span role="row"><span role="cell">5.5 / 7</span><span role="cell">79%</span><span role="cell">C+</span></span><span role="row"><span role="cell">5 / 7</span><span role="cell">71%</span><span role="cell">C</span></span><span role="row"><span role="cell">4.5 / 7</span><span role="cell">64%</span><span role="cell">D</span></span><span role="row"><span role="cell">4 / 7</span><span role="cell">57%</span><span role="cell">below a D on most scales</span></span></span>On a 4-point rubric, “meets the standard” (3 out of 4) becomes 75%, a C, and 2 out of 4 is a failing 50%. Seven points lets solid work land on a B, strong work on an A, and partial work somewhere fair.</p>
+          </details>
+          <details class="faq-item">
+            <summary>How does grading work?</summary>
+            <p>Every graded assignment is a tile on your dashboard showing <em>To grade · Graded · Not submitted</em>. Open it to grade each student with the rubric on screen, or use Focused grading for one student at a time. If a student changes work after you graded it, it comes back marked ↻ to regrade. Ungraded work is left blank, never counted as a zero, and you can leave any assignment out of the grade for one student or the whole class.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Does it connect to Canvas?</summary>
+            <p>Yes, if you want it to. Each teacher connects with their own Canvas access token. The app then creates the assignments in your course and pushes scores and comments with one click (in most apps, the whole gradebook at once). Work you leave out of the grade goes to Canvas as <em>Excused</em>, so it never counts against a student. You can also download a CSV for any gradebook that takes imports.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can I connect it through LTI?</summary>
+            <p>Not yet. Today you add your student link to Canvas, Schoology or Google Classroom as a link that opens in a new tab, and students sign in with Google. Grades reach Canvas through Canvas’s own connection (above), not through LTI. A full LTI 1.3 connection, where the app opens inside your LMS and knows the class and student from the launch, needs your LMS administrator to register the tool and a small secure service to handle the LTI sign-in handshake, which Apps Script can’t do well on its own. Several apps already include an optional connector for that service, switched off by default. If your school or district wants LTI, email <strong>jabens@gmail.com</strong>.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Do I need Canvas at all?</summary>
+            <p>No. Every app keeps its own gradebook. If you use Google Classroom or a class website, share your student link there and enter grades however you like.</p>
+          </details>
+        </div>
+        <h3 class="faq-group">Sharing and changing the apps</h3>
+        <div class="faq">
+          <details class="faq-item">
+            <summary>Can other teachers at my school use my copy?</summary>
+            <p>Yes. As the admin, you can give other teachers access inside the app, and each one gets their own classes. Or each teacher can make their own copy.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can I change an app?</summary>
+            <p>Yes. Your copy is yours: open <strong>Extensions ▸ Apps Script</strong> and change anything. If you improve something, consider sharing it back so every teacher gets it.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can I share an app I made?</summary>
+            <p>Please do. Read the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/APP-STANDARD.md" target="_blank" rel="noopener">app standard</a> and send it in. Every app on this site follows the same rules, so teachers can count on all of them.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Who made these?</summary>
+            <p>Jaben Schalk, a high-school English teacher, built them for his own classes and uses them with his students. Teachers are welcome to help improve them.</p>
+          </details>
+          <details class="faq-item">
+            <summary>Can a company or district use them?</summary>
+            <p>Schools and districts can use them free. Companies that want to sell or bundle them need permission first: email <strong>jabens@gmail.com</strong>.</p>
+          </details>
+        </div>
       </div>
     </div>
   </section>
 
-  <section id="contribute">
+  <section id="support" style="padding-top:20px">
     <div class="wrap">
-      <h2>Make it better</h2>
-      <p class="section-note">These apps get better when teachers share what they learn. You don’t have to write code to help.</p>
-      <div class="two">
-        <div class="panel">
-          <h3>Share an idea or a problem</h3>
-          <p>Tell us what broke, what your students needed, or how you adapted an app for your class.</p>
-          <a class="btn primary" href="https://github.com/jabens-pixel/classroom-apps/issues/new" target="_blank" rel="noopener">Send a suggestion</a>
-        </div>
-        <div class="panel">
-          <h3>Improve the code</h3>
-          <p>Fork the project, make your change in one app’s folder, and open a pull request. Every change is reviewed before it goes in.</p>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener">How to contribute</a>
-        </div>
-      </div>
-      <div class="panel wide" id="add-your-app">
+      <div class="sec-head">
         <div>
-          <h3>Add your own app</h3>
-          <p>Built a classroom app your students use? Share it here. Every app on this site follows the same standard: students never lose work, grading works the same way, and nothing copyrighted is included. Read the standard, then send it in. Each app gets a Make a copy button, a tile picture and a one-minute tour.</p>
-        </div>
-        <div class="actions">
-          <a class="btn primary" href="https://github.com/jabens-pixel/classroom-apps/blob/main/APP-STANDARD.md" target="_blank" rel="noopener">Read the app standard</a>
-          <a class="btn" href="https://github.com/jabens-pixel/classroom-apps/issues/new?template=submit-app.yml" target="_blank" rel="noopener">Submit an app</a>
+          <h2>Keep it free</h2>
+          <p class="section-note">Every unit here is free for every teacher and student. Building them still costs real money for tools and hosting.</p>
         </div>
       </div>
-    </div>
-  </section>
-
-  <section id="support">
-    <div class="wrap">
-      <h2>Keep it free</h2>
-      <p class="section-note">These apps are free for every teacher and student. Building them still costs real money for tools and hosting.</p>
-      <div class="two">
-        <div class="panel">
+      <div class="support">
+        <div class="panel big">
           <h3>Support the project</h3>
           <p>If an app helps your class, a small contribution helps keep them free and growing.</p>
-          <a class="btn primary" href="https://ko-fi.com/jabenschalk" target="_blank" rel="noopener">Support on Ko-fi</a>
+          <a class="btn ink" href="https://ko-fi.com/jabenschalk" target="_blank" rel="noopener">Support on Ko-fi</a>
         </div>
         <div class="panel">
           <h3>For schools and districts</h3>
@@ -554,8 +675,10 @@
 
 <footer>
   <div class="wrap">
-    <p>Made by Jaben Schalk, a high-school English teacher.</p>
+    <p class="wordmark">Curriculum <span>Vibes</span></p>
+    <p>Started by Jaben Schalk, a high-school English teacher, with units he built for his own students. Made by teachers, for teachers and the students they teach.</p>
     <p>Free for teachers, students and schools. Code: <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/LICENSE" target="_blank" rel="noopener">PolyForm Noncommercial 1.0.0</a>. Lesson content: <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/LICENSE-LESSONS.md" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a> (share and adapt with credit, not for sale). Selling it or building it into a paid product needs permission. Story and book texts included are in the public domain.</p>
+    <p><a href="https://github.com/jabens-pixel/classroom-apps" target="_blank" rel="noopener">All the code on GitHub</a></p>
   </div>
 </footer>
 <dialog class="tour" id="tourDialog" aria-label="App tour">
@@ -563,6 +686,30 @@
   <div class="bar"><span id="tourTitle"></span><button type="button" id="tourClose">Close</button></div>
 </dialog>
 <script>
+(function () {   // the hero collage: swap one picture every few seconds so every app takes a turn
+  var pool = [{"id":"macbeth-curriculum","t":"Macbeth Curriculum","img":"img/macbeth-curriculum.webp"},{"id":"memoir","t":"Memoir","img":"img/memoir.webp"},{"id":"podcast-studio","t":"Podcast Studio","img":"img/podcast-studio.webp"},{"id":"bell-ringers","t":"Bell Ringers","img":"img/bell-ringers.webp"},{"id":"lit-circles","t":"Lit Circles","img":"img/lit-circles.webp"},{"id":"lit-circles-hunger-games","t":"Hunger Games Lit Circles","img":"img/lit-circles-hunger-games.webp"},{"id":"lit-circles-simplified","t":"Lit Circles (Simplified)","img":"img/lit-circles-simplified.webp"},{"id":"root-word-study","t":"Root Word Study","img":"img/root-word-study.webp"},{"id":"short-story-lab","t":"Short Story Lab","img":"img/short-story-lab.webp"}], slots = [].slice.call(document.querySelectorAll('.sticker'));
+  if (!slots.length || pool.length <= slots.length) return;
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var paused = false, last = -1, box = document.querySelector('.collage');
+  box.addEventListener('mouseenter', function () { paused = true; });
+  box.addEventListener('mouseleave', function () { paused = false; });
+  box.addEventListener('focusin', function () { paused = true; });
+  box.addEventListener('focusout', function () { paused = false; });
+  var shown = slots.map(function (s) { return s.getAttribute('data-app'); });
+  var queue = pool.filter(function (a) { return shown.indexOf(a.id) === -1; });
+  setInterval(function () {
+    if (paused || document.hidden || !queue.length) return;
+    var i; do { i = Math.floor(Math.random() * slots.length); } while (i === last && slots.length > 1); last = i;
+    var s = slots[i], next = queue.shift(), old = s.getAttribute('data-app');
+    queue.push(pool.filter(function (a) { return a.id === old; })[0]);
+    s.classList.add('flip');
+    setTimeout(function () {
+      s.setAttribute('data-app', next.id); s.href = '#app-' + next.id; s.setAttribute('aria-label', next.t);
+      s.querySelector('.face').style.backgroundImage = "url('" + next.img + "')"; s.querySelector('.lbl').textContent = next.t;
+      s.classList.remove('flip');
+    }, 330);
+  }, 2600);
+})();
 (function () {
   var d = document.getElementById('tourDialog'), v = document.getElementById('tourVideo');
   if (!d || typeof d.showModal !== 'function') return;   // very old browsers: the buttons do nothing

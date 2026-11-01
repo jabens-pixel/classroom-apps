@@ -1,12 +1,12 @@
 name: Submit an app
-description: Offer your own classroom app for the Classroom Apps site.
+description: Offer your own classroom app for the Curriculum Vibes site.
 title: "Submit an app: "
 labels: ["app submission"]
 body:
   - type: markdown
     attributes:
       value: |
-        Thank you! Please read the [Classroom Apps standard](../blob/main/APP-STANDARD.md) first.
+        Thank you! Please read the [Curriculum Vibes app standard](../blob/main/APP-STANDARD.md) first.
         Every listed app follows it, so teachers can rely on every app the same way.
   - type: input
     id: name
