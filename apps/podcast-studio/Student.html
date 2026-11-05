@@ -403,13 +403,26 @@
     if (fd.id === 'runsheet') return episodeRowsHtml(fd, rows, ro);
     var list = Array.isArray(rows) && rows.length ? rows.slice() : [];
     while (list.length < Math.max(1, fd.min || 1)) list.push({});
+    if (fd.card) return rowCardsHtml(fd, list, ro);
     return '<div class="pc-rows" data-rows="' + esc(fd.id) + '"><div class="pc-rows-head" aria-hidden="true">' + fd.cols.map(function (c) { return '<span class="pc-col-' + (c.w || 'md') + '">' + esc(c.label) + '</span>'; }).join('') + '<span class="pc-col-x"></span></div>' +
       list.map(function (r, i) {
         return '<div class="pc-rowline">' + fd.cols.map(function (c) {
           var v = r[c.id] || '', lg = c.w === 'lg';
-          return '<label class="pc-col-' + (c.w || 'md') + '"><span class="pc-sr">' + esc(c.label) + ' ' + (i + 1) + '</span>' + (lg ? '<textarea class="pc-input pc-cell" rows="2" data-col="' + esc(c.id) + '" placeholder="' + esc(i === 0 && c.ph ? 'e.g. ' + c.ph : c.label) + '"' + (ro ? ' readonly' : '') + '>' + esc(v) + '</textarea>' : '<input class="pc-input pc-cell" data-col="' + esc(c.id) + '" value="' + esc(v) + '" placeholder="' + esc(i === 0 && c.ph ? 'e.g. ' + c.ph : c.label) + '"' + (ro ? ' readonly' : '') + '>') + '</label>';
+          return '<label class="pc-col-' + (c.w || 'md') + '"><span class="pc-sr">' + esc(c.label) + ' ' + (i + 1) + '</span>' + (lg ? '<textarea class="pc-input pc-cell" rows="2" data-col="' + esc(c.id) + '" placeholder="' + esc(i === 0 && c.ph ? 'e.g. ' + c.ph : '') + '"' + (ro ? ' readonly' : '') + '>' + esc(v) + '</textarea>' : '<input class="pc-input pc-cell" data-col="' + esc(c.id) + '" value="' + esc(v) + '" placeholder="' + esc(i === 0 && c.ph ? 'e.g. ' + c.ph : '') + '"' + (ro ? ' readonly' : '') + '>') + '</label>';
         }).join('') + (ro ? '<span class="pc-col-x"></span>' : '<button type="button" class="pc-icon-btn pc-col-x" data-act="rowRemove" aria-label="Remove row ' + (i + 1) + '">✕</button>') + '</div>';
       }).join('') + '</div>' + (ro ? '' : '<button type="button" class="pc-btn small ghost" data-act="rowAdd" data-rows="' + esc(fd.id) + '">+ Add a row</button>');
+  }
+  // One card per row, each box labelled (fields with card: 'Source' in PodcastData). Same .pc-rowline / .pc-cell
+  // markup underneath, so saving, Add and Remove work exactly as for a table.
+  function rowCardsHtml(fd, list, ro) {
+    var noun = fd.card;
+    return '<div class="pc-rows pc-rows-cards" data-rows="' + esc(fd.id) + '">' + list.map(function (r, i) {
+      return '<div class="pc-rowline pc-rowcard"><div class="pc-rowcard-head"><b>' + esc(noun) + ' <span class="pc-rowcard-num"></span></b>' +
+        (ro ? '' : '<button type="button" class="pc-rowcard-remove" data-act="rowRemove" aria-label="Remove this ' + esc(noun.toLowerCase()) + '">Remove</button>') + '</div><div class="pc-rowcard-grid">' +
+        fd.cols.map(function (c) {
+          return '<label class="pc-rowcard-field"><span class="pc-rowcard-label">' + esc(c.label) + '</span><textarea class="pc-input pc-cell" rows="2" data-col="' + esc(c.id) + '" placeholder="' + esc(i === 0 && c.ph ? 'e.g. ' + c.ph : '') + '"' + (ro ? ' readonly' : '') + '>' + esc(r[c.id] || '') + '</textarea></label>';
+        }).join('') + '</div></div>';
+    }).join('') + '</div>' + (ro ? '' : '<button type="button" class="pc-btn pc-rowcard-add" data-act="rowAdd" data-rows="' + esc(fd.id) + '">+ Add another ' + esc(noun.toLowerCase()) + '</button>');
   }
   function episodeHtml(fd, v, ro) {
     var lib = S.home.library || [], known = lib.some(function (e) { return e.id === v; }), other = v && !known;
@@ -425,7 +438,7 @@
     var inner;
     if (fd.kind === 'rows') inner = (typeof v === 'string' && v.trim() ? '<div class="pc-old-text"><span class="pc-fhint">What you wrote here before this became a table (kept):</span><p>' + esc(v) + '</p></div>' : '') + rowsHtml(fd, v, ro);
     else if (fd.kind === 'long') inner = (fd.focus && !ro ? '<div class="pc-focusbar"><button type="button" class="pc-btn small" data-act="focusMode" data-field="' + esc(fd.id) + '">⤢ Write in focus mode</button><button type="button" class="pc-btn small ghost pc-focus-exit" data-act="focusExit">✕ Exit focus</button></div>' : '') +
-      '<textarea id="fld_' + esc(fd.id) + '" class="pc-input pc-fval' + (fd.focus ? ' pc-writing' : '') + '" data-field="' + esc(fd.id) + '" data-stat-box="' + esc(fd.id) + '" rows="' + (fd.rows || 5) + '"' + (ro ? ' readonly' : '') + '>' + esc(v || '') + '</textarea><div class="pc-fmeta" data-meta="' + esc(fd.id) + '"></div>';
+      '<div class="pc-wbox"><textarea id="fld_' + esc(fd.id) + '" class="pc-input pc-fval' + (fd.focus ? ' pc-writing' : '') + '" data-field="' + esc(fd.id) + '" data-stat-box="' + esc(fd.id) + '" rows="' + (fd.rows || 5) + '"' + (ro ? ' readonly' : '') + '>' + esc(v || '') + '</textarea><div class="pc-fmeta" data-meta="' + esc(fd.id) + '"></div></div>';
     else if (fd.kind === 'choice') inner = '<div class="pc-choice-row" role="radiogroup" aria-label="' + esc(fd.label) + '">' + fd.options.concat(v && fd.options.indexOf(v) < 0 ? [v] : []).map(function (o) { return '<label class="pc-radio' + (v === o ? ' is-on' : '') + '"><input type="radio" class="pc-fval" name="f_' + esc(fd.id) + '" data-field="' + esc(fd.id) + '" value="' + esc(o) + '"' + (v === o ? ' checked' : '') + (ro ? ' disabled' : '') + '><span>' + esc(o) + '</span></label>'; }).join('') + '</div>';
     else if (fd.kind === 'episode') inner = episodeHtml(fd, v || '', ro);
     else if (fd.kind === 'link') inner = '<div class="pc-linkrow"><input type="url" id="fld_' + esc(fd.id) + '" class="pc-input pc-fval" data-field="' + esc(fd.id) + '" placeholder="https:&#47;&#47;www.canva.com/design/…/view" value="' + esc(v || '') + '"' + (ro ? ' readonly' : '') + '><a class="pc-btn small" data-open="' + esc(fd.id) + '" target="_blank" rel="noopener" href="' + esc(/^https?:\/{2}/i.test(v || '') ? v : '#') + '"' + (/^https?:\/{2}/i.test(v || '') ? '' : ' hidden') + '>Open ↗</a></div>' + (fd.canva ? '<p class="pc-small pc-muted">In Canva: <b>Share → View-only link → Copy</b>, then paste it here. Open it in a private window to check it works.</p>' : '');
@@ -450,12 +463,13 @@
     Object.keys(S.fieldsData || {}).forEach(function (k) { if (f[k] === undefined) f[k] = S.fieldsData[k]; });
     return { f: f };
   }
+  function rowWord(fd, n) { var w = fd.card ? fd.card.toLowerCase() : 'row'; return n === 1 ? w : w + 's'; }
   function missingOf(a, f) {
     var miss = [];
     (a.fields || []).forEach(function (fd) {
       if (!fieldShown(fd, f)) return;
       var v = f[fd.id];
-      if (fd.kind === 'rows') { var n = (v || []).length; if (fd.min && n < fd.min) miss.push(fd.label + ' (' + n + ' of ' + fd.min + ' rows)'); }
+      if (fd.kind === 'rows') { var n = (v || []).length; if (fd.min && n < fd.min) miss.push(fd.label + ' (' + n + ' of ' + fd.min + ' ' + rowWord(fd, 2) + ')'); }
       else if (fd.required && !String(v || '').trim()) miss.push(fd.label);
       if (fd.minWords && PC.words(v) < fd.minWords) miss.push(fd.label + ' (' + PC.words(v) + ' of ' + fd.minWords + ' words)');
     });
@@ -466,7 +480,7 @@
     (a.fields || []).forEach(function (fd) {
       if (!fieldShown(fd, f) || fd.optional) return;
       var v = f[fd.id], ok, text;
-      if (fd.kind === 'rows') { var n = (v || []).length; ok = n >= (fd.min || 1); text = fd.label.replace(/^\d+\.\s*/, '') + ': ' + n + (fd.min ? ' of ' + fd.min + ' rows' : n === 1 ? ' row' : ' rows'); }
+      if (fd.kind === 'rows') { var n = (v || []).length; ok = n >= (fd.min || 1); text = fd.label.replace(/^\d+\.\s*/, '') + ': ' + n + (fd.min ? ' of ' + fd.min + ' ' + rowWord(fd, fd.min) : ' ' + rowWord(fd, n)); }
       else if (fd.kind === 'long') { var w = PC.words(v); ok = fd.minWords ? w >= fd.minWords : w > 0; text = fd.label + ': ' + PC.plural(w, 'word') + (fd.minWords ? ' of ' + fd.minWords : ''); }
       else { ok = !!String(v || '').trim(); text = fd.label; }
       items.push({ ok: ok, text: text });

@@ -880,5 +880,63 @@ body{background-color:var(--paper);background-image:var(--grain)}
 .pc-bs-list .pc-table{margin:0}
 .pc-bs-list td,.pc-bs-list th{padding:6px 10px;font-size:13.5px}
 .pc-name-card{max-width:620px;margin:24px auto}
+/* Soft card writing boxes — 2026-11-03a. Presentation only.
+   Every box a student writes in on a fill-in page, plus discussion posts and replies: rounded warm-white
+   boxes with a soft shadow and a teal glow while typing. A long answer and its word count / writing stats
+   share one box. Boxes grow with the writing where the browser can (field-sizing). The Script & Run Sheet
+   planning desk keeps its own look, so everything here is scoped away from .pc-episode-planner. */
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-input,.pc-compose .pc-input,.pc-reply-box .pc-input{
+  background:#fffdf9;border:1px solid #e3d8c3;border-radius:12px;padding:12px 15px;line-height:1.6;
+  box-shadow:0 1px 2px rgba(60,45,20,.05),0 3px 12px rgba(60,45,20,.045);
+  transition:border-color .15s,box-shadow .15s,background-color .15s}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-input:hover:not(:focus):not([readonly]):not(:disabled),
+.pc-compose .pc-input:hover:not(:focus),.pc-reply-box .pc-input:hover:not(:focus){border-color:#cdbfa3}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-input:focus,.pc-compose .pc-input:focus,.pc-reply-box .pc-input:focus{
+  border-color:var(--accent);box-shadow:0 0 0 4px rgba(40,95,89,.16);outline:none}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-input:focus-visible,.pc-compose .pc-input:focus-visible,.pc-reply-box .pc-input:focus-visible{outline:none}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-input::placeholder,.pc-compose .pc-input::placeholder,.pc-reply-box .pc-input::placeholder{color:#958f82}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-input[readonly],.pc-fld:not(.pc-episode-planner .pc-fld) .pc-input:disabled{background:#faf5ec;box-shadow:none}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-rowline{gap:10px}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-rows{gap:10px}
+
+/* a long answer and its stats strip are one box */
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-wbox{background:#fffdf9;border:1px solid #e3d8c3;border-radius:14px;overflow:hidden;
+  box-shadow:0 1px 2px rgba(60,45,20,.05),0 3px 12px rgba(60,45,20,.045);transition:border-color .15s,box-shadow .15s}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-wbox:hover{border-color:#cdbfa3}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-wbox:focus-within{border-color:var(--accent);box-shadow:0 0 0 4px rgba(40,95,89,.16)}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-wbox>.pc-input,.pc-fld:not(.pc-episode-planner .pc-fld) .pc-wbox>.pc-input:focus{
+  display:block;border:0;border-radius:0;box-shadow:none;background:transparent;padding:15px 17px}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-wbox:has(>.pc-input[readonly]){background:#faf5ec;box-shadow:none}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-wbox>.pc-fmeta{margin:0;padding:8px 12px;border-top:1px solid #efe6d6;background:#fbf5ea}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-wbox>.pc-fmeta:empty{display:none}
+.pc-wbox .pc-stat{background:#fff}
+.pc-wbox .pc-stat-time{background:#eef3fb}
+.pc-wbox .pc-stat.is-warn{background:#fdeceb} .pc-wbox .pc-stat.is-source{background:#fff8e0} .pc-wbox .pc-stat.is-clean{background:#eef6f0}
+.pc-write-wrap.is-focus .pc-wbox{box-shadow:none}
+
+/* boxes grow as students write (no corner drag handle) where the browser supports it */
+@supports (field-sizing:content){
+  .pc-fld:not(.pc-episode-planner .pc-fld) textarea.pc-input:not(.pc-writing),.pc-compose textarea.pc-input,.pc-reply-box textarea.pc-input{field-sizing:content;resize:none}
+  .pc-fld:not(.pc-episode-planner .pc-fld) .pc-wbox>textarea.pc-input:not(.pc-writing){min-height:8.4em}
+  .pc-fld:not(.pc-episode-planner .pc-fld) .pc-rowline textarea.pc-input{min-height:4.6em}
+  .pc-compose textarea.pc-input{min-height:8em} .pc-reply-box textarea.pc-input{min-height:3.4em}
+}
+
+/* row cards (Source notebook): one card per row, each box labelled */
+.pc-rows.pc-rows-cards{display:grid;gap:14px;counter-reset:pcrow}
+.pc-rows-cards .pc-rowline.pc-rowcard{display:block;counter-increment:pcrow;padding:16px 18px 18px;background:#fff;border:1px solid #e3d8c3;border-radius:14px;box-shadow:0 1px 2px rgba(60,45,20,.04)}
+.pc-rowcard-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin:0 0 10px}
+.pc-rowcard-head b{font-size:15px;letter-spacing:.01em}
+.pc-rowcard-num::after{content:counter(pcrow)}
+.pc-rowcard-remove{font:inherit;font-size:13px;color:var(--muted);background:none;border:0;padding:2px 4px;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.pc-rowcard-remove:hover{color:#8c1d17}
+.pc-rowcard-remove:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+.pc-rowcard-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px}
+.pc-rowcard-field{display:block;min-width:0}
+.pc-rowcard-label{display:block;font-size:13px;font-weight:700;color:#4f4a40;margin:0 0 6px}
+.pc-fld:not(.pc-episode-planner .pc-fld) .pc-rowcard .pc-input{box-shadow:none}
+.pc-btn.pc-rowcard-add{display:block;width:100%;margin-top:14px;padding:12px;background:transparent;border:1.5px dashed #c9bc9f;border-radius:12px;color:var(--accent);font-weight:700;box-shadow:none}
+.pc-btn.pc-rowcard-add:hover{background:#fffdf9;border-color:var(--accent)}
+@media (max-width:700px){.pc-rowcard-grid{grid-template-columns:1fr}.pc-rows-cards .pc-rowline.pc-rowcard{padding:14px}}
 </style>
 <script>window.__MB.PodcastTheme = 'ok';</script>

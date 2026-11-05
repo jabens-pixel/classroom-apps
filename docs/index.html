@@ -6,7 +6,7 @@
 <title>Curriculum Vibes</title>
 <meta name="description" content="Complete, free units and classroom tools made by teachers and taught with real students. Copy one into your Google account and teach it tomorrow.">
 <meta property="og:title" content="Curriculum Vibes">
-<meta property="og:description" content="Curriculum students love, made by teachers. Free, classroom-tested, ready to teach tomorrow.">
+<meta property="og:description" content="Free, classroom-tested units, ready to teach tomorrow.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght,SOFT,WONK@9..144,400..900,0..100,0..1&family=Atkinson+Hyperlegible:wght@400;700&family=Caveat:wght@600;700&display=swap" rel="stylesheet">
@@ -63,6 +63,8 @@
   .hero h1 .mark::before { content: ""; position: absolute; left: -.08em; right: -.1em; bottom: .04em; height: .42em; background: var(--mustard); z-index: -1; transform: rotate(-1.5deg); border-radius: 3px 10px 4px 12px; }
   .hero h1 .soft { font-style: italic; font-weight: 500; }
   .lede { font-size: 21px; max-width: 40ch; margin: 24px 0 30px; color: var(--muted); }
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+  .hero .sr-only + .lede { margin-top: 0; }
   .lede strong { color: var(--ink); }
   .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; align-items: center; }
 
@@ -152,6 +154,10 @@
   .faq-table > span { display: contents; }
   .faq-table [role="cell"]:first-child { font-weight: 700; }
 
+  .using { margin-top: 40px; display: flex; align-items: center; justify-content: space-between; gap: 20px 32px; flex-wrap: wrap; background: var(--card); border: 2px solid var(--line); border-radius: 18px; padding: 22px 28px; box-shadow: 6px 6px 0 var(--tomato); transform: rotate(-.4deg); }
+  .using h3 { font-size: 26px; margin: 0 0 4px; }
+  .using p { margin: 0; color: var(--muted); font-size: 17px; max-width: 52ch; }
+  @media (max-width: 520px) { .using { padding: 20px; transform: none; } }
   /* ---------- share / support ---------- */
   .band { background: var(--green); color: #fbf4e4; border-top: 2px solid var(--line); border-bottom: 2px solid var(--line); }
   .band h2 { color: #fbf4e4; }
@@ -203,6 +209,7 @@
     .ticker-track { font-size: 20px; }
   }
 </style>
+
 </head>
 <body>
 <div class="top">
@@ -221,8 +228,7 @@
 <header class="hero">
   <div class="wrap">
     <div>
-      <span class="stamp">Free · made by teachers · taught with real students</span>
-      <h1>Curriculum students <span class="mark">love</span>, <span class="soft">made by teachers.</span></h1>
+      <h1 class="sr-only">Curriculum Vibes</h1>
       <p class="lede">Complete units and classroom routines, from Macbeth to making a podcast, where students <strong>read, write, discuss and create</strong> in one place, with their work saved as they go. Every one has been taught in a real classroom. Copy one into your Google account and teach it tomorrow.</p>
       <div class="hero-actions">
         <a class="btn primary" href="#apps">Browse the apps ↓</a>
@@ -247,7 +253,6 @@
           <h2>The apps</h2>
           <p class="section-note">Each one is a full unit or routine: readings with built-in support, discussion, writing with feedback at every step, and a gradebook for you. Right now it’s English for grades 9–12. Teach another subject? <a href="#share">Add yours.</a></p>
         </div>
-        <span class="hand">tested on actual teenagers ✓</span>
       </div>
       <div class="grid">
       <article id="app-macbeth-curriculum" class="app" style="--accent:var(--tomato);--tilt:-0.6deg">
@@ -260,8 +265,8 @@
           <h3>Macbeth Curriculum</h3>
           <p class="blurb">A full Macbeth unit: the play act by act with side-by-side support, activities, discussion, grading and Canvas.</p>
           <div class="actions">
-            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/18axTT492SozC-Hm58W3Wlxhltz1P3ra3SV2lPbupo-M/copy" target="_blank" rel="noopener">Make a copy</a>
-            <button type="button" class="btn ink tour-btn" data-tour="videos/macbeth-curriculum.mp4" data-title="Macbeth Curriculum"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/18axTT492SozC-Hm58W3Wlxhltz1P3ra3SV2lPbupo-M/copy" target="_blank" rel="noopener" data-goatcounter-click="copy-macbeth-curriculum" data-goatcounter-title="Make a copy: Macbeth Curriculum">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/macbeth-curriculum.mp4" data-title="Macbeth Curriculum" data-goatcounter-click="tour-macbeth-curriculum" data-goatcounter-title="Tour: Macbeth Curriculum"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
             <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/macbeth-curriculum" target="_blank" rel="noopener">Code&nbsp;→</a>
           </div>
           <details>
@@ -286,8 +291,8 @@
           <h3>Memoir</h3>
           <p class="blurb">A memoir writing unit: mentor ideas, drafting, revision, grading and Canvas.</p>
           <div class="actions">
-            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1hoW5dByuvNmlzMB_HR_uWdXudnwVgdX35bU-r1DEcdc/copy" target="_blank" rel="noopener">Make a copy</a>
-            <button type="button" class="btn ink tour-btn" data-tour="videos/memoir.mp4" data-title="Memoir"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1hoW5dByuvNmlzMB_HR_uWdXudnwVgdX35bU-r1DEcdc/copy" target="_blank" rel="noopener" data-goatcounter-click="copy-memoir" data-goatcounter-title="Make a copy: Memoir">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/memoir.mp4" data-title="Memoir" data-goatcounter-click="tour-memoir" data-goatcounter-title="Tour: Memoir"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
             <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/memoir" target="_blank" rel="noopener">Code&nbsp;→</a>
           </div>
           <details>
@@ -312,8 +317,8 @@
           <h3>Podcast Studio</h3>
           <p class="blurb">A podcast unit: planning, scripting, read-aloud practice, grading and Canvas.</p>
           <div class="actions">
-            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1228gIdrr4K0K-xtpQ0x423oD4A6lKycMXOr84WNGUy0/copy" target="_blank" rel="noopener">Make a copy</a>
-            <button type="button" class="btn ink tour-btn" data-tour="videos/podcast-studio.mp4" data-title="Podcast Studio"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1228gIdrr4K0K-xtpQ0x423oD4A6lKycMXOr84WNGUy0/copy" target="_blank" rel="noopener" data-goatcounter-click="copy-podcast-studio" data-goatcounter-title="Make a copy: Podcast Studio">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/podcast-studio.mp4" data-title="Podcast Studio" data-goatcounter-click="tour-podcast-studio" data-goatcounter-title="Tour: Podcast Studio"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
             <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/podcast-studio" target="_blank" rel="noopener">Code&nbsp;→</a>
           </div>
           <details>
@@ -338,8 +343,8 @@
           <h3>Bell Ringers</h3>
           <p class="blurb">Daily writing warm-ups with a built-in library of craft lessons, scoring and Canvas.</p>
           <div class="actions">
-            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1GVgqIBrLinbX3YQQ_lhyy3tEDe5FC-e-0Hj2YFQA8uc/copy" target="_blank" rel="noopener">Make a copy</a>
-            <button type="button" class="btn ink tour-btn" data-tour="videos/bell-ringers.mp4" data-title="Bell Ringers"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1GVgqIBrLinbX3YQQ_lhyy3tEDe5FC-e-0Hj2YFQA8uc/copy" target="_blank" rel="noopener" data-goatcounter-click="copy-bell-ringers" data-goatcounter-title="Make a copy: Bell Ringers">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/bell-ringers.mp4" data-title="Bell Ringers" data-goatcounter-click="tour-bell-ringers" data-goatcounter-title="Tour: Bell Ringers"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
             <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/bell-ringers" target="_blank" rel="noopener">Code&nbsp;→</a>
           </div>
           <details>
@@ -364,8 +369,8 @@
           <h3>Lit Circles</h3>
           <p class="blurb">Literature circles: weekly roles and steps, discussion, peer and self assessment, grading and Canvas.</p>
           <div class="actions">
-            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1BmsksuPD6p4CSNcVy2Q8BojVah01oZi2bB-y-DfecAU/copy" target="_blank" rel="noopener">Make a copy</a>
-            <button type="button" class="btn ink tour-btn" data-tour="videos/lit-circles.mp4" data-title="Lit Circles"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1BmsksuPD6p4CSNcVy2Q8BojVah01oZi2bB-y-DfecAU/copy" target="_blank" rel="noopener" data-goatcounter-click="copy-lit-circles" data-goatcounter-title="Make a copy: Lit Circles">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/lit-circles.mp4" data-title="Lit Circles" data-goatcounter-click="tour-lit-circles" data-goatcounter-title="Tour: Lit Circles"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
             <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles" target="_blank" rel="noopener">Code&nbsp;→</a>
           </div>
           <details>
@@ -390,8 +395,8 @@
           <h3>Hunger Games Lit Circles</h3>
           <p class="blurb">A four-week literature circle unit on The Hunger Games (Suzanne Collins): two assigned reading strategies a week, built-in reading quizzes, discussion, peer and self assessment, grading and Canvas. Students need their own copy of the book.</p>
           <div class="actions">
-            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1OA1mHfE8VGhnNCJ32zScy0zA1e_iPfd9gNGQSC2OQ8I/copy" target="_blank" rel="noopener">Make a copy</a>
-            <button type="button" class="btn ink tour-btn" data-tour="videos/lit-circles-hunger-games.mp4" data-title="Hunger Games Lit Circles"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1OA1mHfE8VGhnNCJ32zScy0zA1e_iPfd9gNGQSC2OQ8I/copy" target="_blank" rel="noopener" data-goatcounter-click="copy-lit-circles-hunger-games" data-goatcounter-title="Make a copy: Hunger Games Lit Circles">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/lit-circles-hunger-games.mp4" data-title="Hunger Games Lit Circles" data-goatcounter-click="tour-lit-circles-hunger-games" data-goatcounter-title="Tour: Hunger Games Lit Circles"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
             <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles-hunger-games" target="_blank" rel="noopener">Code&nbsp;→</a>
           </div>
           <details>
@@ -416,8 +421,8 @@
           <h3>Lit Circles (Simplified)</h3>
           <p class="blurb">Lit Circles without the Reader’s Journal: every week is two reading strategies. Set up one book for the class or different books by group, the same strategies for everyone or rotating roles, with shared reading quizzes, discussion, grading and Canvas.</p>
           <div class="actions">
-            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1YTp1JK25PvYBTpTagptmP9bbtUwtiNxbMWbUWsEpNXY/copy" target="_blank" rel="noopener">Make a copy</a>
-            <button type="button" class="btn ink tour-btn" data-tour="videos/lit-circles-simplified.mp4" data-title="Lit Circles (Simplified)"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1YTp1JK25PvYBTpTagptmP9bbtUwtiNxbMWbUWsEpNXY/copy" target="_blank" rel="noopener" data-goatcounter-click="copy-lit-circles-simplified" data-goatcounter-title="Make a copy: Lit Circles (Simplified)">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/lit-circles-simplified.mp4" data-title="Lit Circles (Simplified)" data-goatcounter-click="tour-lit-circles-simplified" data-goatcounter-title="Tour: Lit Circles (Simplified)"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
             <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/lit-circles-simplified" target="_blank" rel="noopener">Code&nbsp;→</a>
           </div>
           <details>
@@ -442,8 +447,8 @@
           <h3>Root Word Study</h3>
           <p class="blurb">Weekly Greek and Latin roots: sentences, flashcards, pretests and a self-scoring final quiz.</p>
           <div class="actions">
-            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1AMGLM_JQJK-AaJYkOygqCCQMv210a5Try5tVysW2Gvw/copy" target="_blank" rel="noopener">Make a copy</a>
-            <button type="button" class="btn ink tour-btn" data-tour="videos/root-word-study.mp4" data-title="Root Word Study"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1AMGLM_JQJK-AaJYkOygqCCQMv210a5Try5tVysW2Gvw/copy" target="_blank" rel="noopener" data-goatcounter-click="copy-root-word-study" data-goatcounter-title="Make a copy: Root Word Study">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/root-word-study.mp4" data-title="Root Word Study" data-goatcounter-click="tour-root-word-study" data-goatcounter-title="Tour: Root Word Study"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
             <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/root-word-study" target="_blank" rel="noopener">Code&nbsp;→</a>
           </div>
           <details>
@@ -468,8 +473,8 @@
           <h3>Short Story Lab</h3>
           <p class="blurb">A short story unit: twelve stories with reading support (six public-domain stories included in full; you paste in the rest), a writing workshop, grading and Canvas.</p>
           <div class="actions">
-            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1WRYRh2CFpuB5tdOzVdsA-0A23cWD3yC96QLUoemntbU/copy" target="_blank" rel="noopener">Make a copy</a>
-            <button type="button" class="btn ink tour-btn" data-tour="videos/short-story-lab.mp4" data-title="Short Story Lab"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
+            <a class="btn primary" href="https://docs.google.com/spreadsheets/d/1WRYRh2CFpuB5tdOzVdsA-0A23cWD3yC96QLUoemntbU/copy" target="_blank" rel="noopener" data-goatcounter-click="copy-short-story-lab" data-goatcounter-title="Make a copy: Short Story Lab">Make a copy</a>
+            <button type="button" class="btn ink tour-btn" data-tour="videos/short-story-lab.mp4" data-title="Short Story Lab" data-goatcounter-click="tour-short-story-lab" data-goatcounter-title="Tour: Short Story Lab"><span aria-hidden="true">▶</span>&nbsp;1-min tour</button>
             <a class="textlink" href="https://github.com/jabens-pixel/classroom-apps/tree/main/apps/short-story-lab" target="_blank" rel="noopener">Code&nbsp;→</a>
           </div>
           <details>
@@ -485,6 +490,13 @@
         </div>
       </article>
       </div>
+      <div class="using">
+        <div>
+          <h3>Teaching with one of these?</h3>
+          <p>Tell me which ones. It takes a minute and helps decide what gets built next.</p>
+        </div>
+        <a class="btn primary" href="https://docs.google.com/forms/d/e/1FAIpQLSd3R-kZbhwheBaOjCga15A4Qedi_1smMBKozUuLmkExWl2DZQ/viewform" target="_blank" rel="noopener" data-goatcounter-click="using-form" data-goatcounter-title="I’m using this form">I’m using this</a>
+      </div>
     </div>
   </section>
 
@@ -495,7 +507,6 @@
           <h2>How it works</h2>
           <p class="section-note">Each app runs in your own Google account. Your students’ work saves to your Drive. Nothing is shared with anyone else.</p>
         </div>
-        <span class="hand">teach it tomorrow</span>
       </div>
       <ol class="steps">
         <li><span class="num">1</span><h3>Make a copy</h3><p>One click copies the app into your Google account.</p></li>
@@ -518,7 +529,6 @@
           <h2>Made something your students love? Share it.</h2>
           <p class="section-note">Curriculum Vibes grows when teachers share what works in their classrooms. Every unit here meets one standard: students never lose work, grading works the same way, and nothing copyrighted is included. Each one gets a Make a copy button, a picture and a one-minute tour.</p>
         </div>
-        <span class="hand">no coding degree required</span>
       </div>
       <div class="cards3">
         <div class="panel">
@@ -545,7 +555,6 @@
     <div class="wrap faq-wrap">
       <div class="faq-side">
         <h2>Questions teachers ask</h2>
-        <span class="hand">the honest answers</span>
       </div>
       <div>
       
@@ -637,6 +646,10 @@
             <p>Please do. Read the <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/APP-STANDARD.md" target="_blank" rel="noopener">app standard</a> and send it in. Every app on this site follows the same rules, so teachers can count on all of them.</p>
           </details>
           <details class="faq-item">
+            <summary>I’m using one of these. Can I tell you?</summary>
+            <p>Please do. The <a href="https://docs.google.com/forms/d/e/1FAIpQLSd3R-kZbhwheBaOjCga15A4Qedi_1smMBKozUuLmkExWl2DZQ/viewform" target="_blank" rel="noopener"><strong>I’m using this</strong></a> form takes a minute: your name, your school and which apps you use. It helps decide what to build next.</p>
+          </details>
+          <details class="faq-item">
             <summary>Who made these?</summary>
             <p>Jaben Schalk teaches English in Hawaii at Hawaii Technology Academy, where he is the high-school English department head. He has been teaching for 21 years, mostly in middle and high school, and built these for his own classes and teaches them with his students. Teachers are welcome to help improve them. To get in touch, email <a href="mailto:jabens@gmail.com"><strong>jabens@gmail.com</strong></a>.</p>
           </details>
@@ -676,7 +689,7 @@
 <footer>
   <div class="wrap">
     <p class="wordmark">Curriculum <span>Vibes</span></p>
-    <p>Started by Jaben Schalk, an English teacher in Hawaii, with units he built for his own students. Made by teachers, for teachers and the students they teach.</p>
+    <p>Started by Jaben Schalk, an English teacher in Hawaii, with units he built for his own students.</p>
     <p>Free for teachers, students and schools. Code: <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/LICENSE" target="_blank" rel="noopener">PolyForm Noncommercial 1.0.0</a>. Lesson content: <a href="https://github.com/jabens-pixel/classroom-apps/blob/main/LICENSE-LESSONS.md" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a> (share and adapt with credit, not for sale). Selling it or building it into a paid product needs permission. Story and book texts included are in the public domain.</p>
     <p><a href="https://github.com/jabens-pixel/classroom-apps" target="_blank" rel="noopener">All the code on GitHub</a></p>
   </div>
