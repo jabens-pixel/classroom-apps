@@ -1,6 +1,6 @@
-# Hunger Games Lit Circles
+# Hunger Games & Ender’s Game Lit Circles
 
-A four-week literature circle unit on The Hunger Games (Suzanne Collins): two assigned reading strategies a week, built-in reading quizzes, discussion, peer and self assessment, grading and Canvas. Students need their own copy of the book.
+A four-week literature circle unit where each group picks its novel: The Hunger Games (Suzanne Collins) or Ender’s Game (Orson Scott Card). Two assigned reading strategies a week, built-in reading quizzes for both books, discussion, peer and self assessment, grading and Canvas. Students need their own copy of the book.
 
 Grades 9 · Google Apps Script · free for teachers and schools · works with any Google Workspace for Education school.
 

@@ -176,8 +176,49 @@ function pcLimit_(v, n, label) {
 var PC_FIELD_LIMITS = { long: 60000, short: 400, link: 800, choice: 200, episode: 800 };
 /** Cleans a fields-form save. Known fields are checked by their kind; anything else is kept (cleaned)
  *  so a change to the unit's data never throws away writing a student already did. */
+// ---------- self-assessment (2026-11-06): the student scores their own work on the rubric before turning it in ----------
+// Stored beside the work as data.self, never inside data.f, so it is not part of the submission fingerprint (a student
+// changing their self-assessment never makes their work look edited or redone). It is never a grade: the teacher's
+// marking screen only shows it (dashed, Macbeth-style, until the teacher scores).
+//   rubric:   { score, why }            score = one of the rubric's band scores
+//   criteria: { crit: {id: score}, why: {id: text} }
+function pcSelfSpec_(a, settings, key) {
+  if (!a || a.selfAssess === false || (a.form !== 'fields' && a.form !== 'discussion')) return null;
+  if (settings && key && (settings.noGrade || {})[key]) return null;
+  var gt = pcGradeType_(a);
+  if (gt === 'rubric') return { type: 'rubric', scores: pcRubricOf_(a).map(function (b) { return Number(b.score); }) };
+  if (gt === 'criteria') return { type: 'criteria', crit: PC_FINAL_RUBRIC.map(function (c) { return { id: c.id, label: c.label, scores: c.bands.map(function (b) { return Number(b.score); }) }; }) };
+  return null;
+}
+function pcCleanSelf_(a, self) {
+  var spec = pcSelfSpec_(a); if (!spec || !self || typeof self !== 'object') return null;
+  var out = {};
+  if (spec.type === 'rubric') {
+    var v = self.score === '' || self.score == null ? null : Number(self.score);
+    out.score = v !== null && spec.scores.indexOf(v) >= 0 ? v : null;
+    out.why = pcLimit_(self.why, 3000, 'Why you chose that level');
+  } else {
+    out.crit = {}; out.why = {};
+    spec.crit.forEach(function (c) {
+      var v = ((self.crit || {})[c.id]); v = v === '' || v == null ? null : Number(v);
+      if (v !== null && c.scores.indexOf(v) >= 0) out.crit[c.id] = v;
+      var w = pcLimit_(((self.why && typeof self.why === 'object') ? self.why : {})[c.id], 3000, 'Why you chose that level for ' + c.label);
+      if (w.trim()) out.why[c.id] = w;
+    });
+  }
+  return out;
+}
+/** What is still missing from a self-assessment ('' when complete). */
+function pcSelfMissing_(a, self, settings, key) {
+  var spec = pcSelfSpec_(a, settings, key); if (!spec) return '';
+  self = self || {};
+  if (spec.type === 'rubric') return self.score === null || self.score === undefined || !String(self.why || '').trim() ? 'pick the level that matches your work and say why' : '';
+  var miss = spec.crit.filter(function (c) { return (self.crit || {})[c.id] === undefined || !String(((self.why || {})[c.id]) || '').trim(); });
+  return miss.length ? 'pick a level and say why for ' + miss.map(function (c) { return c.label; }).join(', ') : '';
+}
 function pcCleanWork_(a, data, strict) {
   data = data || {};
+  if (a.form === 'discussion') { var ds = pcCleanSelf_(a, data.self); if (!ds) throw new Error('This activity isn’t saved this way.'); return { self: ds }; }
   if (a.form !== 'fields') throw new Error('This activity isn’t saved this way.');
   var inF = data.f && typeof data.f === 'object' ? data.f : {}, spec = {}, out = {};
   (a.fields || []).forEach(function (fd) { spec[fd.id] = fd; });
@@ -198,7 +239,9 @@ function pcCleanWork_(a, data, strict) {
     if (strict && fd.kind === 'link' && s.trim() && !/^https?:\/\//i.test(s.trim())) throw new Error(label + ' must be a link that starts with https:// (copy it from Canva: Share → View-only link). Your work is saved; fix the link, then turn it in.');
     out[id] = s;
   });
-  return { f: out };
+  var res = { f: out }, self = pcCleanSelf_(a, data.self);
+  if (self) res.self = self;
+  return res;
 }
 /** The week and activity a student call is about; refuses what isn't open (a teacher's own view sees all). */
 function pcOpenAct_(me, n, actId) {
@@ -218,7 +261,10 @@ function getStudentItem(payload) {
   var out = { ok: true, key: it.key, form: it.form, act: it.act.id, week: n, loadedAt: new Date(Date.now() - 1500).toISOString(), readOnly: !!me.readOnly };
   if (it.form === 'lesson') return out;
   if (it.form === 'quiz') out.quiz = pcQuizForStudent_(classId, me.email, n, it.act);
-  else if (it.form === 'discussion') out.discussion = pcDiscussionFor_(classId, n, it.act.id, me.email, false);
+  else if (it.form === 'discussion') {
+    out.discussion = pcDiscussionFor_(classId, n, it.act.id, me.email, false);
+    if (pcSelfSpec_(it.act)) { var sr = pcWorkRow_(classId, me.email, n, it.act.id), sd = pcParseChunks_(sr, 'DataJson', 3); out.selfWork = { self: sd._unreadable ? null : (sd.self || null), updatedAt: sr ? pcIso_(sr.UpdatedAt) : '' }; }
+  }
   else {
     var r = pcWorkRow_(classId, me.email, n, it.act.id), d = pcParseChunks_(r, 'DataJson', 3);
     out.data = d._unreadable ? null : d; out.unreadable = !!d._unreadable;
@@ -228,6 +274,7 @@ function getStudentItem(payload) {
   }
   out.grade = pcStudentGrades_(classId, me.email)[it.key] || null;
   out.excludedForClass = !!(it.settings.noGrade || {})[it.key];
+  out.selfSpec = pcSelfSpec_(it.act, it.settings, it.key);
   var gt = pcGradeType_(it.act);
   if (gt === 'rubric') out.rubric = pcRubricOf_(it.act);
   else if (gt === 'criteria') out.criteria = PC_FINAL_RUBRIC;
@@ -265,7 +312,8 @@ function pcBackup_(classId, email, n, kind, prevJson, nextJson, force) {
 function saveWork(payload) {
   payload = payload || {}; var classId = String(payload.classId || ''), me = pcActing_(classId, payload.as, true);
   var n = Math.floor(Number(payload.week)), it = pcOpenAct_(me, n, payload.act);
-  if (it.form !== 'fields') throw new Error('This activity isn’t saved this way.');
+  if (it.form !== 'fields' && !(it.form === 'discussion' && pcSelfSpec_(it.act))) throw new Error('This activity isn’t saved this way.');
+  if (it.form === 'discussion') payload.submit = false;   // a discussion is turned in by posting; only its self-assessment is saved here
   var data = pcCleanWork_(it.act, payload.data, payload.submit === true), json = JSON.stringify(data), actId = it.act.id;
   if (json.length > PC_CHUNK * 3) throw new Error('This is too long to save (' + Math.round(json.length / 1000) + 'k characters). Please shorten it. Nothing was changed.');
   var submit = payload.submit === true, base = String(payload.base || ''), result = null;
@@ -283,7 +331,10 @@ function saveWork(payload) {
           return null;
         }
         pcBackup_(classId, me.email, n, actId, prevJson, json, '');
+        // A page that didn't send a self-assessment (an older tab) never wipes the one already saved.
+        if (!data.self && prev.self && pcSelfSpec_(it.act)) { data.self = prev.self; json = JSON.stringify(data); }
       }
+      if (submit) { var sm = pcSelfMissing_(it.act, data.self, it.settings, it.key); if (sm) throw new Error('Before you turn this in, score yourself on the rubric: ' + sm + '. Nothing was turned in (your writing is still on this screen).'); }
       var f = pcSplit_('DataJson', 3, json);
       f.UpdatedAt = now;
       if (submit) { Object.assign(f, pcSplit_('SubJson', 3, json)); f.SubmittedAt = now; f.SubFp = pcFp_(pcStable_(pcWorkPayload_(data))); }

@@ -76,7 +76,7 @@
         .catch(function (err) {
           d.fails++; writeLocal();
           var msg = err && err.message || String(err);
-          if (/too long|limit|read-only|could not be read|isn’t open|hasn’t opened|not in this class|signed in as|must be a link/i.test(msg)) { setStatus(msg, 'error'); PC.toast(msg, 'error'); return { ok: false, error: msg }; }
+          if (/too long|limit|read-only|could not be read|isn’t open|hasn’t opened|not in this class|signed in as|must be a link|score yourself/i.test(msg)) { setStatus(msg, 'error'); PC.toast(msg, 'error'); return { ok: false, error: msg }; }
           if (d.fails >= 3) setStatus('Your work isn’t reaching the server. Your sign-in may have expired: reload the page and your writing will be offered back.', 'error');
           else { setStatus('Couldn’t save yet. Trying again…', 'warn'); d.timer = setTimeout(function () { PC.guard.save(false); }, 5000); }
           return { ok: false, error: msg };

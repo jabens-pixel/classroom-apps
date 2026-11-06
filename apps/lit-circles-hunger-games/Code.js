@@ -1,10 +1,11 @@
 /**
- * Lit Circles · The Hunger Games — Web App (server)
- * English 1 (Grade 9). A copy of Jaben's Literature Circles app (live 2026-10-29b) for one book:
- * everyone reads The Hunger Games in the same four sections, and every student does the same two
- * reading strategies each week (no Reader's Journal, no Hybrid, no choosing). The weekly routine is
- * unchanged: Step 1 Submission → Step 2 Plan → Reading Quiz → Discussion → Step 3 Peer → Step 4
- * Reflection. The book, the sections and the strategies are set in HG_PLAN just below.
+ * Hunger Games & Ender's Game Lit Circles — Web App (server)
+ * English 1 (Grade 9). A copy of Jaben's Literature Circles app (live 2026-10-29b) for two books:
+ * each group chooses The Hunger Games or Ender's Game when it sets up (2026-11-06a), reads it in
+ * four fixed sections, and every student does the same two reading strategies each week (no
+ * Reader's Journal, no Hybrid, no choosing). The weekly routine is unchanged: Step 1 Submission →
+ * Step 2 Plan → Reading Quiz → Discussion → Step 3 Peer → Step 4 Reflection. The books and their
+ * sections are HG_BOOKS, the weekly strategies HG_PLAN, just below.
  * Backend: one Google Sheet (the database) + this Apps Script web app.
  *
  * Release 2026-09-26a — the grading rebuild. The teacher dashboard now uses the same
@@ -31,8 +32,25 @@ var TEACHER_EMAIL = '';
 // predictor, inferences ("Making Inferences with Fiction"), illustrator ("Character Analysis").
 // Changing a week's strategies later only affects students who haven't started that week: work
 // already saved keeps the two strategies it was written for (hgChoicesFor_), so nothing is hidden.
+// 2026-11-06a: two books. A group picks one when it sets up (the book's title is what the Groups
+// tab stores). Old rows (and anything that isn't Ender's Game) are The Hunger Games. Both books use
+// the same two strategies each week (HG_PLAN.strategies), so the whole class works on the same
+// strategies at the same time.
+var HG_BOOKS = {
+  hg: { key: 'hg', book: 'The Hunger Games', author: 'Suzanne Collins', reading: ['Ch. 1–6', 'Ch. 7–13', 'Ch. 14–20', 'Ch. 21–27'] },
+  eg: { key: 'eg', book: 'Ender’s Game', author: 'Orson Scott Card', reading: ['Ch. 1–4', 'Ch. 5–8', 'Ch. 9–11', 'Ch. 12–15'] }
+};
+var HG_BOOK_ORDER = ['hg', 'eg'];
+var HG_APP_NAME = 'Hunger Games & Ender’s Game Lit Circles';
+/** The book a title (or key) means: Ender's Game when it says so, otherwise The Hunger Games. */
+function hgBookKey_(titleOrKey) {
+  var t = String(titleOrKey == null ? '' : titleOrKey).replace(/^'+/, '');
+  if (HG_BOOKS[t]) return t;
+  return /ender/i.test(t) ? 'eg' : 'hg';
+}
+function hgBook_(titleOrKey) { return HG_BOOKS[hgBookKey_(titleOrKey)]; }
 var HG_PLAN = {
-  book: 'The Hunger Games',
+  book: 'The Hunger Games', // the default book (old groups, demo students)
   author: 'Suzanne Collins',
   reading: ['Ch. 1–6', 'Ch. 7–13', 'Ch. 14–20', 'Ch. 21–27'],
   strategies: {
@@ -54,10 +72,26 @@ function hgChoicesFor_(groupId, email, week) {
   }
   return two(lcOwnRow_(workSheet_(), groupId, email, week)) || two(lcOwnRow_(draftSheet_(), groupId, email, week)) || hgStrategiesFor_(week);
 }
-function hgReadingFor_(week) { return HG_PLAN.reading[Number(week) - 1] || ''; }
+function hgReadingFor_(week, titleOrKey) { var b = titleOrKey == null ? HG_PLAN : hgBook_(titleOrKey); return b.reading[Number(week) - 1] || ''; }
+/** Every book's section for a week, for text that covers the whole class ("The Hunger Games Ch. 1–6 or Ender’s Game Ch. 1–4"). */
+function hgReadingAllBooks_(week) { return HG_BOOK_ORDER.map(function (k) { return HG_BOOKS[k].book + ' ' + hgReadingFor_(week, k); }).join(' or '); }
 var HG_STRATEGY_NAMES = { summarizer: 'Summarizer', researcher: 'Researcher', connector: 'Connector', questioner: 'Questioner', literaryLuminary: 'Literary Luminary', predictor: 'Predictor', inferences: 'Making Inferences with Fiction', illustrator: 'Character Analysis' };
 /** What the page needs to know about the plan (sent with every student state). */
-function hgPublicPlan_() { return { book: HG_PLAN.book, author: HG_PLAN.author, reading: HG_PLAN.reading.slice(), strategies: { 1: hgStrategiesFor_(1), 2: hgStrategiesFor_(2), 3: hgStrategiesFor_(3), 4: hgStrategiesFor_(4) } }; }
+function hgPublicPlan_(group) {
+  var b = hgBook_(group ? group.bookTitle : 'hg');
+  return { book: b.book, author: b.author, bookKey: b.key, reading: b.reading.slice(), appName: HG_APP_NAME,
+    books: HG_BOOK_ORDER.map(function (k) { var x = HG_BOOKS[k]; return { key: k, book: x.book, author: x.author, reading: x.reading.slice() }; }),
+    strategies: { 1: hgStrategiesFor_(1), 2: hgStrategiesFor_(2), 3: hgStrategiesFor_(3), 4: hgStrategiesFor_(4) } };
+}
+/** True once anyone in the group has saved Step 1 work, a draft, a plan or started a quiz: the
+ *  group's book can't change after that (all of it belongs to that book's chapters). */
+function hgGroupHasWork_(groupId) {
+  var gid = String(groupId || ''); if (!gid) return false;
+  var tabs = [workSheet_(), draftSheet_(), stepDraftSheet_()];
+  try { tabs.push(lcQuizAttemptSheet_()); } catch (e) {}
+  for (var i = 0; i < tabs.length; i++) { if (lcFindRowNumbers_(tabs[i], 'GroupId', gid).length) return true; }
+  return false;
+}
 
 // ---------- Getting a student's writing back (run from the Apps Script editor) ----------
 // Every time a student's saved writing is about to be replaced in a way that could lose something
@@ -84,7 +118,7 @@ var GEMINI_MODEL = 'gemini-3.7-flash';
 // Bump on every release: here, LCH_RELEASE at the top of BackendClient.html (it sets the badge and
 // LC_CLIENT_VERSION, so Index.html only needs re-pasting when Index itself changes) and
 // FILE_FINGERPRINTS.release at the bottom of this file.
-var LC_APP_VERSION = '2026-10-29b';
+var LC_APP_VERSION = '2026-11-06b';
 var LC_LIVE_VERSION_PROP = 'LC_LIVE_APP_VERSION';
 
 var SHEET_NAMES = { GROUPS: 'Groups', WORK: 'WeeklyWork', DRAFTS: 'WeeklyDrafts', PEER: 'PeerAssessments', HISTORY: 'BookHistory', REFLECT: 'Reflections', RESUME: 'StudentResume', SELF: 'DiscussionSelfAssessments', STEP: 'StepDrafts', BACKUP: 'WorkBackups', WSTATS: 'WritingStats', AWAY: 'DiscussionAway' };
@@ -119,7 +153,7 @@ function doGet(e) {
   lcRegisterLiveAppVersion_();
   var t = HtmlService.createTemplateFromFile('Index');
   return t.evaluate()
-    .setTitle('Lit Circles · The Hunger Games')
+    .setTitle(HG_APP_NAME)
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -211,7 +245,7 @@ function getSs_() {
   var active = SpreadsheetApp.getActiveSpreadsheet();
   if (active) { props.setProperty('SPREADSHEET_ID', active.getId()); LC_X_.ss = active; return active; }
   // Standalone script — create the database the first time and remember it.
-  var created = SpreadsheetApp.create('Hunger Games Lit Circles - App Data');
+  var created = SpreadsheetApp.create(HG_APP_NAME + ' - App Data');
   props.setProperty('SPREADSHEET_ID', created.getId());
   LC_X_.ss = created;
   return created;
@@ -692,9 +726,11 @@ function lcResetResume_(email) {
 function rowToGroup_(row) {
   return {
     groupId: row[0],
-    bookTitle: HG_PLAN.book, // one book for every group (HG_PLAN), whatever the row holds
+    // 2026-11-06a: the group's book (HG_BOOKS) and its fixed sections, whatever else the row holds
+    bookTitle: hgBook_(row[1]).book,
+    bookKey: hgBookKey_(row[1]),
     memberEmails: (row[2] || '').toString().split(',').map(function (s) { return s.trim(); }).filter(Boolean),
-    weekReading: HG_PLAN.reading.slice(),
+    weekReading: hgBook_(row[1]).reading.slice(),
     createdAt: row[7] instanceof Date ? row[7].toISOString() : (row[7] ? row[7].toString() : '')
   };
 }
@@ -764,7 +800,7 @@ function getState(email) {
       // (1.5 s early, so a save landing at the very moment of this read is never mistaken as seen)
       loadedAt: new Date(Date.now() - 1500).toISOString(),
       stepDrafts: {},
-      plan: hgPublicPlan_()
+      plan: hgPublicPlan_(group)
     };
     // 2026-10-29a: the page asks a student for their first and last name until they give it
     // (only for the student themself, never when a teacher opens their pages).
@@ -868,11 +904,17 @@ function saveGroupSetup(email, bookTitle, memberEmailsCsv, weekReadingArr, baseM
     var members = list(memberEmailsCsv);
     if (members.indexOf(email) === -1) members.push(email);
     var seen = {}; members = members.filter(function (m) { if (seen[m]) return false; seen[m] = true; return true; });
-    // One book and one reading schedule for the whole class (HG_PLAN) — whatever the page sent.
-    var reading = HG_PLAN.reading.slice();
-    bookTitle = HG_PLAN.book;
+    // 2026-11-06a: the group's book is one of HG_BOOKS (the page sends the title it picked); its
+    // reading schedule is that book's fixed sections — whatever else the page sent.
+    var chosen = hgBook_(bookTitle), reading = chosen.reading.slice();
+    bookTitle = chosen.book;
     lcInvalidateGroups_();
     var existing = findGroupByEmail_(email), sh = groupsSheet_();
+    // Switching an existing group to the other book: only before anyone in it has started work.
+    if (existing && typeof baseMembersCsv === 'string' && hgBookKey_(existing.bookTitle) !== chosen.key) {
+      if (hgGroupHasWork_(existing.groupId)) throw new Error('Your group has already started work on ' + existing.bookTitle + ', so it can’t switch to ' + chosen.book + ' now. Ask your teacher if you need to change books.');
+      notice = 'Your group now reads ' + chosen.book + '.';
+    }
 
     // 1. Already added by a teammate while this page showed the setup form: join, change nothing.
     if (existing && typeof baseMembersCsv !== 'string') {
@@ -1514,7 +1556,7 @@ function exportReportPdf(email, bookTitle, membersStr, sections) {
   email = lcActingEmail_(email);
   var doc = DocumentApp.create('LitCircle Report - temp - ' + Utilities.getUuid());
   var body = doc.getBody();
-  body.appendParagraph('Lit Circles Report · ' + HG_PLAN.book).setHeading(DocumentApp.ParagraphHeading.TITLE);
+  body.appendParagraph('Lit Circles Report · ' + hgBook_(bookTitle).book).setHeading(DocumentApp.ParagraphHeading.TITLE);
   body.appendParagraph(bookTitle || '(untitled book)').setHeading(DocumentApp.ParagraphHeading.HEADING1);
   body.appendParagraph('Student: ' + email);
   body.appendParagraph('Group: ' + (membersStr || ''));
@@ -2677,7 +2719,7 @@ function exportLiteratureGradesCsv(payload) {
     row.push(started, sum.earned, sum.possible, sum.percent == null ? '' : sum.percent, sum.waiting);
     rows.push(row);
   });
-  return { ok: true, filename: (c.className || 'Hunger Games Lit Circles') + (c.period ? ' P' + c.period : '') + ' - Grades.csv', csv: lcCsv_(rows) };
+  return { ok: true, filename: (c.className || HG_APP_NAME) + (c.period ? ' P' + c.period : '') + ' - Grades.csv', csv: lcCsv_(rows) };
 }
 
 // ============================================================================
@@ -2915,21 +2957,21 @@ function lcCanvasMatchStudent_(email, students) { var e = normEmail_(email); for
 function lcCanvasAssessmentKey_(week, stage) { return 'assessment:' + Number(week) + ':' + String(stage); }
 function lcCanvasAssessmentMeta_(week, stage) {
   var m = LC_STAGE_META[String(stage)]; if (!m) throw new Error('Invalid assessment stage.');
-  return { week: Number(week), stage: String(stage), title: m.title, points: m.max, label: 'Hunger Games Lit Circles - Week ' + Number(week) + ' - ' + m.title, key: lcCanvasAssessmentKey_(week, stage) };
+  return { week: Number(week), stage: String(stage), title: m.title, points: m.max, label: HG_APP_NAME + ' - Week ' + Number(week) + ' - ' + m.title, key: lcCanvasAssessmentKey_(week, stage) };
 }
 // What students see in each Canvas assignment. Edit the sentences in quotes to change the
 // message; keep the quotes and commas. The app sends this on every Push and every Save in
 // "Due dates & Canvas…", so edit it here, not in Canvas (Canvas edits get replaced).
 function lcCanvasDescription_(week, stage) {
   var messages = {
-    submission: 'Complete your Week ' + week + ' Lit Circle submission (Step 1: ' + hgStrategiesFor_(week).map(function (k) { return HG_STRATEGY_NAMES[k] || k; }).join(' + ') + ', ' + hgReadingFor_(week) + ') in the Hunger Games Lit Circles app. It is marked with the 2 Reading Strategies rubric (7 points).',
-    preparation: 'Complete your Week ' + week + ' five-minute discussion plan (Step 2) in the Hunger Games Lit Circles app. A complete plan earns 3 points.',
-    quiz: 'Take your Week ' + week + ' Reading Quiz in the Hunger Games Lit Circles app right before your group discussion. It has 10 multiple-choice questions on your group\'s reading for the week, one point each. Your teacher opens it in class.',
-    peer: 'Rate every groupmate after the Week ' + week + ' discussion (Step 3) in the Hunger Games Lit Circles app. Complete peer feedback earns 2 points.',
-    reflection: 'Complete your Week ' + week + ' written reflection (Step 4) in the Hunger Games Lit Circles app. It is marked with the 7-point reflection rubric.'
+    submission: 'Complete your Week ' + week + ' Lit Circle submission (Step 1: ' + hgStrategiesFor_(week).map(function (k) { return HG_STRATEGY_NAMES[k] || k; }).join(' + ') + ', ' + hgReadingAllBooks_(week) + ') in the ' + HG_APP_NAME + ' app. It is marked with the 2 Reading Strategies rubric (7 points).',
+    preparation: 'Complete your Week ' + week + ' five-minute discussion plan (Step 2) in the ' + HG_APP_NAME + ' app. A complete plan earns 3 points.',
+    quiz: 'Take your Week ' + week + ' Reading Quiz in the ' + HG_APP_NAME + ' app right before your group discussion. It has 10 multiple-choice questions on your group\'s reading for the week, one point each. Your teacher opens it in class.',
+    peer: 'Rate every groupmate after the Week ' + week + ' discussion (Step 3) in the ' + HG_APP_NAME + ' app. Complete peer feedback earns 2 points.',
+    reflection: 'Complete your Week ' + week + ' written reflection (Step 4) in the ' + HG_APP_NAME + ' app. It is marked with the 7-point reflection rubric.'
   };
   var afterText = 'Your teacher marks the work in the app and sends the score here.';
-  var linkText = 'Open Hunger Games Lit Circles';
+  var linkText = 'Open ' + HG_APP_NAME;
   var signInNote = 'Sign in with your school Google account.';
 
   var esc = function (s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); };
@@ -3247,7 +3289,7 @@ function exportLiteratureCanvasWeekCsv(payload) {
     cols.forEach(function (d) { var r = d.rows[i]; row.push(r.score == null ? '' : r.score); });
     rows.push(row);
   });
-  return { ok: true, filename: 'Hunger Games Lit Circles - Week ' + week + ' - Canvas.csv', csv: lcCsv_(rows) };
+  return { ok: true, filename: HG_APP_NAME + ' - Week ' + week + ' - Canvas.csv', csv: lcCsv_(rows) };
 }
 
 
@@ -3553,13 +3595,13 @@ function teacherMoveLiteratureStudentGroup(payload){
 }
 function teacherCreateLiteratureGroupForStudent(payload){
   return withLock_(function(){
-    var t=lcRequireTeacher_();payload=payload||{};var classId=String(payload.classId||''),email=normEmail_(payload.studentEmail),bookTitle=HG_PLAN.book;
+    var t=lcRequireTeacher_();payload=payload||{};var classId=String(payload.classId||''),email=normEmail_(payload.studentEmail),bookTitle=hgBook_(payload.bookTitle||(findGroupByEmail_(email)||{}).bookTitle||'hg').book;
     if(!lcTeacherOwnsClass_(classId,t))throw new Error('Class not found or access denied.');
     if(!email||!lcTeacherStudentEnrolled_(classId,email))throw new Error('That student is not enrolled in this class.');
     if(!bookTitle)throw new Error('Enter a book title for the new group.');
     var current=findGroupByEmail_(email),sameBook=current&&String(current.bookTitle||'').trim().toLowerCase()===bookTitle.toLowerCase();
     if(current){lcRemoveStudentFromGroup_(current.groupId,email);if(!sameBook){lcArchiveIfMissing_(email,current);lcClearResumeTeacher_(email);}}
-    var readings=HG_PLAN.reading.slice();
+    var readings=hgBook_(bookTitle).reading.slice();
     var gid=Utilities.getUuid(),sh=groupsSheet_(),row=sh.getLastRow()+1;sh.getRange(row,2).setNumberFormat('@');sh.getRange(row,4,1,4).setNumberFormat('@');
     sh.getRange(row,1,1,8).setValues([[gid,bookTitle,email,String(readings[0]||''),String(readings[1]||''),String(readings[2]||''),String(readings[3]||''),new Date()]]);lcInvalidateGroups_();
     if(current&&sameBook)lcMigrateStudentOwnedWork_(email,current.groupId,gid);
@@ -3595,17 +3637,17 @@ function teacherRestoreLiteratureArchive(payload){
 // Regenerate FILE_FINGERPRINTS with Node every release.
 // ============================================================================
 var FILE_FINGERPRINTS = {
-  "release": "2026-10-29b",
+  "release": "2026-11-06b",
   "files": {
     "Index": {
-      "chars": 414726,
-      "md5": "9b60ed342411a4974283b7a8753a73fc",
-      "md5ws": "10d4b1065066aa7b2872e88b1ace9009"
+      "chars": 414764,
+      "md5": "a0127cdd18ca435fe5fa336ed08a4f5e",
+      "md5ws": "e562cd2d21ed74acc9f6cc0b353808d5"
     },
     "BackendClient": {
-      "chars": 291686,
-      "md5": "82d86011adbb16f2f8aeea97cc191c24",
-      "md5ws": "69536323fc518e0ef8510faf7edac56c"
+      "chars": 292221,
+      "md5": "d32113e4723113d536af29da0816eba2",
+      "md5ws": "0d5dbe8e27be498c54ac88be510cef3e"
     },
     "Checklists": {
       "chars": 37708,
@@ -3633,9 +3675,9 @@ var FILE_FINGERPRINTS = {
       "md5ws": "b957e6ed7e7bb406b3df20166f4072b8"
     },
     "ReadingQuiz": {
-      "chars": 25556,
-      "md5": "1dfa629f2948fcb5db5e0a3b4e27f57c",
-      "md5ws": "10fb8c822c239264fef84c8051e2920f"
+      "chars": 27234,
+      "md5": "7c8edc57551b0579d9eb71ea6cb4b7dc",
+      "md5ws": "7362eb8f96e819f661c56f99c7c1f6dc"
     },
     "DiscussionDeck": {
       "chars": 40018,
@@ -3668,9 +3710,9 @@ var FILE_FINGERPRINTS = {
       "md5ws": "d7487e82fe6723edd480fc42386d0e5f"
     },
     "HungerGames": {
-      "chars": 11508,
-      "md5": "b8309cb32c43db3ec2ee090a8d8e9fd6",
-      "md5ws": "428b4c089604df81266ebf10d135598c"
+      "chars": 15400,
+      "md5": "1c0f3746ce5b6c85558b185791a0d2c3",
+      "md5ws": "a6e2260dfaa1ebb090d7e85364e95a91"
     },
     "LibraryTheme": {
       "chars": 232280,
@@ -3686,7 +3728,7 @@ function lcFileFingerprint_(name) {
 }
 
 function checkFiles() {
-  var lines = ['Hunger Games Lit Circles release ' + FILE_FINGERPRINTS.release + ' (server code: ' + LC_APP_VERSION + ')'];
+  var lines = [HG_APP_NAME + ' release ' + FILE_FINGERPRINTS.release + ' (server code: ' + LC_APP_VERSION + ')'];
   var expected = FILE_FINGERPRINTS.files, allOk = true;
   Object.keys(expected).forEach(function (name) {
     var want = expected[name], got;

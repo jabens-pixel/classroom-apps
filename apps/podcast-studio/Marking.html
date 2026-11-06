@@ -100,6 +100,25 @@
     if (it.type === 'rubric') return ((d.rubric || []).filter(function (r) { return r.score === Math.round(score); })[0] || {}).label || '';
     return '';
   }
+  // ---------- the student's self-assessment (2026-11-06; Macbeth's layout) ----------
+  // Their level is dashed on the bands until you score; the note says what they picked and why. It is never a grade.
+  function selfOf(r) { return r && r.self && typeof r.self === 'object' ? r.self : null; }
+  function selfTotal(r) {
+    var sf = selfOf(r), it = M.data.item; if (!sf) return null;
+    if (it.type === 'rubric') return sf.score === null || sf.score === undefined ? null : Number(sf.score);
+    if (it.type === 'criteria') { var defs = M.data.criteria || [], cr = sf.crit || {}; return defs.every(function (c) { return cr[c.id] !== undefined; }) ? defs.reduce(function (t, c) { return t + Number(cr[c.id]); }, 0) : null; }
+    return null;
+  }
+  function selfNoteHtml(r, critId) {
+    var sf = selfOf(r), it = M.data.item, g = r.grade || {};
+    if (it.type !== 'rubric' && it.type !== 'criteria') return '';
+    var pick = sf ? (critId ? (sf.crit || {})[critId] : sf.score) : undefined, why = sf ? (critId ? (sf.why || {})[critId] : sf.why) : '';
+    if (pick === undefined || pick === null) return '<p class="pc-self-note is-none">' + (r.cell.submitted ? 'No self-assessment' + (critId ? ' for this criterion.' : '.') : 'No self-assessment yet.') + '</p>';
+    var label = critId ? '' : ((M.data.rubric || []).filter(function (b) { return Number(b.score) === Number(pick); })[0] || {}).label;
+    var mark = critId ? (g.criteria || {})[critId] : g.score, scored = mark !== null && mark !== undefined;
+    return '<p class="pc-self-note">★ The student rated themselves <b>' + (label ? esc(label) + ' (' + pick + ')' : pick + ' pts') + '</b>' + (String(why || '').trim() ? ': “' + esc(why) + '”' : '.') +
+      (scored ? (Number(mark) === Number(pick) ? ' You agreed.' : ' You gave ' + mark + '.') : ' Shown dashed above until you decide.') + '</p>';
+  }
   function badges(r) {
     var it = M.data.item, c = r.cell, g = r.grade || {}, out = [];
     if (c.redo) out.push('<span class="pc-mbadge is-redo">↻ ' + (it.kind === 'discussion' ? 'REDONE' : 'RESUBMITTED') + ' — needs regrade</span>');
@@ -110,6 +129,7 @@
     if (!c.submitted && !(it.kind === 'quiz' && c.started)) out.push(r.hasDraft ? '<span class="pc-mbadge is-draft">Draft — not submitted</span>' : '<span class="pc-mbadge">Not submitted</span>');
     if (r.workIsDraft && c.score !== null && c.score !== undefined) out.push('<span class="pc-mbadge is-draft">Teacher graded draft</span>');
     if (r.editsAfterSubmit) out.push('<span class="pc-mbadge is-draft">Edits not turned in yet</span>');
+    var st = selfTotal(r); if (st !== null) out.push('<span class="pc-mbadge is-self">★ Self-assessed ' + st + '/' + it.max + '</span>');
     var text = workText(r), pc = Object.keys(r.stats || {}).reduce(function (n, k) { return n + (Number((r.stats[k] || {}).pastedChars) || 0); }, 0);
     if (pc && text.length) { var p = Math.min(100, Math.round(pc / text.length * 100)); if (p >= 10) out.push('<span class="pc-mbadge is-paste">📋 ' + p + '% pasted</span>'); }
     if (it.type === 'criteria' && (c.score === null || c.score === undefined) && Object.keys(((r.grade || {}).criteria) || {}).length) out.push('<span class="pc-mbadge is-draft">Part of the rubric scored</span>');
@@ -191,7 +211,7 @@
     var it = M.data.item, c = r.cell, g = r.grade || {}, e = esc(r.email), ctx = cid() + '::' + it.key + '::' + r.email;
     var score = c.score, h = '<div class="pc-mpanel">';
     if (it.type === 'rubric') {
-      h += '<div class="pc-bands' + ((M.data.rubric || []).length === 5 ? ' is-five' : '') + '" role="group" aria-label="Rubric level">' + (M.data.rubric || []).map(function (b) { var on = score !== null && score !== undefined && Math.round(score) === b.score; return '<button type="button" class="pc-band' + (on ? ' is-on' : '') + '" data-act="markBand" data-email="' + e + '" data-score="' + b.score + '" aria-pressed="' + on + '" title="' + esc(b.text) + '"><b>' + b.score + '</b><span>' + esc(b.label) + '</span></button>'; }).join('') + '</div>';
+      h += '<div class="pc-bands' + ((M.data.rubric || []).length === 5 ? ' is-five' : '') + '" role="group" aria-label="Rubric level">' + (M.data.rubric || []).map(function (b) { var on = score !== null && score !== undefined && Math.round(score) === b.score; var me = selfOf(r) && selfOf(r).score !== null && selfOf(r).score !== undefined && Number(selfOf(r).score) === b.score; return '<button type="button" class="pc-band' + (on ? ' is-on' : '') + (me ? ' is-self' : '') + '" data-act="markBand" data-email="' + e + '" data-score="' + b.score + '" aria-pressed="' + on + '" title="' + esc(b.text) + '"><b>' + b.score + '</b><span>' + esc(b.label) + '</span>' + (me ? '<i class="pc-self-tag">★ Student</i>' : '') + '</button>'; }).join('') + '</div><div class="pc-self-slot" data-email="' + e + '">' + selfNoteHtml(r) + '</div>';
     } else if (it.type === 'points') {
       h += '<div class="pc-bands is-three" role="group" aria-label="Complete, partly complete or incomplete">' + [[it.max, 'Complete', '✓'], [half(it.max), 'Partly', '½'], [0, 'Incomplete', '✗']].map(function (b) { var on = score !== null && score !== undefined && Number(score) === b[0]; return '<button type="button" class="pc-band' + (on ? ' is-on' : '') + '" data-act="markBand" data-email="' + e + '" data-score="' + b[0] + '" aria-pressed="' + on + '"><b>' + b[2] + '</b><span>' + b[1] + ' (' + b[0] + ')</span></button>'; }).join('') + '</div>';
     } else if (it.type === 'criteria') {
@@ -199,7 +219,7 @@
       h += M.data.criteria.map(function (cd) {
         var v = cr[cd.id];
         return '<div class="pc-crit" data-crit="' + esc(cd.id) + '"><div class="pc-crit-head"><b>' + esc(cd.label) + '</b><label class="pc-crit-score"><span class="pc-sr">' + esc(cd.label) + ' score</span><input type="number" class="pc-input pc-crit-box" data-email="' + e + '" data-crit="' + esc(cd.id) + '" min="0" max="' + cd.max + '" step="0.5" value="' + (v === undefined ? '' : v) + '"><span>/' + cd.max + '</span></label></div>' +
-          '<div class="pc-bands is-crit" role="group" aria-label="' + esc(cd.label) + '">' + cd.bands.map(function (b) { var on = v !== undefined && Number(v) === b.score; return '<button type="button" class="pc-band pc-crit-band' + (on ? ' is-on' : '') + '" data-act="markCrit" data-email="' + e + '" data-crit="' + esc(cd.id) + '" data-score="' + b.score + '" aria-pressed="' + on + '" title="' + esc(b.text) + '"><b>' + b.score + '</b><span>' + esc(b.text.split('. ')[0]) + '</span></button>'; }).join('') + '</div></div>';
+          '<div class="pc-bands is-crit" role="group" aria-label="' + esc(cd.label) + '">' + cd.bands.map(function (b) { var on = v !== undefined && Number(v) === b.score, me = selfOf(r) && (selfOf(r).crit || {})[cd.id] !== undefined && Number(selfOf(r).crit[cd.id]) === b.score; return '<button type="button" class="pc-band pc-crit-band' + (on ? ' is-on' : '') + (me ? ' is-self' : '') + '" data-act="markCrit" data-email="' + e + '" data-crit="' + esc(cd.id) + '" data-score="' + b.score + '" aria-pressed="' + on + '" title="' + esc(b.text) + '"><b>' + b.score + '</b><span>' + esc(b.text.split('. ')[0]) + '</span>' + (me ? '<i class="pc-self-tag">★ Student</i>' : '') + '</button>'; }).join('') + '</div><div class="pc-self-slot" data-email="' + e + '" data-crit="' + esc(cd.id) + '">' + selfNoteHtml(r, cd.id) + '</div></div>';
       }).join('') + '<p class="pc-crit-total" data-email="' + e + '">' + critTotal(r) + '</p>';
     } else {
       h += '<div class="pc-mquiz-panel">' + quizPanelInner(r) + '</div>';
@@ -266,6 +286,7 @@
       el.querySelectorAll('.pc-crit-box').forEach(function (b) { if (document.activeElement !== b) { var v = cr[b.dataset.crit]; b.value = v === undefined ? '' : v; } });
       var tot = el.querySelector('.pc-crit-total'); if (tot) tot.innerHTML = critTotal(r);
     }
+    el.querySelectorAll('.pc-self-slot').forEach(function (n) { n.innerHTML = selfNoteHtml(r, n.dataset.crit || ''); });
     var ex = el.querySelector('.pc-ex-box'); if (ex) ex.checked = !!r.cell.studentExcluded;
     var keep = el.querySelector('[data-act="markKeep"]'); if (keep && !r.cell.redo) keep.remove();
     updateFocusCount();

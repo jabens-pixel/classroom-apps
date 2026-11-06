@@ -938,5 +938,65 @@ body{background-color:var(--paper);background-image:var(--grain)}
 .pc-btn.pc-rowcard-add{display:block;width:100%;margin-top:14px;padding:12px;background:transparent;border:1.5px dashed #c9bc9f;border-radius:12px;color:var(--accent);font-weight:700;box-shadow:none}
 .pc-btn.pc-rowcard-add:hover{background:#fffdf9;border-color:var(--accent)}
 @media (max-width:700px){.pc-rowcard-grid{grid-template-columns:1fr}.pc-rows-cards .pc-rowline.pc-rowcard{padding:14px}}
+/* Canva How-To Videos: links to Canva's own videos and help pages — 2026-11-04a. Presentation only. */
+.pc-watch{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin:10px 0 14px}
+.pc-watch-link{position:relative;display:flex;align-items:center;gap:12px;padding:12px 14px;background:#fffdf9;border:1px solid #e3d8c3;border-radius:12px;color:var(--ink);text-decoration:none;box-shadow:0 1px 2px rgba(60,45,20,.05),0 3px 12px rgba(60,45,20,.045);transition:border-color .15s,box-shadow .15s,transform .15s}
+.pc-watch-link:hover{border-color:var(--accent);box-shadow:0 0 0 3px rgba(40,95,89,.12)}
+.pc-watch-link:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.pc-watch-ic{flex:0 0 38px;height:38px;display:grid;place-items:center;border-radius:50%;background:var(--accent);color:#fff;font-size:15px;line-height:1}
+.pc-watch-link.is-help .pc-watch-ic{background:#efe6d4;color:var(--ink)}
+.pc-watch-txt{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;gap:1px}
+.pc-watch-txt b{font-size:15px;line-height:1.3}
+.pc-watch-txt small{font-size:12.5px;color:var(--muted)}
+.pc-watch-go{flex:0 0 auto;color:var(--accent);font-weight:800}
+@media (prefers-reduced-motion:reduce){.pc-watch-link{transition:none}}
+/* Teacher preview: open / hide the item you're looking at — 2026-11-04b. Presentation only. */
+.pc-relbar{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;margin:14px 0 0;padding:12px 16px;border:1px solid #e3d8c3;border-left:5px solid var(--accent);border-radius:10px;background:#fffdf9;font-size:14.5px}
+.pc-relbar.is-hidden{border-left-color:#b88d40;background:#fdf5e2}
+.pc-relbar-txt{flex:1 1 280px;min-width:0}
+.pc-relbar-txt b{margin-right:4px}
+.pc-relbar-acts{display:flex;flex-wrap:wrap;gap:8px}
+
+/* Score yourself (rubric self-assessment) + work carried from earlier steps — 2026-11-06. Presentation only. */
+.pc-self{margin:18px 0 8px;padding:16px 18px;border:2px solid var(--ink);border-radius:12px;background:var(--card);box-shadow:4px 4px 0 rgba(0,0,0,.08);transition:box-shadow .2s}
+.pc-self.is-done{border-color:var(--ok)}
+.pc-self.is-nudged{box-shadow:0 0 0 4px var(--accent-soft),4px 4px 0 rgba(0,0,0,.08)}
+.pc-self-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:10px}
+.pc-self-head h3{margin:2px 0 4px;font-size:21px}
+.pc-self-head p{margin:0;color:var(--muted);font-size:14px;max-width:760px}
+.pc-self-state{flex:0 0 auto;font:700 13px/1 var(--sans);padding:6px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent-2)}
+.pc-self.is-done .pc-self-state{background:var(--ok-soft);color:var(--ok)}
+.pc-self-bands{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px;margin:8px 0 10px}
+.pc-self-band{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:10px 12px;border:1.5px solid var(--line);border-radius:10px;background:#fff;color:var(--ink);font:400 13.5px/1.45 var(--sans);cursor:pointer;min-height:44px}
+.pc-self-band:hover:not(:disabled){border-color:var(--accent)}
+.pc-self-band:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.pc-self-band.is-on{border:2px solid var(--accent);background:var(--accent-soft);box-shadow:inset 0 0 0 1px var(--accent)}
+.pc-self-band:disabled{cursor:default;opacity:.85}
+.pc-self-pts{display:flex;align-items:baseline;gap:8px}
+.pc-self-pts b{font:800 22px/1 var(--sans)}
+.pc-self-pts small{font:700 12px/1.2 var(--sans);text-transform:uppercase;letter-spacing:.06em;color:var(--muted)}
+.pc-self-band.is-on .pc-self-pts small{color:var(--accent-2)}
+.pc-self-desc{color:var(--ink)}
+.pc-self-crit{border-top:1px solid var(--line2);padding-top:10px;margin-top:10px}
+.pc-self-crit h4{margin:0 0 4px}.pc-self-crit h4 small{font-weight:400;color:var(--muted)}
+.pc-self-why textarea{min-height:64px;resize:none;field-sizing:content}
+.pc-self-msg{margin:6px 0 0}
+/* teacher marking: the student's pick, dashed until the teacher scores */
+.pc-band{position:relative}
+.pc-bands:not(:has(.is-on)) .pc-band.is-self{border:2px dashed var(--gold,#8a5a00);background:#fff8e0}
+.pc-self-tag{display:block;font:700 10.5px/1.2 var(--sans);font-style:normal;color:var(--gold,#8a5a00);margin-top:3px;letter-spacing:.02em}
+.pc-band.is-on .pc-self-tag{color:inherit}
+.pc-self-note{margin:6px 0 10px;font-size:13.5px;line-height:1.45;color:var(--ink)}
+.pc-self-note.is-none{color:var(--muted)}
+.pc-mbadge.is-self{background:#fff3cc;color:#5c4100;border:1px solid #e3c36a}
+/* work carried from an earlier step */
+.pc-from-slot{display:block;margin:6px 0 2px;padding:8px 12px;border-left:4px solid var(--accent);background:var(--accent-soft);border-radius:0 8px 8px 0;font-size:13.5px;line-height:1.45;color:var(--ink)}
+.pc-from-slot span{display:block;font:700 11px/1.3 var(--sans);text-transform:uppercase;letter-spacing:.08em;color:var(--accent-2);margin-bottom:2px}
+.pc-from-slot p{margin:0;white-space:pre-wrap}
+.pc-from-note{margin:4px 0 0;font-size:12.5px;color:var(--muted)}
+.pc-fld-ref .pc-ref-body{border:1px dashed var(--line);border-radius:10px;padding:10px 14px;background:var(--card);max-height:320px;overflow:auto}
+.pc-ref-part span{display:block;font:700 11px/1.3 var(--sans);text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:6px}
+.pc-ref-part p{margin:2px 0 6px;white-space:pre-wrap;font-size:14px}
+@media(max-width:640px){.pc-self{padding:14px 12px}.pc-self-head{flex-direction:column}.pc-self-bands{grid-template-columns:1fr}}
 </style>
 <script>window.__MB.PodcastTheme = 'ok';</script>

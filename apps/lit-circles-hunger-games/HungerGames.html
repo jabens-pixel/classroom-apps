@@ -1,10 +1,13 @@
-<!-- HungerGames: this copy's one book and fixed weekly strategies (English 1, Grade 9).
+<!-- HungerGames: this copy's two books and fixed weekly strategies (English 1, Grade 9).
+     2026-11-06a: each group picks The Hunger Games or Ender's Game when it sets up (HG_BOOKS in
+     Code.js); the page gets the group's book as state.plan (book, author, reading) and both books
+     as state.plan.books. A group can switch books only before anyone in it has started work.
      Rides along LAST after BackendClient (LC_INCLUDE_WITH in Code.js), so it wraps the
      functions the other files set up ("later definitions win").
      - Step 1 has no pathway choice: no Reader's Journal, no Hybrid. Every student does the
        same two strategies that week (HG_PLAN in Code.js; the page gets it as state.plan).
-     - The group setup page only asks for teammates; the book and the four reading sections
-       are fixed. "Start a New Book" is gone.
+     - The group setup page asks for the book (one of the two) and teammates; each book's four
+       reading sections are fixed. "Start a New Book" is gone.
      Nothing here saves or grades anything; the server enforces the same plan on every save. -->
 <style>
 .hg-plan-shell{max-width:1120px;margin:0 auto}
@@ -22,15 +25,27 @@
 .hg-setup .hg-sched{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:6px 0 14px}
 .hg-setup .hg-sched div{background:#f4f4ef;border:1px solid #d8d8cf;padding:8px 10px;font-size:14px;color:#17201b}
 .hg-setup .hg-sched b{display:block;font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:#4a564f}
+.hg-setup .hg-books{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin:6px 0 14px}
+.hg-setup .hg-book{display:block;position:relative;cursor:pointer;background:#fff;border:2px solid #c9c9bf;padding:14px 14px 12px 44px;color:#17201b}
+.hg-setup .hg-book input{position:absolute;left:14px;top:17px;width:20px;height:20px;margin:0;accent-color:#17201b}
+.hg-setup .hg-book strong{display:block;font-size:18px;line-height:1.25}
+.hg-setup .hg-book .hg-by{display:block;font-size:14px;color:#4a564f;margin-bottom:8px}
+.hg-setup .hg-book .hg-sched{margin:0;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.hg-setup .hg-book .hg-sched div{padding:6px 8px;font-size:13px}
+.hg-setup .hg-book.is-on{border-color:#17201b;box-shadow:inset 0 0 0 1px #17201b;background:#f7f9ec}
+.hg-setup .hg-book.is-off{opacity:.55;cursor:not-allowed}
+.hg-setup .hg-booknote{font-size:14px;color:#3d4a43;margin:-4px 0 14px}
 .week-focus-reading .hg-week-strats{display:block;margin-top:6px;font-size:13px;font-weight:600;color:#3d4a43;line-height:1.35}
-@media (max-width:760px){.hg-plan-cards{grid-template-columns:1fr}.hg-setup .hg-sched{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:760px){.hg-plan-cards{grid-template-columns:1fr}.hg-setup .hg-sched{grid-template-columns:repeat(2,minmax(0,1fr))}.hg-setup .hg-books{grid-template-columns:1fr}}
 </style>
 <script>
 (function () {
   'use strict';
   var W = window;
   // Same as HG_PLAN in Code.js; the server's copy (state.plan) wins whenever it has arrived.
-  var FALLBACK = { book: 'The Hunger Games', author: 'Suzanne Collins', reading: ['Ch. 1–6', 'Ch. 7–13', 'Ch. 14–20', 'Ch. 21–27'],
+  var FALLBACK = { book: 'The Hunger Games', author: 'Suzanne Collins', bookKey: 'hg', reading: ['Ch. 1–6', 'Ch. 7–13', 'Ch. 14–20', 'Ch. 21–27'],
+    books: [{ key: 'hg', book: 'The Hunger Games', author: 'Suzanne Collins', reading: ['Ch. 1–6', 'Ch. 7–13', 'Ch. 14–20', 'Ch. 21–27'] },
+            { key: 'eg', book: 'Ender’s Game', author: 'Orson Scott Card', reading: ['Ch. 1–4', 'Ch. 5–8', 'Ch. 9–11', 'Ch. 12–15'] }],
     strategies: { 1: ['summarizer', 'researcher'], 2: ['predictor', 'illustrator'], 3: ['connector', 'questioner'], 4: ['literaryLuminary', 'inferences'] } };
   function plan() { var p = W.state && W.state.plan; return (p && p.strategies && p.reading) ? p : FALLBACK; }
   function stratsFor(wk) { var s = plan().strategies[String(wk)] || plan().strategies[wk] || FALLBACK.strategies[wk] || []; return s.filter(function (k) { return !!(W.STRATEGY_DEFS && W.STRATEGY_DEFS[k]); }); }
@@ -107,7 +122,12 @@
     });
     return html;
   };
-  W.startNewBookFlow = function () { W.showInfo('Everyone in this class reads ' + plan().book + ', so there is no new book to start.'); };
+  W.startNewBookFlow = function () { W.showInfo('Your group reads ' + plan().book + '. A group can switch to the other book in Edit My Group, but only before anyone has started work.'); };
+  function books() { return (plan().books && plan().books.length) ? plan().books : FALLBACK.books; }
+  function schedHtml(b) { return b.reading.map(function (r, i) { return '<div><b>Week ' + (i + 1) + '</b>' + esc(r) + '<br><small>' + esc(names(i + 1).join(' + ')) + '</small></div>'; }).join(''); }
+  W.hgPickBook = function (key) {
+    document.querySelectorAll('.hg-book').forEach(function (el) { var on = el.getAttribute('data-book') === key; el.classList.toggle('is-on', on); var r = el.querySelector('input'); if (r) r.checked = on; });
+  };
 
   // Group setup: only teammates. The book and the four sections are the same for everyone.
   W.viewSetup = function () {
@@ -115,22 +135,46 @@
     var others = g ? g.memberEmails.filter(function (m) { return m.toLowerCase() !== me; }) : [];
     var boxes = '<div class="email-box-label">Your email</div><input type="email" value="' + esc(W.state.email) + '" disabled style="opacity:0.7;">';
     for (var i = 0; i < 4; i++) boxes += '<div class="email-box-label" style="margin-top:10px;">Teammate ' + (i + 1) + ' email' + (i === 0 ? '' : ' (optional)') + '</div><input type="email" id="teammate' + i + '" placeholder="teammate@school.org" value="' + esc(others[i] || '') + '">';
-    var sched = plan().reading.map(function (r, i) { return '<div><b>Week ' + (i + 1) + '</b>' + esc(r) + '<br><small>' + esc(names(i + 1).join(' + ')) + '</small></div>'; }).join('');
-    return '<div class="card hg-setup"><h2>' + (g ? 'Edit Your Group' : 'Set Up Your Group') + '</h2><p class="muted">Do this together as a group during your first meeting. Everyone in your group adds the same teammates.</p>' +
-      '<label>Book</label><div class="hg-fixed"><strong>' + esc(plan().book) + '</strong>' + esc(plan().author || '') + ' · the whole class reads this book</div>' +
-      '<label>Reading schedule</label><div class="hg-sched">' + sched + '</div>' +
+    // 2026-11-06a: pick the book (each with its own four sections). A new group must pick one;
+    // an existing group shows its book selected (switching is checked by the server).
+    var cur = g ? (plan().bookKey || '') : '';
+    var cards = books().map(function (b) {
+      var on = b.key === cur;
+      return '<label class="hg-book' + (on ? ' is-on' : '') + '" data-book="' + esc(b.key) + '"><input type="radio" name="hgBook" value="' + esc(b.key) + '"' + (on ? ' checked' : '') + ' onchange="hgPickBook(\'' + esc(b.key) + '\')"><strong>' + esc(b.book) + '</strong><span class="hg-by">' + esc(b.author || '') + '</span><div class="hg-sched">' + schedHtml(b) + '</div></label>';
+    }).join('');
+    return '<div class="card hg-setup"><h2>' + (g ? 'Edit Your Group' : 'Set Up Your Group') + '</h2><p class="muted">Do this together as a group during your first meeting. Choose your book together, and everyone in your group adds the same teammates.</p>' +
+      '<label>Your book</label><div class="hg-books" role="radiogroup" aria-label="Your book">' + cards + '</div>' +
+      '<p class="hg-booknote">' + (g ? 'Your group can switch books only before anyone in it has started Week 1 work.' : 'Both books use the same two reading strategies each week. Everyone in your group reads the same book.') + '</p>' +
       '<label>Group members</label>' + boxes +
       '<div style="margin-top:18px;"><button id="setupSaveBtn" onclick="doSaveSetup()">' + (g ? 'Save Group' : 'Save &amp; Continue to Week 1') + '</button>' + (g ? ' <button class="secondary" onclick="goHome()">Cancel</button>' : '') + '</div></div>';
   };
   W.doSaveSetup = function () {
+    var picked = document.querySelector('input[name="hgBook"]:checked'), bk = null;
+    books().forEach(function (b) { if (picked && b.key === picked.value) bk = b; });
+    if (!bk) { W.showError('Choose your group’s book first: ' + books().map(function (b) { return b.book; }).join(' or ') + '.'); return; }
     var teammates = [0, 1, 2, 3].map(function (i) { var el = document.getElementById('teammate' + i); return el ? el.value.trim() : ''; }).filter(Boolean);
     var members = [W.state.email].concat(teammates).join(',');
-    W.callServer('saveGroupSetup', [W.state.email, plan().book, members, plan().reading.slice()], function (s) {
+    // (SaveGuard adds the teammates this tab loaded, and shows the server's notice)
+    W.callServer('saveGroupSetup', [W.state.email, bk.book, members, bk.reading.slice()], function (s) {
       var st = W.state;
       st.group = s.group; st.weeklyWork = s.weeklyWork; st.weeklyDrafts = s.weeklyDrafts || {}; st.teacherFeedback = s.teacherFeedback || {}; st.discussionAway = s.discussionAway || {}; st.peerAssessmentsGiven = s.peerAssessmentsGiven; st.pastBooks = s.pastBooks || []; st.reflections = s.reflections || {}; st.selfAssessments = s.selfAssessments || {}; st.peerFeedbackReceived = s.peerFeedbackReceived || {};
       if (s.plan) st.plan = s.plan;
       st.week = 1; st.view = 'week'; W.render();
     }, null, { button: document.getElementById('setupSaveBtn') });
+  };
+
+  // SaveGuard's note on the setup page talks about typing the book title and reading schedule;
+  // here the book is picked and the schedule comes with it.
+  var _render = W.render;
+  W.render = function () {
+    var out = _render.apply(this, arguments);
+    try {
+      var p = document.querySelector('#lcSgSetupNote p');
+      if (p) p.innerHTML = p.innerHTML
+        .split('They type the book title, everyone’s school email and the reading schedule').join('They choose the book and type everyone’s school email')
+        .split('fix the book title or the reading schedule').join('or switch books (only before anyone has started work)');
+    } catch (e) {}
+    return out;
   };
 
   (W.__MB = W.__MB || {}).HungerGames = 'ok';

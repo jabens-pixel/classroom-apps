@@ -215,6 +215,11 @@ function getMarking(payload) {
         row.unreadable = !!(row.work && row.work._unreadable);
       }
       row.stats = stats[st.email] || {};
+      row.self = f && f.draft && !f.draft._unreadable ? (f.draft.self || null) : null;
+    }
+    if (form === 'discussion' && pcSelfSpec_(a)) {
+      var dr = pcWorkRow_(classId, st.email, ik.week, ik.act), dd = pcParseChunks_(dr, 'DataJson', 3);
+      row.self = dd._unreadable ? null : (dd.self || null);
     }
     if (!row.viewFp) row.viewFp = c.fp;
     rows.push(row);

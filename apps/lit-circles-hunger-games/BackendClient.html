@@ -501,7 +501,7 @@ window.__MB.BackendClient = 'loading';
   }
   // This file stamps the release (the badge + the version check), so a release that changes only
   // BackendClient and Code.gs doesn't need the 400 KB Index re-pasted. Keep in step with LC_APP_VERSION.
-  var LCH_RELEASE = '2026-10-29b';
+  var LCH_RELEASE = '2026-11-06b';
   W.LC_CLIENT_VERSION = LCH_RELEASE;
   (function () { var b = document.querySelector('.app-version'); if (b) b.textContent = 'v' + LCH_RELEASE; })();
 
@@ -1061,7 +1061,7 @@ window.__MB.BackendClient = 'loading';
   function studentsInner(d) {
     var students = d.students || [], groups = activeGroups(d);
     var rows = students.map(function (s) {
-      var opts = '<option value="">No group (student sets one up)</option>' + groups.map(function (g) { return '<option value="' + esc(g.groupId) + '" ' + (keyOf(s.groupId) === keyOf(g.groupId) ? 'selected' : '') + '>' + esc((g.bookTitle || 'Untitled') + ' · ' + plural((g.memberEmails || []).length, 'student')) + '</option>'; }).join('') + '<option value="__new__">＋ New group…</option>';
+      var opts = '<option value="">No group (student sets one up)</option>' + groups.map(function (g) { return '<option value="' + esc(g.groupId) + '" ' + (keyOf(s.groupId) === keyOf(g.groupId) ? 'selected' : '') + '>' + esc((g.bookTitle || 'Untitled') + ' · ' + plural((g.memberEmails || []).length, 'student')) + '</option>'; }).join('') + '<option value="__new__:hg">＋ New Hunger Games group…</option><option value="__new__:eg">＋ New Ender’s Game group…</option>';
       var dots = (s.summary && s.summary.weeks || []).map(function (wk) {
         var done = STAGES.every(function (st) { var x = wk.stages[st] || {}; return x.status !== 'missing' && x.status !== 'notStarted' && x.status !== 'notTaken' && x.status !== 'inProgress' && (x.status !== 'auto' || x.complete); });
         return '<span class="lch-weekdot ' + (wk.started ? (done ? 'is-done' : 'is-going') : '') + '" title="Week ' + wk.week + ': ' + (wk.started ? (done ? 'every step done' : 'in progress') : 'not started') + '">W' + wk.week + '</span>';
@@ -1074,7 +1074,7 @@ window.__MB.BackendClient = 'loading';
       (students.length ? '<div style="overflow-x:auto"><table class="lch-roster"><thead><tr><th>Student</th><th>Book</th><th>Weeks</th><th>Group</th><th>Past books</th><th></th></tr></thead><tbody>' + rows + '</tbody></table></div>' : '') +
       '<p class="lch-note">Moving a student between two groups reading the same book keeps their own work. Moving to a different book archives the current one first (restore it any time from “Past books”). Removing a student from the roster keeps their work and grades.</p>' +
       '<div class="lch-tools"><div class="lch-tool"><h4>Add students</h4><p>Paste school emails, one per line or separated by commas.</p><textarea id="lchAddEmails" placeholder="student1@yourschool.org&#10;student2@yourschool.org">' + esc(LCH.addEmails[classId()] || '') + '</textarea><div style="margin-top:9px"><button class="lch-btn primary" data-lch="add-students">Add students</button></div></div>' +
-      '<div class="lch-tool"><h4>Class code</h4><p>Students enter this the first time they open Hunger Games Lit Circles.</p><div class="lch-joincode">' + esc(d.classInfo.joinCode) + '</div></div>' +
+      '<div class="lch-tool"><h4>Class code</h4><p>Students enter this the first time they open Hunger Games &amp; Ender’s Game Lit Circles.</p><div class="lch-joincode">' + esc(d.classInfo.joinCode) + '</div></div>' +
       '<div class="lch-tool"><h4>Demo students</h4><p>Ten practice students with Week 1 finished, for trying the grading screens. They are clearly marked and can be removed.</p><button class="lch-btn" data-lch="demo-load">Load 10 demo students</button> <button class="lch-btn danger" data-lch="demo-remove">Remove demo students</button></div></div>';
   }
 
@@ -2197,7 +2197,7 @@ window.__MB.BackendClient = 'loading';
     var head = '<section class="card lch-card lch-qz-openbox ' + (on ? 'is-on' : '') + '"><div class="lch-qz-open-row"><div><h3>Week ' + w + ' Reading Quiz</h3><p class="lch-card-sub">' +
       (released ? 'Students can take it only while <b>Quiz open now</b> is on. Turn it on right before groups discuss, and off when they are done — that is also when students see their results.' : '<b>Week ' + w + ' is hidden from students.</b> Open the week on the dashboard before opening its quiz.') + '</p></div>' +
       '<div class="lch-qz-open-ctl">' + quizSwitchHtml(w) + '<span class="lch-mini ' + (approved === groups.length && groups.length ? 'is-clear' : '') + '">' + approved + ' of ' + plural(groups.length, 'group') + ' approved</span></div></div>' +
-      '<div class="lch-qz-how"><p><b>Ready-made quizzes.</b> Every group starts with the built-in ' + r.count + '-question quiz for this week’s section of <i>The Hunger Games</i>, already approved — nothing to draft. You can still edit a group’s copy (then “Save &amp; keep approved”), draft a new one with AI (your own chat AI works — no setup), write your own, or delete it; “Use the built-in quiz” brings it back.</p><p><b>How it works.</b> Each group gets ' + r.count + ' multiple-choice questions on this week’s section. Every student gets them one at a time, in their own order with the choices shuffled; the answers stay on the server. Leaving the quiz tab or window locks the question on screen and is logged for you.</p>' +
+      '<div class="lch-qz-how"><p><b>Ready-made quizzes.</b> Every group starts with the built-in ' + r.count + '-question quiz for this week’s section of its book (<i>The Hunger Games</i> or <i>Ender’s Game</i>), already approved — nothing to draft. You can still edit a group’s copy (then “Save &amp; keep approved”), draft a new one with AI (your own chat AI works — no setup), write your own, or delete it; “Use the built-in quiz” brings it back.</p><p><b>How it works.</b> Each group gets ' + r.count + ' multiple-choice questions on this week’s section. Every student gets them one at a time, in their own order with the choices shuffled; the answers stay on the server. Leaving the quiz tab or window locks the question on screen and is logged for you.</p>' +
       '<p><b>Closing it shows results.</b> When you switch the quiz off, students who took it see their score and the right answers to the questions they answered. If you reopen it later (for a make-up), those students could share answers — a make-up is safer on paper, with the score typed in on the results screen.</p>' +
       '<p><b>Check before you approve.</b> The AI is told the group’s book and exact chapters, that nothing after them may appear — not even in a wrong answer — and never to quote the book. It can still get a detail wrong or misplace a chapter. Read every question; ⚑ marks the ones the AI was less sure of. Nothing reaches students until you approve it.</p></div>' +
       (missing && r.aiReady ? '<div style="margin-top:10px"><button class="lch-btn primary" data-lch="quiz-draft-all"' + (Object.keys(Z.busy).some(function (k) { return Z.busy[k]; }) ? ' disabled' : '') + '>✦ Draft the ' + plural(missing, 'missing quiz', 'missing quizzes') + ' with AI</button> <span class="lch-note">One group at a time; about 30–40 seconds each. You still check and approve each one.</span></div>' : '') +
@@ -2886,10 +2886,11 @@ window.__MB.BackendClient = 'loading';
   }
   function moveGroup(email, sel) {
     var d = dash(), stu = (d.students || []).filter(function (s) { return s.email === email; })[0], target = sel.value;
-    if (target === '__new__') {
-      // one book for the whole class (HG_PLAN): no title to ask for
-      var title = 'The Hunger Games';
-      if (!W.confirm('Start a new group with just this student? Their work comes with them, and you can move classmates into the group afterwards.')) { sel.value = stu ? stu.groupId || '' : ''; return; }
+    if (target.indexOf('__new__') === 0) {
+      // 2026-11-06a: two books (HG_BOOKS) — the option says which one
+      var title = target === '__new__:eg' ? 'Ender’s Game' : 'The Hunger Games';
+      var same = stu && stu.groupId && String((activeGroups(d).filter(function (x) { return keyOf(x.groupId) === keyOf(stu.groupId); })[0] || {}).bookTitle || '') === title;
+      if (!W.confirm('Start a new ' + title + ' group with just this student? ' + (stu && stu.groupId && !same ? 'Their work on their old book is kept in their past books (you can restore it later).' : 'Their work comes with them.') + ' You can move classmates into the group afterwards.')) { sel.value = stu ? stu.groupId || '' : ''; return; }
       teacherCall('teacherCreateLiteratureGroupForStudent', { classId: classId(), studentEmail: email, bookTitle: String(title).trim(), weekReading: stu && stu.weekReading ? stu.weekReading : ['', '', '', ''] }, sel, 'New group created.');
       return;
     }
@@ -3030,7 +3031,7 @@ window.__MB.BackendClient = 'loading';
     if (plan.stuck) {
       bar.innerHTML = '<span><b>This link is still running v' + esc(W.LC_CLIENT_VERSION) + '</b>, but v' + esc(plan.to) + ' has been saved. Reloading won’t change that until it is deployed to this link: in Apps Script, Deploy → Manage deployments → pencil (edit) on this deployment → Version: New version → Deploy. Students keep using v' + esc(W.LC_CLIENT_VERSION) + ' meanwhile.</span><button type="button" data-lch="update-dismiss">OK</button>';
     } else {
-      bar.innerHTML = '<span>A newer version of Hunger Games Lit Circles is ready (v' + esc(plan.to) + ').</span>' +
+      bar.innerHTML = '<span>A newer version of Hunger Games &amp; Ender’s Game Lit Circles is ready (v' + esc(plan.to) + ').</span>' +
         (plan.url ? '<a class="lc-update-go" data-lch="update-reload" href="' + esc(plan.url) + '" target="_top">Reload</a>' : '<span><b>Press your browser’s reload button.</b></span>');
     }
     document.body.appendChild(bar);
@@ -3075,7 +3076,7 @@ window.__MB.BackendClient = 'loading';
   // feedback:'' with every score, which would wipe a comment. They can't run now: each one says so.
   ['saveLcGrade', 'saveTeacherStageGrade', 'saveAutoStageOverride', 'saveBatchLiteratureGrade', 'toggleLiteratureGradeExcluded'].forEach(function (n) {
     W[n] = function () {
-      var m = 'That is an old grading screen and nothing was saved. Reload Hunger Games Lit Circles and grade from the Teacher dashboard.';
+      var m = 'That is an old grading screen and nothing was saved. Reload Hunger Games & Ender’s Game Lit Circles and grade from the Teacher dashboard.';
       if (typeof W.showError === 'function') W.showError(m); else toast(m, true);
       return false;
     };

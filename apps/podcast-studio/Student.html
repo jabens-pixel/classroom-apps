@@ -69,7 +69,7 @@
   function ribbon() {
     var m = me();
     if (PC.state.as) return '<div class="pc-ribbon' + (m.readOnly ? '' : ' is-demo') + '"><span>' + (m.readOnly ? 'Viewing <b>' + esc(m.name) + '</b>’s work · read-only' : 'Using demo student <b>' + esc(m.name) + '</b> · saves work') + '</span><button type="button" class="pc-btn small" data-act="backToDashboard">← Back to dashboard</button></div>';
-    if (m.teacherSelf) return '<div class="pc-ribbon is-preview"><span>Student view of your own class. Hidden weeks and items show here for you, marked “Hidden from students”.</span></div>';
+    if (m.teacherSelf) return '<div class="pc-ribbon is-preview"><span>Student view of your own class. Hidden weeks and items show here for you, marked “Hidden from students”, with a button to open them.</span></div>';
     return '';
   }
   A.backToDashboard = function () { PC.leave(function () { PC.state.role = 'teacher'; PC.state.as = ''; PC.go('dashboard'); }); };
@@ -226,6 +226,7 @@
       process: '<rect x="41" y="12" width="38" height="22" rx="2" fill="G"/><rect x="12" y="64" width="39" height="23" rx="2" fill="P"/><rect x="70" y="64" width="39" height="23" rx="2" fill="T"/><path d="M60 34v15M31 64V49h59v15M48 21h24M22 73h19M80 73h19M55 43l5 6 5-6M26 57l5 7 5-7M85 57l5 7 5-7"/>',
       scripting: '<path fill="P" d="M33 9h54v45H33z"/><path d="M42 19h35M42 27h35M42 35h23"/><rect x="23" y="46" width="74" height="22" rx="5" fill="T"/><path fill="T" d="M24 61h72l12 29H12z"/><path fill="P" d="M27 68h66l5 15H22z"/><path d="M32 73h2M43 73h2M54 73h2M65 73h2M76 73h2M87 73h2M28 79h2M39 79h2M50 79h2M61 79h2M72 79h2M83 79h2M35 87h50M17 51h6M97 51h7"/>',
       script: '<path fill="P" d="M27 12h62v79H27z"/><path d="M36 24h44M36 33h44M36 42h44M36 51h44M47 21v57M36 61h10M53 61h13"/><circle cx="85" cy="75" r="21" fill="G"/><path d="M85 60v15l10 5M80 51h10M85 51v4"/>',
+      canvahow: '<rect x="14" y="14" width="92" height="62" rx="4" fill="P"/><rect x="21" y="21" width="78" height="38" rx="2" fill="T"/><path fill="G" d="M53 30l20 10-20 10z"/><path d="M24 68h72M44 64v8M30 66v4M58 66v4M72 66v4M86 66v4"/><path fill="P" d="M8 82h104l-7 10H15z"/><path d="M50 86h20"/>',
       recording: '<rect x="43" y="9" width="34" height="51" rx="17" fill="P"/><path d="M51 21h18M49 29h22M49 37h22M51 45h18"/><path fill="T" d="M32 40h6v9q0 24 22 24t22-24v-9h6v12q0 26-25 27v12h17v6H40v-6h17V79Q32 78 32 52z"/><path d="M20 25l8 4M18 45h8M93 28l8-4M95 45h8"/>',
       cover: '<path fill="T" d="M16 16h81v75H16z"/><path fill="P" d="M25 25h63v56H25z"/><circle cx="57" cy="49" r="18" fill="G"/><circle cx="57" cy="49" r="7" fill="T"/><path d="M34 72h45M33 29h28"/><path fill="G" d="M96 35l10 4-19 49-12 8 2-15z"/><path d="M77 81l10 7M99 44l-15 38"/>',
       episode: '<circle cx="60" cy="51" r="41" fill="P"/><circle cx="60" cy="51" r="34" fill="T"/><circle cx="60" cy="51" r="28"/><circle cx="60" cy="51" r="22"/><circle cx="60" cy="51" r="13" fill="G"/><circle cx="60" cy="51" r="3" fill="P"/><path d="M33 28l8 6M79 70l8 6M29 34l7 5M84 63l8 5"/>',
@@ -264,11 +265,41 @@
     }).join('') + '</nav>';
     app.innerHTML = ribbon() + '<div class="pc-crumbs"><button type="button" class="pc-link" data-act="toHome">← All weeks</button><span>Podcast Studio</span></div>' +
       '<header class="pc-week-banner pc-broadcast-banner pc-week-' + u.n + '"><div class="pc-chapter-copy"><div class="pc-chapter-kicker"><span>' + esc(u.label) + '</span><span>Podcast Studio / Production guide</span></div><h1>' + esc(u.title || u.label) + '</h1>' +
-      (u.summary ? '<p class="pc-week-sum">' + esc(u.summary) + '</p>' : '') + '</div><div class="pc-chapter-art pc-art-' + ({1:'headphones',2:'notebook',3:'mic'}[u.n] || 'mic') + '" aria-hidden="true"></div>' + (u.eq ? '<div class="pc-chapter-question"><span>Essential question</span><p>' + esc(u.eq) + '</p></div>' : '') + '</header>' + nav + '<div id="pcStep" class="pc-step-body"></div>';
+      (u.summary ? '<p class="pc-week-sum">' + esc(u.summary) + '</p>' : '') + '</div><div class="pc-chapter-art pc-art-' + ({1:'headphones',2:'notebook',3:'mic'}[u.n] || 'mic') + '" aria-hidden="true"></div>' + (u.eq ? '<div class="pc-chapter-question"><span>Essential question</span><p>' + esc(u.eq) + '</p></div>' : '') + '</header>' + nav + relBarHtml(u, actOf(u, step)) + '<div id="pcStep" class="pc-step-body"></div>';
     var body = PC.byId('pcStep'), a = actOf(u, step);
     if (!u.open[a.id] && !me().teacherSelf) { PC.guard.close(); body.innerHTML = '<section class="pc-card"><h2>Not open yet</h2><p>Your teacher hasn’t opened “' + esc(a.title) + '” yet. Anything you already wrote is kept.</p></section>'; return; }
     var idx = steps.map(function (s) { return s.k; }).indexOf(step), next = steps[idx + 1] || null;
     (STEP_VIEWS[a.form] || STEP_VIEWS.fields)(body, u, a, next);
+  };
+  // Teacher preview of your own class: open or hide the item you're looking at (and the rest of its week) right here.
+  // Same server calls as Release & Resources on the dashboard; only the class's teacher (or an admin) can make them.
+  function relBarHtml(u, a) {
+    if (!me().teacherSelf || !a) return '';
+    var open = !!u.open[a.id], key = 'w' + u.n + '_' + a.id, what = a.form === 'lesson' ? 'this lesson' : '“' + a.title + '”';
+    var hidden = u.activities.filter(function (x) { return !u.open[x.id]; }).length;
+    return '<div class="pc-relbar' + (open ? ' is-open' : ' is-hidden') + '" id="pcRelBar" role="region" aria-label="Teacher: open to students">' +
+      '<span class="pc-relbar-txt"><b>' + (open ? '✓ Open to students' : '🔒 Hidden from students') + '</b> ' + (open ? 'Students in this class can see ' + esc(what) + '.' : 'Only you can see ' + esc(what) + ' right now.') + '</span>' +
+      '<span class="pc-relbar-acts"><button type="button" class="pc-btn small' + (open ? ' ghost' : ' primary') + '" data-act="previewRelease" data-key="' + esc(key) + '" data-on="' + (open ? 'false' : 'true') + '">' + (open ? 'Hide from students' : '🔓 Open to students') + '</button>' +
+      (hidden ? '<button type="button" class="pc-btn small" data-act="previewWeekRelease" data-week="' + u.n + '">Open all of ' + esc(u.label) + ' (' + hidden + ' hidden)</button>' : '') + '</span></div>';
+  }
+  function afterPreviewRelease(msg) {
+    loadHome(function (err) { if (err) return PC.toast(err.message, 'error'); if (PC.state.view === 'week') PC.views.week(PC.byId('app')); PC.toast(msg); });
+  }
+  A.previewRelease = function (el) {
+    var on = el.dataset.on === 'true', key = el.dataset.key; el.disabled = true;
+    PC.leave(function () {
+      PC.rpc('setRelease', { classId: PC.state.classId, itemKey: key, on: on }, { retry: true })
+        .then(function () { afterPreviewRelease(on ? 'Open to students.' : 'Hidden from students. Their work is kept.'); })
+        .catch(function (e) { el.disabled = false; PC.toast(e.message, 'error'); });
+    }, function () { el.disabled = false; });
+  };
+  A.previewWeekRelease = function (el) {
+    var wk = Number(el.dataset.week); el.disabled = true;
+    PC.leave(function () {
+      PC.rpc('setWeekRelease', { classId: PC.state.classId, week: wk, on: true }, { retry: true })
+        .then(function () { afterPreviewRelease('All of Week ' + wk + ' is open to students.'); })
+        .catch(function (e) { el.disabled = false; PC.toast(e.message, 'error'); });
+    }, function () { el.disabled = false; });
   };
   A.toHome = function () { PC.leave(function () { PC.go('home'); }); };
   A.toStep = function (el) { PC.leave(function () { PC.go('week', { step: el.dataset.step }); }); };
@@ -291,7 +322,8 @@
     if (a.gradeType === 'criteria' && g.criteria && Object.keys(g.criteria).length) crit = '<ul class="pc-crit-scores">' + (item.criteria || []).map(function (c) { var v = g.criteria[c.id]; return '<li><span>' + esc(c.label) + '</span><b>' + (v === undefined ? 'Not scored yet' : v + '/' + c.max) + '</b></li>'; }).join('') + '</ul>';
     if (g.score === null || g.score === undefined) return (g.comment || crit) ? '<div class="pc-feedback"><h3>Feedback from your teacher</h3>' + crit + (g.comment ? '<p>' + esc(g.comment) + '</p>' : '') + (crit ? '<p class="pc-small pc-muted">Not graded yet: your teacher is still scoring part of the rubric.</p>' : '') + '</div>' : '';
     var label = a.gradeType === 'rubric' ? ((item.rubric || []).filter(function (r) { return r.score === Math.round(g.score); })[0] || {}).label : a.gradeType === 'criteria' ? 'Final Episode' : (g.score >= a.points ? 'Complete' : g.score > 0 ? 'Partly complete' : 'Incomplete');
-    return '<div class="pc-feedback"><h3>Graded: ' + esc(label || '') + ' · ' + esc(g.score) + '/' + esc(a.points) + '</h3>' + crit + (g.comment ? '<p>' + esc(g.comment) + '</p>' : '') + '</div>';
+    var mine = S.selfData && item.selfSpec ? (item.selfSpec.type === 'rubric' ? (S.selfData.score !== null && S.selfData.score !== undefined ? S.selfData.score : null) : (Object.keys(S.selfData.crit || {}).length === item.selfSpec.crit.length ? Object.keys(S.selfData.crit).reduce(function (t, k) { return t + Number(S.selfData.crit[k]); }, 0) : null)) : null;
+    return '<div class="pc-feedback"><h3>Graded: ' + esc(label || '') + ' · ' + esc(g.score) + '/' + esc(a.points) + '</h3>' + (mine !== null ? '<p class="pc-small">You gave yourself ' + esc(mine) + '/' + esc(a.points) + '.</p>' : '') + crit + (g.comment ? '<p>' + esc(g.comment) + '</p>' : '') + '</div>';
   }
   PC.critTableHtml = function (crit) {
     return '<div class="pc-table-wrap"><table class="pc-crit-table"><thead><tr><th>Criterion</th>' + crit[0].bands.map(function (b) { return '<th>' + b.score + ' pts</th>'; }).join('') + '</tr></thead><tbody>' +
@@ -299,11 +331,70 @@
   };
   function howScored(item) {
     if (item.rubric) return '<details class="pc-howscored"><summary>How it’s scored</summary><ol class="pc-rubric-list">' + item.rubric.map(function (r) { return '<li><b>' + r.score + ' · ' + esc(r.label) + '</b> ' + esc(r.text) + '</li>'; }).join('') + '</ol></details>';
-    if (item.criteria) return '<details class="pc-howscored" open><summary>How it’s scored: the Final Episode rubric</summary>' + PC.critTableHtml(item.criteria) + '</details>';
+    if (item.criteria) return '<details class="pc-howscored"><summary>How it’s scored: the Final Episode rubric</summary>' + PC.critTableHtml(item.criteria) + '</details>';
     if (item.complete) return '<details class="pc-howscored"><summary>How it’s scored</summary><p><b>Complete:</b> ' + esc(item.complete.complete) + '</p><p><b>Incomplete:</b> ' + esc(item.complete.incomplete) + '</p></details>';
     return '';
   }
   function promptHtml(a) { return a.prompt ? '<div class="pc-prompt">' + esc(a.prompt) + '</div>' : ''; }
+
+  // ---------- Score yourself (2026-11-06): the student's own rubric score + why, before turning in ----------
+  // Saved beside the work as data.self (never inside the work itself, so it never makes turned-in work look edited).
+  // The teacher sees it on the marking screen; it is never the grade.
+  function selfDone(spec, self) {
+    if (!spec) return true; self = self || {};
+    if (spec.type === 'rubric') return self.score !== null && self.score !== undefined && !!String(self.why || '').trim();
+    return spec.crit.every(function (c) { return (self.crit || {})[c.id] !== undefined && !!String(((self.why || {})[c.id]) || '').trim(); });
+  }
+  function selfBandsHtml(bands, picked, crit, ro, labelOf) {
+    // 0 is the teacher's "not submitted / no evidence" level, so it isn't one a student picks for their own work.
+    return '<div class="pc-self-bands" role="radiogroup">' + bands.filter(function (b) { return Number(b.score) > 0; }).map(function (b) {
+      var on = picked !== undefined && picked !== null && Number(picked) === Number(b.score);
+      return '<button type="button" class="pc-self-band' + (on ? ' is-on' : '') + '" role="radio" aria-checked="' + on + '" data-act="selfPick" data-score="' + b.score + '"' + (crit ? ' data-crit="' + esc(crit) + '"' : '') + (ro ? ' disabled' : '') + '>' +
+        '<span class="pc-self-pts"><b>' + b.score + '</b>' + (labelOf(b) ? '<small>' + esc(labelOf(b)) + '</small>' : '') + '</span><span class="pc-self-desc">' + esc(b.text) + '</span></button>';
+    }).join('') + '</div>';
+  }
+  function selfPanelHtml(item, self, ro, discussion) {
+    var spec = item.selfSpec; if (!spec) return '';
+    self = self || {};
+    var done = selfDone(spec, self), intro = discussion ? 'After you post and reply, pick the level that matches your work and say why.' : 'Before you turn this in, pick the level that matches your work and say why. Point to something specific in your work.';
+    var h = '<section class="pc-self' + (done ? ' is-done' : '') + '" id="pcSelf" aria-labelledby="pcSelfTitle"><header class="pc-self-head"><div><span class="pc-eyebrow">The rubric</span><h3 id="pcSelfTitle">Score yourself</h3>' +
+      '<p>' + esc(intro) + ' Your teacher sees your score and your reason. It doesn’t set your grade.</p></div><span class="pc-self-state" id="pcSelfState">' + (done ? '✓ Done' : 'Needed') + '</span></header>';
+    if (spec.type === 'rubric') {
+      h += selfBandsHtml(item.rubric || [], self.score, '', ro, function (b) { return b.label; }) +
+        '<label class="pc-field pc-self-why"><span>Why this level?</span><textarea class="pc-input pc-self-whybox" rows="3" maxlength="3000"' + (ro ? ' readonly' : '') + ' placeholder="e.g. Every part has a specific example from my work, but I didn’t proofread the ending.">' + esc(self.why || '') + '</textarea></label>';
+    } else {
+      h += (item.criteria || []).map(function (c) {
+        return '<div class="pc-self-crit" data-crit="' + esc(c.id) + '"><h4>' + esc(c.label) + ' <small>out of ' + c.max + '</small></h4>' + selfBandsHtml(c.bands, (self.crit || {})[c.id], c.id, ro, function () { return ''; }) +
+          '<label class="pc-field pc-self-why"><span>Why this level for ' + esc(c.label) + '?</span><textarea class="pc-input pc-self-whybox" data-crit="' + esc(c.id) + '" rows="2" maxlength="3000"' + (ro ? ' readonly' : '') + '>' + esc(((self.why || {})[c.id]) || '') + '</textarea></label></div>';
+      }).join('');
+    }
+    if (discussion && !ro) h += '<p class="pc-small pc-muted pc-self-msg" id="pcSelfMsg" role="status">' + (done ? 'Saved. Your teacher can see it.' : 'It saves by itself.') + '</p>';
+    return h + '</section>';
+  }
+  /** Reads the panel on screen into S.selfData. */
+  function readSelf() {
+    var spec = S.item && S.item.selfSpec, box = PC.byId('pcSelf'); if (!spec) return null;
+    if (!box) return S.selfData || null;
+    var out = spec.type === 'rubric' ? { score: null, why: '' } : { crit: {}, why: {} };
+    box.querySelectorAll('.pc-self-band.is-on').forEach(function (b) { if (b.dataset.crit) out.crit[b.dataset.crit] = Number(b.dataset.score); else out.score = Number(b.dataset.score); });
+    box.querySelectorAll('.pc-self-whybox').forEach(function (t) { if (t.dataset.crit) { if (t.value.trim()) out.why[t.dataset.crit] = t.value; } else out.why = t.value; });
+    S.selfData = out;
+    return out;
+  }
+  function selfRefresh() {
+    var spec = S.item && S.item.selfSpec, box = PC.byId('pcSelf'); if (!spec || !box) return;
+    var done = selfDone(spec, readSelf()); box.classList.toggle('is-done', done);
+    var st = PC.byId('pcSelfState'); if (st) st.textContent = done ? '✓ Done' : 'Needed';
+  }
+  A.selfPick = function (el) {
+    if (el.disabled) return;
+    var grp = el.closest('.pc-self-bands'), was = el.classList.contains('is-on');
+    grp.querySelectorAll('.pc-self-band').forEach(function (b) { b.classList.remove('is-on'); b.setAttribute('aria-checked', 'false'); });
+    if (!was) { el.classList.add('is-on'); el.setAttribute('aria-checked', 'true'); }
+    selfRefresh();
+    if (S.selfOnChange) S.selfOnChange();
+  };
+  document.addEventListener('input', function (e) { if (e.target.classList && e.target.classList.contains('pc-self-whybox')) { selfRefresh(); if (S.selfOnChange) S.selfOnChange(); } });
 
   var STEP_VIEWS = {};
 
@@ -312,6 +403,10 @@
     var h = '<section class="pc-lesson-sec">' + (sec.h ? '<h3>' + esc(sec.h) + '</h3>' : '') + (sec.sub ? '<p class="pc-lesson-sub">' + esc(sec.sub) + '</p>' : '');
     if (sec.video) h += '<div class="pc-video"><iframe src="https:&#47;&#47;www.youtube-nocookie.com/embed/' + esc(sec.video.id) + '" title="' + esc(sec.video.title) + '" loading="lazy" allow="accelerometer; encrypted-media; gyroscope; picture-in-picture; fullscreen" allowfullscreen referrerpolicy="strict-origin-when-cross-origin"></iframe></div>' +
       '<p class="pc-small"><a href="' + esc(sec.video.url) + '" target="_blank" rel="noopener">Open the video on YouTube ↗</a> <span class="pc-muted">(if it doesn’t play here)</span></p>';
+    if (sec.watch) h += '<div class="pc-watch">' + sec.watch.map(function (w) {
+      var help = w.kind === 'help', meta = help ? 'Canva Help Center · steps with pictures' : (w.kind === 'guide' ? 'Canva Design School guide' : 'Canva Design School') + (w.len ? ' · ' + w.len : '');
+      return '<a class="pc-watch-link' + (help ? ' is-help' : '') + '" href="' + esc(w.url) + '" target="_blank" rel="noopener"><span class="pc-watch-ic" aria-hidden="true">' + (w.kind === 'canva' ? '▶' : '📖') + '</span><span class="pc-watch-txt"><b>' + esc(w.title) + '</b><small>' + esc(meta) + '</small></span><span class="pc-watch-go" aria-hidden="true">↗</span><span class="pc-sr"> (opens in a new tab)</span></a>';
+    }).join('') + '</div>';
     (sec.p || []).forEach(function (t) { h += '<p>' + esc(t) + '</p>'; });
     if (sec.list) h += '<ul class="pc-lesson-list">' + sec.list.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ul>';
     if (sec.steps) h += '<ol class="pc-lesson-steps">' + sec.steps.map(function (t) { return '<li>' + esc(t) + '</li>'; }).join('') + '</ol>';
@@ -355,6 +450,11 @@
   }
   A.turnIn = function (el) {
     if (el.disabled) return;
+    if (S.item && S.item.selfSpec && !readOnly() && !selfDone(S.item.selfSpec, readSelf())) {
+      PC.toast('Score yourself on the rubric first: pick a level and say why.', 'error');
+      var sp = PC.byId('pcSelf'); if (sp) { sp.scrollIntoView({ block: 'center', behavior: 'smooth' }); sp.classList.add('is-nudged'); setTimeout(function () { sp.classList.remove('is-nudged'); }, 1600); }
+      return;
+    }
     var miss = S.fieldsMissing ? S.fieldsMissing() : [];
     if (miss.length && !confirm('Still missing: ' + miss.join(', ') + '.\n\nTurn it in anyway? You can turn it in again later.')) return;
     el.disabled = true; var old = el.textContent; el.textContent = 'Turning in…';
@@ -485,6 +585,7 @@
       else { ok = !!String(v || '').trim(); text = fd.label; }
       items.push({ ok: ok, text: text });
     });
+    if (S.item && S.item.selfSpec) items.push({ ok: selfDone(S.item.selfSpec, S.selfData), text: 'Scored yourself on the rubric' });
     return '<h3>Checklist</h3><ul>' + items.map(function (i) { return '<li class="' + (i.ok ? 'is-ok' : '') + '"><span aria-hidden="true">' + (i.ok ? '✓' : '○') + '</span>' + esc(i.text) + '</li>'; }).join('') + '</ul><p class="pc-small pc-muted">The checklist counts what it can see. It can’t judge how strong your thinking is; the rubric is about that.</p>';
   }
   function assignmentHtml(pa) {
@@ -498,16 +599,16 @@
       var ro = readOnly();
       if (item.unreadable) return unreadable(body, a.title);
       var data = item.data || {}, vals = Object.assign({}, data.f || {});
-      S.fieldsData = vals;
+      S.fieldsData = vals; S.selfData = data.self || null;
       var canvaKey = a.id === 'cover' ? 'cover' : a.id === 'script' ? 'runsheet' : '';
       body.innerHTML = '<section class="pc-card pc-fields-card' + (a.id === 'script' ? ' pc-episode-planner' : '') + '">' + gradedHead(u, a) + stepHeading(a) + (a.assignment ? assignmentHtml(S.home.processAssignment) : '') + (a.id === 'script' ? plannerIntro() : promptHtml(a)) +
         (canvaKey ? '<div class="pc-row">' + canvaBtn(canvaKey, CANVA_LABEL[canvaKey]) + '</div>' : '') + howScored(item) +
         feedbackHtml(item, a) + '<div id="pcOffer" class="pc-offer" hidden></div>' +
         '<div class="pc-write-wrap" id="pcWriteWrap"><aside class="pc-write-side"><div class="pc-checklist" id="pcChecklist"></div></aside>' +
         '<div class="pc-write-main" id="pcForm">' + (a.fields || []).map(function (fd) { return a.id === 'script' ? plannerField(fd, vals, ro) : fieldHtml(fd, vals, ro); }).join('') + '</div></div>' +
-        saveBar(item, a.title) + nextBtn(next) + '</section>';
+        selfPanelHtml(item, S.selfData, ro, false) + saveBar(item, a.title) + nextBtn(next) + '</section>';
       var root = body.querySelector('.pc-fields-card');
-      var read = function () { return readFields(a); };
+      var read = function () { var r = readFields(a), sd = item.selfSpec ? readSelf() : null; if (sd) r.self = sd; return r; };
       var refresh = function () {
         var f = read().f;
         (a.fields || []).forEach(function (fd) { var el = root.querySelector('.pc-fld[data-fid="' + fd.id + '"]'); if (el) el.hidden = !fieldShown(fd, f); });
@@ -525,6 +626,8 @@
       S.fieldsMissing = function () { return missingOf(a, read().f); };
       openGuard(u, a, item, read(), read, function (d) {
         S.fieldsData = Object.assign({}, (d && d.f) || {});
+        S.selfData = (d && d.self) || null;
+        var sp = PC.byId('pcSelf'); if (sp) sp.outerHTML = selfPanelHtml(item, S.selfData, ro, false);
         PC.byId('pcForm').innerHTML = (a.fields || []).map(function (fd) { return fieldHtml(fd, S.fieldsData, ro); }).join('');
         if (!ro) PC.byId('pcForm').querySelectorAll('[data-stat-box]').forEach(function (x) { PC.stats.bind(x); });   // keep the live counters
         refresh();
@@ -536,6 +639,7 @@
         if (e.target.tagName === 'SELECT') { var other = e.target.parentNode.querySelector('.pc-ep-other'); if (other) { other.hidden = e.target.value !== '__other'; if (!other.hidden) other.focus(); } }
         PC.guard.changed(); refresh();
       });
+      S.selfOnChange = function () { PC.guard.changed(); refresh(); };
       refresh();
       if (PC.store.get('pcFocusPref', false) && !ro && (a.fields || []).some(function (fd) { return fd.focus; })) A.focusMode();
     });
@@ -753,7 +857,7 @@
   function draftKey(parentId) { return 'pcd|' + me().email + '|' + PC.state.classId + '|w' + PC.state.week + '|' + PC.state.step + '|' + (parentId || 'top'); }
   STEP_VIEWS.discussion = function (body, u, a, next) {
     PC.guard.close();
-    loadItem(body, a, function (item) { drawDiscussion(body, u, a, item, next); });
+    loadItem(body, a, function (item) { S.selfData = (item.selfWork && item.selfWork.self) || null; S.selfDirty = false; drawDiscussion(body, u, a, item, next); });
   };
   function linkify(text) {
     return esc(text).replace(/https?:\/{2}[^\s<]+[^\s<.,;:!?)\]\x27\x22]/g, function (m) { return '<a href="' + m + '" target="_blank" rel="noopener">' + m + '</a>'; });
@@ -775,8 +879,11 @@
         '<div class="pc-post-text">' + linkify(p.text) + '</div>' +
         (rs.length ? '<div class="pc-replies">' + rs.map(function (r) { return '<div class="pc-reply' + (r.mine ? ' is-mine' : '') + '" data-id="' + esc(r.id) + '"><header><b>' + esc(r.mine ? 'You' : r.name) + '</b><time>' + esc(PC.fmtDate(r.createdAt, true)) + (r.editedAt ? ' · edited' : '') + '</time>' + (r.mine && !ro ? '<button type="button" class="pc-link" data-act="editPost" data-id="' + esc(r.id) + '">Edit</button>' : '') + '</header><div class="pc-post-text">' + linkify(r.text) + '</div></div>'; }).join('') + '</div>' : '') +
         (d.unlocked && !ro ? '<div class="pc-reply-box" data-parent="' + esc(p.id) + '"><textarea class="pc-input pc-reply-text" rows="2" maxlength="8000" placeholder="Reply" aria-label="Reply to ' + esc(p.mine ? 'your post' : p.name) + '">' + esc(PC.store.get(draftKey(p.id), '')) + '</textarea><button type="button" class="pc-btn small" data-act="reply" data-parent="' + esc(p.id) + '">Reply</button></div>' : '') + '</article>';
-    }).join('') + '</div>' + nextBtn(next) + '</section>';
+    }).join('') + '</div>' + (item.selfSpec && top.some(function (p) { return p.mine; }) ? selfPanelHtml(item, S.selfData, ro, true) : '') + nextBtn(next) + '</section>';
     body.innerHTML = h;
+    // A discussion's self-assessment saves by itself a moment after the student stops (like every other box).
+    S.selfOnChange = function () { S.selfDirty = true; var m = PC.byId('pcSelfMsg'); if (m) m.textContent = 'Saving soon…'; clearTimeout(S.selfTimer); S.selfTimer = setTimeout(discSelfSave, 1500); };
+    PC.guard.registerExtra('self', function () { return !!(S.selfDirty && S.item && S.item.form === 'discussion' && PC.byId('pcSelf')); });
     // Half-written posts and replies are kept on this device and warn before leaving.
     body.querySelectorAll('#pcPostText, .pc-reply-text').forEach(function (t) {
       t.addEventListener('input', function () { var k = draftKey(t.id === 'pcPostText' ? '' : t.closest('.pc-reply-box').dataset.parent); if (t.value.trim()) PC.store.set(k, t.value); else PC.store.del(k); });
@@ -795,6 +902,16 @@
       redrawDiscussion();
       PC.toast(parentId ? 'Reply posted.' : 'Posted. Now read your classmates’ posts and reply.', 'ok');
     }).catch(function (e) { btn.disabled = false; PC.toast(e.message + ' Your writing is still here.', 'error'); });
+  }
+  function discSelfSave() {
+    if (!S.item || S.item.form !== 'discussion' || !PC.byId('pcSelf') || readOnly()) return;
+    var self = readSelf(), m = PC.byId('pcSelfMsg'), sentJson = JSON.stringify(self);
+    if (m) m.textContent = 'Saving…';
+    PC.rpc('saveWork', { classId: PC.state.classId, as: asArg(), week: PC.state.week, act: PC.state.step, data: { self: self }, base: (S.item.selfWork && S.item.selfWork.updatedAt) || S.item.loadedAt }, { retry: true, timeoutMs: 45000 }).then(function (r) {
+      if (r && r.stale) { if (m) m.textContent = 'This was changed in another tab. Reload the page to see the newest copy.'; return; }
+      S.item.selfWork = { self: self, updatedAt: r.savedAt };
+      if (JSON.stringify(readSelf()) === sentJson) { S.selfDirty = false; if (m) m.textContent = selfDone(S.item.selfSpec, self) ? 'Saved. Your teacher can see it.' : 'Saved. Finish it: pick a level and say why.'; }
+    }).catch(function (e) { if (m) m.textContent = e.message + ' Trying again soon.'; clearTimeout(S.selfTimer); S.selfTimer = setTimeout(discSelfSave, 5000); });
   }
   A.post = function (el) { sendPost(PC.byId('pcPostText').value, '', el); };
   A.reply = function (el) { var t = el.closest('.pc-reply-box').querySelector('textarea'); sendPost(t.value, el.dataset.parent, el); };

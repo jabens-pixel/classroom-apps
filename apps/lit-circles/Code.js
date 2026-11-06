@@ -45,7 +45,7 @@ var GEMINI_MODEL = 'gemini-3.7-flash';
 // Bump on every release: here, LCH_RELEASE at the top of BackendClient.html (it sets the badge and
 // LC_CLIENT_VERSION, so Index.html only needs re-pasting when Index itself changes) and
 // FILE_FINGERPRINTS.release at the bottom of this file.
-var LC_APP_VERSION = '2026-10-29b';
+var LC_APP_VERSION = '2026-11-05b';
 var LC_LIVE_VERSION_PROP = 'LC_LIVE_APP_VERSION';
 
 var SHEET_NAMES = { GROUPS: 'Groups', WORK: 'WeeklyWork', DRAFTS: 'WeeklyDrafts', PEER: 'PeerAssessments', HISTORY: 'BookHistory', REFLECT: 'Reflections', RESUME: 'StudentResume', SELF: 'DiscussionSelfAssessments', STEP: 'StepDrafts', BACKUP: 'WorkBackups', WSTATS: 'WritingStats', JIMG: 'JournalImages', AWAY: 'DiscussionAway' };
@@ -151,7 +151,7 @@ function getAppVersion() {
 
 // ---------- Per-execution caches ----------
 // Apps Script globals live for one server call, so these never go stale across users.
-var LC_X_ = { ss: null, sheets: {}, headers: {}, users: null, classes: null, enroll: null };
+var LC_X_ = { ss: null, sheets: {}, headers: {}, users: null, classes: null, enroll: null, actor: '' };
 
 function getSs_() {
   if (LC_X_.ss) return LC_X_.ss;
@@ -205,7 +205,8 @@ function lcEnsureColumns_(sh, headers) {
     sh.getRange(1, start + 1, 1, missing.length).setValues([missing]);
     have = have.slice(0, start).concat(missing);
   }
-  delete LC_X_.headers[sh.getName()];
+  // 2026-11-05a: this read IS the header row: keep it, so lcHeaders_ doesn't read it a second time
+  LC_X_.headers[sh.getName()] = have.slice();
   return have;
 }
 /** Header names of a tab (cached for this call). */
@@ -222,10 +223,12 @@ function lcCol_(sh, header) { var i = lcHeaders_(sh).indexOf(header); return i <
 /** Row numbers (ascending) whose `header` cell equals `value` — found with TextFinder, so a
  *  big tab is never downloaded just to locate one student's rows. */
 function lcFindRowNumbers_(sh, header, value) {
-  var col = lcCol_(sh, header), last = sh.getLastRow();
-  if (!col || last < 2 || value === '' || value == null) return [];
-  var cells = sh.getRange(2, col, last - 1, 1).createTextFinder(String(value)).matchEntireCell(true).matchCase(false).findAll();
-  return cells.map(function (c) { return c.getRow(); }).sort(function (a, b) { return a - b; });
+  var col = lcCol_(sh, header);
+  if (!col || value === '' || value == null) return [];
+  // 2026-11-05a: one search of the whole tab, keeping only hits in this column below the header
+  // (it used to ask for the row count first: one more trip to Google for every lookup).
+  var cells = sh.createTextFinder(String(value)).matchEntireCell(true).matchCase(false).findAll();
+  return cells.filter(function (c) { return c.getColumn() === col && c.getRow() >= 2; }).map(function (c) { return c.getRow(); }).sort(function (a, b) { return a - b; });
 }
 /** Read whole rows as header-keyed objects: [{_row, Header: value, ...}]. */
 function lcReadRows_(sh, rowNums) {
@@ -464,6 +467,7 @@ function lcCurrentEmail_() { try { return normEmail_(Session.getActiveUser().get
 function lcActingEmail_(email, write) {
   var e = normEmail_(email);
   if (!e) throw new Error('Missing student email.');
+  if (!LC_X_.actor) LC_X_.actor = e; // whose rows this call works on (lcWithUserLock_)
   var session = lcCurrentEmail_();
   if (!session || session === e) return e;
   var u = lcUser_(session);
@@ -478,11 +482,39 @@ function lcActingEmail_(email, write) {
 
 /** A student's own rows. The lock only stops the same student's two saves from racing; every
  *  write is already one setValues on that student's own row (re-checked just before writing), so
- *  if the lock is busy for a few seconds the save goes ahead rather than failing. */
-function lcWithUserLock_(fn) {
-  var lock = null, held = false;
-  try { lock = LockService.getUserLock(); held = lock.tryLock(6000); } catch (e) { held = false; }
-  try { return fn(); } finally { if (held) { try { lock.releaseLock(); } catch (e2) {} } }
+ *  if the lock is busy for a few seconds the save goes ahead rather than failing.
+ *  2026-11-05a: the app runs as the teacher, so LockService.getUserLock() was ONE lock for the whole
+ *  class — every student's save waited for every other student's (5–9 s saves, 6 s quiz answers in
+ *  class). The lock is now per student (a short marker in the script cache, keyed by the student's
+ *  email), so students never wait for each other; one student's own tabs still take turns. The
+ *  change is written to the sheet before the lock is let go. */
+function lcWithUserLock_(fn, email) {
+  var who = normEmail_(email || LC_X_.actor), cache = null;
+  if (who) { try { cache = CacheService.getScriptCache(); } catch (e) { cache = null; } }
+  if (!cache) {
+    var lock = null, held0 = false;
+    try { lock = LockService.getUserLock(); held0 = lock.tryLock(6000); } catch (e) { held0 = false; }
+    try { return fn(); } finally { if (held0) { try { SpreadsheetApp.flush(); } catch (e3) {} try { lock.releaseLock(); } catch (e2) {} } }
+  }
+  var key = 'lclk:' + who, token = Utilities.getUuid(), held = false, until = Date.now() + 6000;
+  while (true) {
+    var cur = null; try { cur = cache.get(key); } catch (e) { break; }
+    if (!cur) { try { cache.put(key, token, 30); held = cache.get(key) === token; } catch (e) { held = false; } if (held) break; }
+    if (Date.now() >= until) break; // busy for 6 s: go ahead (each write re-checks the row first)
+    Utilities.sleep(120 + Math.floor(Math.random() * 120));
+  }
+  try { return fn(); } finally {
+    if (held) { try { SpreadsheetApp.flush(); } catch (e3) {} try { if (cache.get(key) === token) cache.remove(key); } catch (e2) {} }
+  }
+}
+/** 2026-11-05a: small things every quiz answer needs (the student's group and class, the class
+ *  settings, the approved quiz) are kept in the script cache for a short while. Any change to class
+ *  settings (quiz open/close, weeks) or to a quiz makes every kept copy out of date at once. */
+function lcLookupGen_() {
+  try { var c = CacheService.getScriptCache(); return (c && c.get('lc:gen')) || '0'; } catch (e) { return ''; }
+}
+function lcLookupsChanged_() {
+  try { var c = CacheService.getScriptCache(); if (c) c.put('lc:gen', String(Date.now()) + Math.floor(Math.random() * 1000), 21600); } catch (e) {}
 }
 /** Shared rows (groups, grades, class settings, bulk teacher tools). Kept short. */
 function withLock_(fn) {
@@ -1977,6 +2009,7 @@ function createLiteratureClass(payload) {
     lcAppendObject_(sh, { ClassId: id, TeacherEmail: t.email, ClassName: name, Period: String(payload.period || ''), JoinCode: code, SettingsJson: JSON.stringify(settings), Active: true, CreatedAt: new Date(), UpdatedAt: new Date() });
     LC_X_.classes = null;
   });
+  lcLookupsChanged_();
   return { ok: true, classInfo: { classId: id, teacherEmail: t.email, className: name, period: String(payload.period || ''), joinCode: code, settings: settings, active: true } };
 }
 
@@ -2000,6 +2033,9 @@ function lcUpdateClassRow_(classId, fn) {
     obj.ClassName = cellToText_(obj.ClassName); obj.Period = cellToText_(obj.Period); obj.JoinCode = String(obj.JoinCode || '');
     lcWriteObjectRow_(sh, rec._row, obj);
     LC_X_.classes = null;
+    // written first, then every student's kept copy of the class settings is made out of date
+    try { SpreadsheetApp.flush(); } catch (e) {}
+    lcLookupsChanged_();
     return { settings: settings, result: result, row: obj };
   });
 }
@@ -3607,7 +3643,7 @@ function teacherRestoreLiteratureArchive(payload){
 // Regenerate FILE_FINGERPRINTS with Node every release.
 // ============================================================================
 var FILE_FINGERPRINTS = {
-  "release": "2026-10-29b",
+  "release": "2026-11-05b",
   "files": {
     "Index": {
       "chars": 414880,
@@ -3616,8 +3652,8 @@ var FILE_FINGERPRINTS = {
     },
     "BackendClient": {
       "chars": 282230,
-      "md5": "958fcf95c95082739839df66b1f1c135",
-      "md5ws": "bbf150b0aba1836904e294598302369f"
+      "md5": "a2457d944b75c505db3ebcc038f4f772",
+      "md5ws": "54ef5c33899f90448e8a63fb9a6d57f6"
     },
     "Checklists": {
       "chars": 37708,
@@ -3645,9 +3681,9 @@ var FILE_FINGERPRINTS = {
       "md5ws": "b957e6ed7e7bb406b3df20166f4072b8"
     },
     "ReadingQuiz": {
-      "chars": 25556,
-      "md5": "1dfa629f2948fcb5db5e0a3b4e27f57c",
-      "md5ws": "10fb8c822c239264fef84c8051e2920f"
+      "chars": 27234,
+      "md5": "7c8edc57551b0579d9eb71ea6cb4b7dc",
+      "md5ws": "7362eb8f96e819f661c56f99c7c1f6dc"
     },
     "DiscussionDeck": {
       "chars": 40018,

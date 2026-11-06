@@ -13,7 +13,7 @@
  * skip that screen (seen 2026-10-31), so the note says "if". Setup replaces the note when it finishes.
  * Running it again is safe: the setup keeps the existing data.
  */
-var CAS_APP = {"title":"Hunger Games Lit Circles","setup":"setupLiteratureCirclesBackend","dbProp":""};
+var CAS_APP = {"title":"Hunger Games & Ender’s Game Lit Circles","setup":"setupLiteratureCirclesBackend","dbProp":""};
 var CAS_PROP_URL = 'CLASSROOM_APP_STUDENT_URL';
 var CAS_PROP_FOR = 'CLASSROOM_APP_SET_UP_FOR';   // the script these settings belong to (a copied Sheet brings the old ones along)
 

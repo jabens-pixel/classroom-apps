@@ -154,7 +154,7 @@ function lcQuizSnapshot_(snap) {
     var seenG = {};
     Object.keys(snap.groupByEmail || {}).forEach(function (em) {
       var g = snap.groupByEmail[em]; if (!g || seenG[g.groupId]) return; seenG[g.groupId] = true;
-      [1, 2, 3, 4].forEach(function (w) { var k = String(g.groupId) + '|' + w; if (!banks[k] && !off[k]) { var bi = hgBuiltInBank_(g.groupId, w); if (bi) banks[k] = bi; } });
+      [1, 2, 3, 4].forEach(function (w) { var k = String(g.groupId) + '|' + w; if (!banks[k] && !off[k]) { var bi = hgBuiltInBank_(g.groupId, w, g.bookTitle); if (bi) banks[k] = bi; } });
     });
     var wanted = {}; snap.enrollments.forEach(function (e) { wanted[normEmail_(e.StudentEmail)] = true; });
     lcAllRows_(lcQuizAttemptSheet_()).forEach(function (r) {
@@ -335,7 +335,7 @@ function restoreBuiltInLiteratureQuiz(payload) {
   var ctx = lcQuizTeacherGroup_(classId, payload.groupId), g = ctx.group;
   var counts = lcQuizAttemptCounts_(g.groupId, week, ctx.allMembers);
   if (counts.started) throw new Error('Students have started this quiz, so it can’t be swapped now.');
-  if (!hgBuiltInBank_(g.groupId, week)) throw new Error('There is no built-in quiz for Week ' + week + '.');
+  if (!hgBuiltInBank_(g.groupId, week, g.bookTitle)) throw new Error('There is no built-in quiz for Week ' + week + '.');
   // Status '' = no saved copy, so the built-in quiz is used (the row itself is kept, never deleted)
   lcQuizWriteBank_(g.groupId, week, function () { var f = { Status: '', Count: 0, UpdatedAt: new Date(), UpdatedBy: ctx.teacher.email, ApprovedAt: '' }; LC_CHUNK_COLS.forEach(function (k) { f[k] = ''; }); return f; });
   var bank = lcQuizBank_(g.groupId, week);
@@ -819,7 +819,7 @@ function lcQuizStudentSummary_(email, group) {
     var saved = {};
     banks.forEach(function (b) { saved[Number(b.Week)] = String(b.Status || ''); if (String(b.Status) === 'approved') out[Number(b.Week)] = { approved: true, section: cellToText_(b.Section), state: 'notStarted' }; });
     // weeks with no saved copy use the built-in quiz (approved); a deleted one ('off') has none
-    [1, 2, 3, 4].forEach(function (w) { var st = saved[w]; if (st === undefined || st === '') { var bi = hgBuiltInBank_(group.groupId, w); if (bi) out[w] = { approved: true, section: bi.section, state: 'notStarted' }; } });
+    [1, 2, 3, 4].forEach(function (w) { var st = saved[w]; if (st === undefined || st === '') { var bi = hgBuiltInBank_(group.groupId, w, group.bookTitle); if (bi) out[w] = { approved: true, section: bi.section, state: 'notStarted' }; } });
     atts.forEach(function (a) { var w = Number(a.Week); out[w] = out[w] || { approved: false }; out[w].state = a.FinishedAt ? 'finished' : 'inProgress'; out[w].answered = Number(a.Answered || 0); out[w].max = Number(a.Max || 0); });
   } catch (e) {}
   return out;

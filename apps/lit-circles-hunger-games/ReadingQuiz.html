@@ -226,11 +226,11 @@ window.__MB.ReadingQuiz = 'loading';
     if (Q.busy || !onQuestion() || Q.pick < 0) return;
     if (Q.pendingLeave && retryPendingLeave()) return; // a leave that couldn't be sent goes first
     var v = Q.view, brief = Q.brief.splice(0, Q.brief.length);
-    Q.busy = true; var sb = $('lcQuizSubmit'); if (sb) { sb.disabled = true; sb.textContent = 'Saving…'; }
+    Q.busy = true; Q.answering = v.current.id; var sb = $('lcQuizSubmit'); if (sb) { sb.disabled = true; sb.textContent = 'Saving…'; }
     Q.lockedNote = '';
-    rpc('answerLiteratureQuiz', { email: me(), week: Q.wk, qid: v.current.id, pick: Q.pick, session: SESSION, brief: brief }).then(function (nv) { Q.busy = false; take(nv); }, function (e) {
-      Q.busy = false; Q.brief = brief.concat(Q.brief);
-      Q.err = errMsg(e) + ' Your answer may not have saved — press Submit again.'; paint();
+    rpc('answerLiteratureQuiz', { email: me(), week: Q.wk, qid: v.current.id, pick: Q.pick, session: SESSION, brief: brief }).then(function (nv) { Q.busy = false; Q.answering = ''; take(nv); saveAwayDone(); }, function (e) {
+      Q.busy = false; Q.answering = ''; Q.brief = brief.concat(Q.brief);
+      Q.err = errMsg(e) + ' Your answer may not have saved — press Submit again.'; paint(); saveAwayDone();
     });
   };
   W.lcQuizAskLeave = function () {
@@ -262,11 +262,20 @@ window.__MB.ReadingQuiz = 'loading';
   W.addEventListener('online', function () { if (onQuestion()) retryPendingLeave(); });
   function awayStart(kind) {
     if (!onQuestion() || Q.away) return;
+    // 2026-11-05b: the answer to this question is already on its way, so it keeps counting. Looking
+    // away while it saves still costs a question (the teacher's rule): it is remembered here and,
+    // once the save is back, the NEXT question is locked (see saveAwayDone).
+    if (Q.answering && Q.answering === Q.view.current.id) {
+      if (!Q.saveAway) Q.saveAway = { kind: kind, at: Date.now(), back: 0 };
+      else { Q.saveAway.back = 0; if (kind === 'hidden') Q.saveAway.kind = 'hidden'; }
+      return;
+    }
     Q.away = { kind: kind, at: Date.now(), qid: Q.view.current.id, timer: null };
     var grace = Number(Q.view.graceMs) || 1500;
     Q.away.timer = setTimeout(function () { if (Q.away && !Q.away.sent) { Q.away.sent = true; leave(Q.away.kind, Date.now() - Q.away.at); } }, grace);
   }
   function awayEnd() {
+    if (Q.saveAway && !Q.saveAway.back) { Q.saveAway.back = Date.now(); return; }
     if (!Q.away) return;
     var a = Q.away, ms = Date.now() - a.at; Q.away = null; clearTimeout(a.timer);
     if (a.sent) return;
@@ -274,6 +283,22 @@ window.__MB.ReadingQuiz = 'loading';
     // the question on screen is locked now that they are back.
     if (ms >= ((Q.view && Number(Q.view.graceMs)) || 1500) && onQuestion() && Q.view.current.id === a.qid) { leave(a.kind, ms); return; }
     Q.brief.push({ kind: a.kind, ms: ms, qid: a.qid, at: new Date().toISOString() });
+  }
+  /** The answer's save came back (or failed). If the student looked away while it was saving, the
+   *  question now on screen is locked the same way as any other looking away: at once if they were
+   *  gone past the grace time, or when the grace time runs out if they still aren't back. */
+  function saveAwayDone() {
+    var a = Q.saveAway; Q.saveAway = null;
+    if (!a || !onQuestion()) return;
+    var grace = Number(Q.view.graceMs) || 1500, qid = Q.view.current.id;
+    if (a.back) {
+      var ms = a.back - a.at;
+      if (ms >= grace) leave(a.kind, ms); else Q.brief.push({ kind: a.kind, ms: ms, qid: qid, at: new Date().toISOString() });
+      return;
+    }
+    // still away: carry on timing from when they left
+    Q.away = { kind: a.kind, at: a.at, qid: qid, timer: null };
+    Q.away.timer = setTimeout(function () { if (Q.away && !Q.away.sent) { Q.away.sent = true; leave(Q.away.kind, Date.now() - Q.away.at); } }, Math.max(0, grace - (Date.now() - a.at)));
   }
   document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'hidden') { if (Q.away) Q.away.kind = 'hidden'; else awayStart('hidden'); } else awayEnd(); });
   W.addEventListener('blur', function () { awayStart('blur'); });

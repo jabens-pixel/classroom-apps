@@ -221,7 +221,10 @@ function getLiteratureQuizzes(payload) {
 /** Write a bank row (one setValues). `fields` may be a function of the fresh row. */
 function lcQuizWriteBank_(groupId, week, fields) {
   return withLock_(function () {
-    return lcUpsertByKeys_(lcQuizBankSheet_(), 'GroupId', { GroupId: String(groupId), Week: Number(week) }, fields);
+    var out = lcUpsertByKeys_(lcQuizBankSheet_(), 'GroupId', { GroupId: String(groupId), Week: Number(week) }, fields);
+    try { SpreadsheetApp.flush(); } catch (e) {}
+    lcLookupsChanged_(); // students' kept copies of the quiz are out of date now
+    return out;
   });
 }
 function lcQuizBankFields_(classId, g, section, status, questions, teacherEmail, note, prev, notes) {
@@ -336,7 +339,7 @@ function resetLiteratureQuizAttempt(payload) {
       var f = { StartedAt: '', FinishedAt: '', Answered: '', Score: '', Max: '', Locked: '', UpdatedAt: new Date() };
       LC_CHUNK_COLS.forEach(function (k) { f[k] = ''; }); return f;
     });
-  });
+  }, email);
   return { ok: true, by: t.email };
 }
 
@@ -360,7 +363,7 @@ function unlockLiteratureQuizQuestions(payload) {
       d.events.push({ at: new Date().toISOString(), kind: 'unlocked', n: n, by: t.email });
       return lcQuizAttemptFields_(d, null, rec, new Date());
     }, { noCreate: true });
-  });
+  }, email);
   return { ok: true, unlocked: n };
 }
 
@@ -557,15 +560,30 @@ function lcQuizStudentView_(ctx, d) {
   v.current = { id: q.id, n: d.order.indexOf(q.id) + 1, q: q.q, choices: perm.map(function (p) { return q.choices[p]; }) };
   return v;
 }
-/** Load everything a student call needs. */
+/** Load everything a student call needs.
+ *  2026-11-05a: the group, class, class settings and quiz are kept in the script cache for 30 s
+ *  (they were read from four tabs on every answer). Opening/closing the quiz, changing the class or
+ *  saving a quiz makes the kept copy out of date at once (lcLookupsChanged_); a group change is
+ *  still caught on every answer (the attempt write re-checks the group). */
+var LC_QUIZ_CTX_TTL = 30;
+function lcQuizCtxKey_(email, week) { var g = lcLookupGen_(); return g ? 'lcqc:' + g + ':' + week + ':' + email : ''; }
+function lcQuizCtxForget_(email, week) {
+  try { var k = lcQuizCtxKey_(email, week), c = CacheService.getScriptCache(); if (k && c) c.remove(k); } catch (e) {}
+}
 function lcQuizStudentCtx_(payload, readOnly) {
   payload = payload || {};
   var email = lcActingEmail_(payload.email, !readOnly), week = lcWeek_(payload.week || 1);
-  var group = findGroupByEmail_(email); if (!group) throw new Error('Set up your group first.');
-  var cls = lcQuizStudentClass_(email, week);
-  if (!cls) throw new Error('Week ' + week + ' isn’t open yet.');
-  var bank = lcQuizBank_(group.groupId, week);
-  return { email: email, week: week, group: group, classId: cls.classId, settings: cls.settings, open: lcQuizOpenFor_(cls.settings, week), openedAt: ((cls.settings.quizOpenedAt || {})[String(week)]) || '', bank: bank, session: String(payload.session || '').slice(0, 40) };
+  var key = lcQuizCtxKey_(email, week), cache = null, kept = null;
+  if (key) { try { cache = CacheService.getScriptCache(); var raw = cache && cache.get(key); kept = raw ? JSON.parse(raw) : null; } catch (e) { kept = null; } }
+  if (!kept || !kept.group || !kept.classId) {
+    var group = findGroupByEmail_(email); if (!group) throw new Error('Set up your group first.');
+    var cls = lcQuizStudentClass_(email, week);
+    if (!cls) throw new Error('Week ' + week + ' isn’t open yet.');
+    kept = { group: group, classId: cls.classId, settings: cls.settings, bank: lcQuizBank_(group.groupId, week) };
+    if (cache && key) { try { var json = JSON.stringify(kept); if (json.length < 90000) cache.put(key, json, LC_QUIZ_CTX_TTL); } catch (e) {} }
+  }
+  var st = kept.settings || {};
+  return { email: email, week: week, group: kept.group, classId: kept.classId, settings: st, open: lcQuizOpenFor_(st, week), openedAt: ((st.quizOpenedAt || {})[String(week)]) || '', bank: kept.bank || null, session: String(payload.session || '').slice(0, 40) };
 }
 /** Point d.cur at the next question not answered yet (or nothing when finished). */
 function lcQuizServeNext_(d, now, session, bank) {
@@ -585,7 +603,7 @@ function lcQuizCleanBrief_(list) {
 /** Runs one change to the student's attempt row under their lock, from the fresh row. */
 function lcQuizMutateAttempt_(ctx, fn, create) {
   var view = null;
-  lcWithUserLock_(function () {
+  try { lcWithUserLock_(function () {
     lcUpsertByKeys_(lcQuizAttemptSheet_(), 'Email', { Email: ctx.email, Week: ctx.week, GroupId: String(ctx.group.groupId) }, function (rec, now) {
       var d = lcQuizAttemptData_(rec);
       if (d && d.unreadable) throw new Error('Your quiz record couldn’t be read. Tell your teacher.');
@@ -600,7 +618,11 @@ function lcQuizMutateAttempt_(ctx, fn, create) {
       view = lcQuizStudentView_(ctx, d);
       return {};
     }, { noCreate: !create, groupOf: ctx.email });
-  });
+  }, ctx.email); } catch (e) {
+    // moved to another group by the teacher: don't keep using the old group from the cache
+    if (e && e.message === LC_GROUP_CHANGED_MSG) lcQuizCtxForget_(ctx.email, ctx.week);
+    throw e;
+  }
   return view || lcQuizStudentView_(ctx, null);
 }
 

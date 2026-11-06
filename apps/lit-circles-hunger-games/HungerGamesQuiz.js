@@ -1,5 +1,6 @@
 /**
- * Hunger Games Lit Circles — the built-in Reading Quiz for each week's section.
+ * Hunger Games & Ender's Game Lit Circles — the built-in Reading Quiz for each week's section of
+ * The Hunger Games (Ender's Game's are in EndersGameQuiz.js).
  *
  * Every group starts with these ten questions for the week, already approved (nothing for the
  * teacher to draft). They are original questions written for this unit; they never quote the book.
@@ -31,10 +32,10 @@ var HG_QUIZ = {
     { id: 'qhg2a02', kind: 'recall', where: 'Ch. 8', q: 'What training score does Katniss receive?', choices: ['5', '8', '11', '10'], answer: 2, why: 'Her 11 is the highest score of any tribute, which surprises everyone, including her.' },
     { id: 'qhg2a03', kind: 'recall', where: 'Ch. 9', q: 'In her interview with Caesar Flickerman, what helps Katniss win over the audience?', choices: ['She tells a funny story about Haymitch', 'She sings a song from District 12', 'She twirls so her dress looks like it is on fire', 'She shows off her skill with a bow on stage'], answer: 2, why: 'Cinna’s dress flares like flames when she spins, and the crowd loves it.' },
     { id: 'qhg2a04', kind: 'recall', where: 'Ch. 9', q: 'What surprising thing does Peeta reveal in his interview?', choices: ['He plans to win no matter what it costs', 'He has had a crush on Katniss for a long time', 'He is secretly an expert archer', 'He volunteered so his brother wouldn’t have to'], answer: 1, why: 'Peeta tells all of Panem that the girl he likes came to the Games with him.' },
-    { id: 'qhg2a05', kind: 'inference', where: 'Ch. 9', q: 'Why does Haymitch say Peeta’s confession helped Katniss instead of hurting her?', choices: ['It proved Peeta is too weak to be a threat', 'It made the strongest tributes afraid of her', 'It means the Gamemakers have to protect her', 'It made her seem desirable and memorable, which can win sponsors'], answer: 3, why: 'Before the interview she came across as hard to like. Now the audience sees a love story, and sponsors pay for stories.' },
-    { id: 'qhg2a06', kind: 'inference', where: 'Ch. 9–10', q: 'On the roof the night before the Games, what does Peeta say he wants?', choices: ['To keep the Capitol from changing who he is, even if he dies', 'To win the Games no matter what he has to do', 'To find Katniss as soon as the Games begin', 'To go home and take over his family’s bakery'], answer: 0, why: 'Peeta wants to show the Capitol that he is more than a piece in their Games.' },
-    { id: 'qhg2a07', kind: 'recall', where: 'Ch. 9–11', q: 'What is Haymitch’s advice for the start of the Games?', choices: ['Fight for the best weapons at the Cornucopia', 'Find Peeta right away and stay together', 'Get away from the Cornucopia and find water', 'Climb the tallest tree and wait for gifts'], answer: 2, why: 'He tells them to skip the bloodbath, put distance between themselves and the others, and find a water source.' },
-    { id: 'qhg2a08', kind: 'recall', where: 'Ch. 12', q: 'Who is Katniss shocked to see traveling with the Career pack?', choices: ['Thresh', 'Rue', 'The boy from District 9', 'Peeta'], answer: 3, why: 'Peeta is with the Careers as they hunt the other tributes, which makes Katniss question everything he said.' },
+    { id: 'qhg2a05', kind: 'inference', where: 'Ch. 10', q: 'Why does Haymitch say Peeta’s confession helped Katniss instead of hurting her?', choices: ['It proved Peeta is too weak to be a threat', 'It made the strongest tributes afraid of her', 'It means the Gamemakers have to protect her', 'It made her seem desirable and memorable, which can win sponsors'], answer: 3, why: 'Before the interview she came across as hard to like. Now the audience sees a love story, and sponsors pay for stories.' },
+    { id: 'qhg2a06', kind: 'inference', where: 'Ch. 10', q: 'On the roof the night before the Games, what does Peeta say he wants?', choices: ['To keep the Capitol from changing who he is, even if he dies', 'To win the Games no matter what he has to do', 'To find Katniss as soon as the Games begin', 'To go home and take over his family’s bakery'], answer: 0, why: 'Peeta wants to show the Capitol that he is more than a piece in their Games.' },
+    { id: 'qhg2a07', kind: 'recall', where: 'Ch. 10', q: 'What is Haymitch’s advice for the start of the Games?', choices: ['Fight for the best weapons at the Cornucopia', 'Find Peeta right away and stay together', 'Get away from the Cornucopia and find water', 'Climb the tallest tree and wait for gifts'], answer: 2, why: 'He tells them to skip the bloodbath, put distance between themselves and the others, and find a water source.' },
+    { id: 'qhg2a08', kind: 'recall', where: 'Ch. 11–12', q: 'Who is Katniss shocked to see traveling with the Career pack?', choices: ['Thresh', 'Rue', 'The boy from District 9', 'Peeta'], answer: 3, why: 'Peeta is with the Careers as they hunt the other tributes, which makes Katniss question everything he said.' },
     { id: 'qhg2a09', kind: 'inference', where: 'Ch. 12', q: 'How does Katniss figure out that water must be close by?', choices: ['A parachute arrives with a map of the arena', 'She reasons that Haymitch would send water if she were far from it, so his silence means she is near', 'She hears a stream from the top of a tree', 'Peeta shouts the direction to her during the bloodbath'], answer: 1, why: 'She reads Haymitch’s silence as a message, keeps going, and finds a pond.' },
     { id: 'qhg2a10', kind: 'recall', where: 'Ch. 13', q: 'What does the Gamemakers’ wall of fire do to Katniss?', choices: ['It burns down the Cornucopia while she watches', 'It destroys her backpack and everything in it', 'It traps her in a cave for two days', 'It drives her back toward the other tributes and burns her leg'], answer: 3, why: 'The fire pushes her toward the Careers, and fireballs burn the back of her calf.' }
   ],
@@ -47,7 +48,7 @@ var HG_QUIZ = {
     { id: 'qhg3a06', kind: 'recall', where: 'Ch. 16', q: 'How does Katniss set off the mines around the supply pile?', choices: ['She throws rocks at the trigger plates', 'She shoots open a bag of apples so they spill onto the ground', 'She lights the grass around the pile', 'She lures another tribute onto the mines'], answer: 1, why: 'The falling apples set off the mines and blow up the supplies.' },
     { id: 'qhg3a07', kind: 'inference', where: 'Ch. 18', q: 'Why does Katniss cover Rue’s body with flowers?', choices: ['Her district’s tradition requires it', 'So the Careers won’t find the body', 'To show the Capitol that Rue was a person, not just a piece in their Games', 'Because Haymitch told her it would win sponsors'], answer: 2, why: 'It is a way of honoring Rue and of refusing to let the Capitol own her death.' },
     { id: 'qhg3a08', kind: 'recall', where: 'Ch. 18', q: 'What gift arrives after Rue’s death that surprises Katniss?', choices: ['Medicine from District 12', 'A note from Gale', 'A new set of arrows from the Capitol', 'A loaf of bread from District 11'], answer: 3, why: 'District 11 sends bread as thanks for how she treated Rue — the first time a district has sent a gift to another district’s tribute.' },
-    { id: 'qhg3a09', kind: 'recall', where: 'Ch. 19', q: 'What rule change do the Gamemakers announce?', choices: ['Two tributes from the same district can win together', 'Tributes are now allowed to leave the arena', 'The arena will shrink every night', 'Sponsors can no longer send gifts'], answer: 0, why: 'The new rule makes Katniss go looking for Peeta.' },
+    { id: 'qhg3a09', kind: 'recall', where: 'Ch. 18', q: 'What rule change do the Gamemakers announce?', choices: ['Two tributes from the same district can win together', 'Tributes are now allowed to leave the arena', 'The arena will shrink every night', 'Sponsors can no longer send gifts'], answer: 0, why: 'The new rule makes Katniss go looking for Peeta.' },
     { id: 'qhg3a10', kind: 'recall', where: 'Ch. 19', q: 'Where does Katniss find Peeta, and what condition is he in?', choices: ['In a cave, with a broken arm', 'Near the Cornucopia, guarding the Careers’ supplies', 'Up a tree, hungry but unhurt', 'Camouflaged in the mud near a stream, with a badly infected leg wound'], answer: 3, why: 'He has painted himself to blend into the bank. The cut from Cato’s sword is getting worse.' }
   ],
   4: [ // Ch. 21–27
@@ -57,21 +58,32 @@ var HG_QUIZ = {
     { id: 'qhg4a04', kind: 'inference', where: 'Ch. 22', q: 'Why does Katniss play up the romance with Peeta while they wait out the storm in the cave?', choices: ['The Gamemakers order her to', 'She has decided she wants to marry him', 'She hopes it will make Cato leave them alone', 'Haymitch’s gifts suggest that the audience, and sponsors, reward the love story'], answer: 3, why: 'When a kiss brings a gift, she reads it as a message from Haymitch: keep the story going and the sponsors will help.' },
     { id: 'qhg4a05', kind: 'recall', where: 'Ch. 23', q: 'What happens to Foxface?', choices: ['Cato catches her near the stream', 'She dies after eating poisonous berries that Peeta gathered', 'She falls from a tree during the storm', 'The Gamemakers remove her from the arena'], answer: 1, why: 'She steals some of Peeta’s food, not knowing the berries are nightlock.' },
     { id: 'qhg4a06', kind: 'recall', where: 'Ch. 24–25', q: 'What chases Katniss and Peeta to the Cornucopia?', choices: ['A swarm of tracker jackers', 'A flood released by the Gamemakers', 'Wolf-like mutts that seem to have the eyes of the dead tributes', 'Poisonous snakes from the lake'], answer: 2, why: 'The Gamemakers release the mutts to force the last tributes together for the finale.' },
-    { id: 'qhg4a07', kind: 'recall', where: 'Ch. 25', q: 'How does Cato finally die?', choices: ['He eats poisonous berries', 'A hovercraft takes him away alive', 'He drowns in the lake', 'Katniss shoots him with an arrow to end his suffering'], answer: 3, why: 'After hours with the mutts, she uses her last arrow as an act of mercy.' },
+    { id: 'qhg4a07', kind: 'recall', where: 'Ch. 25', q: 'How does Cato finally die?', choices: ['He eats poisonous berries', 'A hovercraft takes him away alive', 'He drowns in the lake', 'Katniss shoots him with an arrow to end his suffering'], answer: 3, why: 'After a night of the mutts attacking him, Katniss shoots him out of pity.' },
     { id: 'qhg4a08', kind: 'recall', where: 'Ch. 25', q: 'What do the Gamemakers announce after Cato dies?', choices: ['The rule change is canceled, so only one tribute can win', 'Both tributes will be crowned victors', 'A second feast will be held at dawn', 'Peeta is out of the Games because of his injuries'], answer: 0, why: 'They take back the rule change to force Katniss and Peeta to turn on each other.' },
     { id: 'qhg4a09', kind: 'inference', where: 'Ch. 25', q: 'Why does the threat to eat the berries together force the Gamemakers to give in?', choices: ['The berries were never really poisonous', 'Eating in the arena breaks the rules', 'The Games need a victor, and two tributes dying together would ruin the show', 'The audience voted to let them live'], answer: 2, why: 'Without a victor the Capitol’s Games fall apart, so the Gamemakers declare them both winners.' },
     { id: 'qhg4a10', kind: 'inference', where: 'Ch. 26–27', q: 'Why is Peeta hurt and upset on the trip home?', choices: ['He blames Katniss for his injured leg', 'He learns that much of what Katniss showed in the arena was a performance for the cameras', 'He wanted to stay in the Capitol', 'Haymitch takes credit for their win'], answer: 1, why: 'Haymitch warns Katniss the Capitol is angry about the berries, so she must keep up the romance. Peeta realizes it was partly an act.' }
   ]
 };
 
-/** The built-in bank for a group's week, shaped like a saved one (lcQuizBankFromRec_). */
-function hgBuiltInBank_(groupId, week) {
-  var list = HG_QUIZ[Number(week)];
+/** The built-in bank for a group's week, shaped like a saved one (lcQuizBankFromRec_).
+ *  2026-11-06a: the quiz is the group's book's — HG_QUIZ (The Hunger Games) or EG_QUIZ
+ *  (Ender's Game, EndersGameQuiz.js). `book` is the group's book title when the caller has it;
+ *  otherwise the group's row says which book. */
+function hgBuiltInBank_(groupId, week, book) {
+  var key = book != null && book !== '' ? hgBookKey_(book) : hgGroupBookKey_(groupId);
+  var all = key === 'eg' ? (typeof EG_QUIZ !== 'undefined' ? EG_QUIZ : {}) : HG_QUIZ;
+  var list = all[Number(week)];
   if (!list) return null;
   return {
-    groupId: String(groupId || ''), week: Number(week), classId: '', bookTitle: HG_PLAN.book,
-    section: hgReadingFor_(week), status: 'approved', count: list.length, updatedAt: '', updatedBy: '', approvedAt: '',
+    groupId: String(groupId || ''), week: Number(week), classId: '', bookTitle: HG_BOOKS[key].book,
+    section: hgReadingFor_(week, key), status: 'approved', count: list.length, updatedAt: '', updatedBy: '', approvedAt: '',
     questions: lcQuizCleanList_(list.map(function (q) { var o = {}; Object.keys(q).forEach(function (k) { o[k] = q[k]; }); o.src = 'builtin'; return o; })).map(lcQuizStrip_),
     note: '', notes: null, unreadable: false, builtIn: true
   };
+}
+/** Which book a group reads ('hg' or 'eg'), from the Groups tab (read once per call). */
+function hgGroupBookKey_(groupId) {
+  var gid = String(groupId || ''), rows = lcGroupRows_();
+  for (var i = 0; i < rows.length; i++) if (String(rows[i].values[0]) === gid) return hgBookKey_(rows[i].values[1]);
+  return 'hg';
 }

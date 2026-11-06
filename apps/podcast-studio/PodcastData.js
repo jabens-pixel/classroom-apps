@@ -17,6 +17,8 @@
 //   discussion  post first, then see classmates and reply
 // Grading: quiz = auto; rubric: '<key>' = that PC_RUBRICS rubric, out of 7; criteria: true = the
 // Final Episode rubric (each criterion scored, the total is the grade).
+// Self-assessment (2026-11-06): every assignment scored on a rubric (rubric or criteria) asks the student to score
+// themselves and say why before turning it in (discussions: after posting). selfAssess: false on an activity leaves it out.
 // Activity ids are where students' work is filed. NEVER rename an id once students have started.
 // ============================================================================
 
@@ -322,6 +324,77 @@ var PC_UNIT = [
   { n: 3, title: 'Record, Build & Publish', eq: 'How do sound and design change the way a message lands?',
     summary: 'Record your episode, build it and its cover art in Canva, share it at the Listening Party, and look back at your process.',
     activities: [
+      // Canva How-To Videos (2026-11-04a): Canva's own Design School videos and Help pages open in a new tab;
+      // the steps under each are ours, for this project. `watch` kinds: canva (Design School), guide, help.
+      { id: 'canvahow', form: 'lesson', icon: '🎬', title: 'Canva How-To Videos', sections: [
+        { h: 'Start here', sub: 'Short videos from Canva, plus the steps for our podcast', list: [
+          'Each skill below has a short video or guide from Canva (it opens in a new tab) and the steps for this project.',
+          'Watch the one you need, then come back and follow the steps in your own episode design.',
+          'Sign in to Canva with your school Google account, so your work is saved and your teacher can open it.',
+          'Canva updates often. If a button has moved, look for the same word in the menus or type it in the search bar at the top of the editor.' ] },
+        { h: '1. Start your episode design', sub: 'Do this once', watch: [
+          { kind: 'canva', title: 'Making videos', len: '4 min', url: 'https://www.canva.com/design-school/lessons/making-videos' } ], steps: [
+          'Go to canva.com and choose Continue with Google. Use your school account.',
+          'Choose Create a design, then Video. A blank video opens with a timeline along the bottom.',
+          'Click the name at the top (Untitled design) and rename it: your show name and Episode 1.',
+          'Everything you add (recordings, music, pictures) goes into this one design. Canva saves as you work.' ] },
+        { h: '2. Get to know the video editor', watch: [
+          { kind: 'guide', title: 'Meet your video editor', len: '5 min', url: 'https://www.canva.com/design-school/resources/meet-your-video-editor' } ], list: [
+          'Left panel: Design (templates), Elements (graphics, photos, audio), Text, Uploads and more.',
+          'Middle: the page listeners see while your audio plays, such as your cover art.',
+          'Bottom: the timeline. Pages sit in a row and audio sits underneath them. Press play to hear it from the playhead.',
+          'Toolbar above the page: it changes whatever you have selected, like the volume or fade of an audio clip.' ] },
+        { h: '3. Record your voice in Canva', watch: [
+          { kind: 'canva', title: 'How to record yourself', len: '3 min', url: 'https://www.canva.com/design-school/resources/how-to-record-yourself' },
+          { kind: 'help', title: 'Record a voiceover in the editor', url: 'https://www.canva.com/help/record-voiceover/' } ], steps: [
+          'Open Uploads in the left panel and choose Record yourself.',
+          'Allow Canva to use your microphone. You can turn the camera off: for a podcast, only your voice matters.',
+          'Check the right microphone is chosen, then press Record. Wait for the countdown, then speak.',
+          'When the segment is done, stop, listen back, and save it (or retake it).',
+          'The recording lands on your timeline and in Uploads. Record one segment at a time, so one mistake doesn’t mean starting over.' ] },
+        { h: '4. Bring in recordings from your phone', steps: [
+          'Record on your phone (Voice Memos or any recorder app) in a quiet, soft room.',
+          'Send the file to yourself: share it to your school Google Drive, or save it to Files.',
+          'On your computer or Chromebook: Uploads, then Upload files, then choose the recording.',
+          'Or open the Canva app on your phone, signed in to the same school account, and upload it there. It shows up in Uploads on every device.',
+          'Click the uploaded clip (or drag it onto the timeline) to add it to your episode.' ] },
+        { h: '5. Trim, split and balance your audio', watch: [
+          { kind: 'canva', title: 'Deep Dive: Video Editing', len: '2 min', url: 'https://www.canva.com/design-school/resources/deep-dive-video-editing' },
+          { kind: 'help', title: 'Edit and trim audio tracks', url: 'https://www.canva.com/help/trim-audio-and-adjust-volume/' } ], steps: [
+          'Trim: click a clip on the timeline, then drag its start or end to cut silence and mistakes.',
+          'Split: move the playhead to the spot, right-click the clip and choose Split (or press S). Delete the piece you don’t want.',
+          'Volume: select a clip and use the volume button on the toolbar. Balance all evens out every clip at once.',
+          'Fade: select a music clip and choose Fade to ease it in and out.',
+          'Drag clips left or right to close gaps. Then play the whole episode from the start before you move on.' ] },
+        { h: '6. Add music and sound effects', watch: [
+          { kind: 'canva', title: 'Attention-grabbing audio (in the Canva phone app)', len: '3 min', url: 'https://www.canva.com/design-school/resources/attention-grabbing-audio' },
+          { kind: 'help', title: 'Add music and audio', url: 'https://www.canva.com/help/stock-music' } ], steps: [
+          'Open Elements and search for what you need (theme music, lofi, applause, rain), then look under Audio.',
+          'Click a track to add it, then drag it under the part where it belongs.',
+          'Turn music down under voices (about 10–20%) so every word is clear.',
+          'Trim the music to fit, and fade it in and out.',
+          'Use Canva’s library or sound you made. Don’t use songs you don’t have permission to use, and list your music in your credits.' ] },
+        { h: '7. Pictures and graphics', watch: [
+          { kind: 'canva', title: 'How to remove image backgrounds (in the Canva phone app)', len: '2 min', url: 'https://www.canva.com/design-school/resources/remove-image-backgrounds/' },
+          { kind: 'guide', title: 'Uploading and editing photos', len: '5 min', url: 'https://www.canva.com/design-school/resources/uploading-and-editing-photos/' } ], steps: [
+          'Elements: search for a photo or graphic, then click it to add it to your page.',
+          'Your own photos: Uploads, then Upload files.',
+          'Select a photo and choose Edit to crop it, fix the light, or remove the background.',
+          'Use your own photos or Canva’s library. If you use someone else’s picture, ask permission and credit it.' ] },
+        { h: '8. Make your cover art', watch: [
+          { kind: 'canva', title: 'How to combine text and images', len: '5 min', url: 'https://www.canva.com/design-school/resources/how-to-combine-text-and-images' } ], steps: [
+          'Start from the cover maker in Cover Art, or in Canva choose Create a design and search for Podcast cover (a square design).',
+          'Make the show name big: it has to read at thumbnail size, about as big as a postage stamp.',
+          'Use one or two fonts and strong contrast between the words and the background.',
+          'One clear picture beats a collage.',
+          'Download it as a PNG, then upload it into your episode as the first page.' ] },
+        { h: '9. Share your link and keep a copy', watch: [
+          { kind: 'canva', title: 'Sharing, collaborating and downloading', len: '5 min', url: 'https://www.canva.com/design-school/lessons/sharing-collaborating-and-downloading' } ], steps: [
+          'Share, then View-only link, then Copy. That link is what you paste into Podcast Studio.',
+          'Test it: open the link in a private (incognito) window. If it asks you to sign in or request access, check your sharing settings.',
+          'Keep a copy for yourself: Share, then Download, then MP4 video.',
+          'Never hand in an edit link: anyone with it could change your episode.' ] }
+      ] },
       { id: 'recording', form: 'lesson', icon: '🔴', title: 'Recording and Using Canva', sections: [
         { h: 'Recording Essentials', sub: 'Understanding equipment and recording techniques', cards: [
           { h: 'Equipment', p: 'You will likely record with your iphone, although our school does have some equipment you can use. Test your equipment and record in the quietest setting possible. Wind is your enemy when recording.' },

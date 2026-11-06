@@ -1,18 +1,18 @@
 {
-  "title": "Hunger Games Lit Circles",
-  "summary": "A four-week literature circle unit on The Hunger Games for grade 9: two reading strategies a week, built-in reading quizzes, discussion and reflection.",
+  "title": "Hunger Games & Ender’s Game Lit Circles",
+  "summary": "A four-week literature circle unit for grade 9: each group reads The Hunger Games or Ender’s Game, with two reading strategies a week, built-in reading quizzes, discussion and reflection.",
   "reset": "LC_X_ = { ss: null, sheets: {}, headers: {}, users: null, classes: null, enroll: null };",
   "steps": [
     { "as": "student", "wait": 2200 },
-    { "caption": "The student view. The whole class reads the novel in four sections.", "hold": 3800 },
+    { "caption": "The student view. Each group reads The Hunger Games or Ender’s Game, in four sections.", "hold": 3800 },
     { "move": ".week-focus-card.week-1 .week-go-resume", "after": 400 },
     { "caption": "Every week starts with a question worth thinking about.", "hold": 2600 },
     { "click": ".week-focus-card.week-1 .week-go-resume", "after": 1300 },
-    { "caption": "Everyone does the same two reading strategies each week. The rubric comes first.", "hold": 3400 },
+    { "caption": "Both books use the same two reading strategies each week. The rubric comes first.", "hold": 3400 },
     { "click": "text=I Understand the Rubric", "after": 1400 },
     { "caption": "One strategy at a time, with a checklist beside the writing. It saves as they type.", "hold": 600 },
     { "type": "#f_summarizer__summary", "text": "Katniss volunteers to take her younger sister's place in the reaping, and the two tributes leave for the Capitol.", "after": 1600 },
-    { "caption": "Then a built-in reading quiz, a group discussion, peer assessment and a reflection.", "hold": 1800 },
+    { "caption": "Then a built-in reading quiz on their book, a group discussion, peer assessment and a reflection.", "hold": 1800 },
     { "move": "#savePrepBtn", "after": 1500 },
     { "as": "teacher", "wait": 2200 },
     { "caption": "The teacher dashboard. Every step of every week is a tile.", "hold": 3200 },
@@ -26,5 +26,5 @@
     { "click": ".lch-bank-chip >> nth=0", "after": 1200, "optional": true },
     { "caption": "Everything saves on its own. Push grades to Canvas when you’re ready.", "hold": 4000 }
   ],
-  "end": { "foot": "Students need their own copy of the novel. Your students’ work stays in your own Google Drive." }
+  "end": { "foot": "Students need their own copy of the book. Your students’ work stays in your own Google Drive." }
 }
